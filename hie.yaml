@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "spl-compiler:lib"
+
+    - path: "./app/Main.hs"
+      component: "spl-compiler:exe:spl-compiler-exe"
+
+    - path: "./app/Paths_spl_compiler.hs"
+      component: "spl-compiler:exe:spl-compiler-exe"
+
+    - path: "./test"
+      component: "spl-compiler:test:spl-compiler-test"
