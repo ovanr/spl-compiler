@@ -14,7 +14,7 @@ import qualified Data.Text.Encoding as TE
 -- this wrapper generates the Alex data type 
 -- which is a state monad with possibility of failure
 -- see the generated file for its definition
--- Alex :: AlexState -> Either String (AlexState, a) }
+-- Alex :: AlexState -> Either String (AlexState, a)
 %wrapper "monadUserState-bytestring"
 
 $digit = 0-9 --digits
