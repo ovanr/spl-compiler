@@ -26,28 +26,58 @@ tokens :-
     -- e.g. if we see */ then we enter the mlc state
     -- and only rules that start with mlc are taken into account
     -- otherwise we are at the default 0 state
-    <mlc> "*/"                          { begin 0 }
-    <mlc> (. # \*)+                     { skip }
-    <mlc> .                             { skip }
-    <mlc> \n                            { skip }
-    <0> "/*"                            { begin mlc }
-    <0> $white+                         { skip }
-    <0> "--".*                          { skip }
-    <0> let                             { \_ _ -> return Let }
-    <0> in                              { \_ _ -> return In }
-    <0> $digit+                         { token (\ai l -> Int . read . T.unpack $ getCurrentToken ai l) }
-    <0> [\=\+\-\*\/\(\)]                { token (\ai l -> Sym . T.head $ getCurrentToken ai l) }
-    <0> $alpha [$alpha $digit \_ \']*   { token (\ai l -> Var $ getCurrentToken ai l ) }
+    <mlc> "*/"                           { begin 0 }
+    <mlc> (. # \*)+                      { skip }
+    <mlc> .                              { skip }
+    <mlc> \n                             { skip }
+    <0> "/*"                             { begin mlc }
+    <0> $white+                          { skip }
+    <0> "--".*                           { skip }
+    <0> let                              { \_ _ -> return Let }
+    <0> in                               { \_ _ -> return In }
+    <0> $digit+                          { token (\ai l -> Int . read . T.unpack $ getCurrentToken ai l) }
+    <0> [\+\-\*\/\%\-\=\!\<\>\&\|\:\[\]] { token (\ai l -> Sym . T.head $ getCurrentToken ai l) }
+    <0> $alpha [$alpha $digit \_ \']*    { token (\ai l -> Var $ getCurrentToken ai l ) }
 
 {
+
 data Token = 
-      Let
-    | In 
-    | Sym Char
+      Keyword
+    | Type 
+    | Symbol
     | Var T.Text
     | Int Int
     | EOF
     deriving (Eq, Show)
+
+data Keyword =
+      Var
+    | Void
+    | If
+    | Else
+    | While
+    | Return
+
+data Type =
+      IntType
+    | BoolType
+    | CharType
+
+-- ; { } 
+data Symbol = 
+      SquareBracketOpen
+    | SquareBracketClosed
+    | BracketOpen
+    | BracketClosed
+    | RightArrow
+    | SingleColon
+    | DoubleColon
+
+data Separator =
+      Semicolon
+    | CurlyBraceOpen
+    | CurlyBraceClosed
+
 
 alexEOF = return EOF
 
