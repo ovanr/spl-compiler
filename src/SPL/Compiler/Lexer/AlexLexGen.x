@@ -1,7 +1,15 @@
 {
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main (main) where
+module SPL.Compiler.Lexer.AlexLexGen 
+    (
+    tokenize, 
+    Token(..), 
+    Symbol(..), 
+    Type(..),
+    Keyword(..), 
+    Separator(..)
+    ) where
 
 import Control.Applicative
 import System.Environment
@@ -33,20 +41,24 @@ tokens :-
     <0> "/*"                             { begin mlc }
     <0> $white+                          { skip }
     <0> "--".*                           { skip }
-    <0> let                              { \_ _ -> return Let }
-    <0> in                               { \_ _ -> return In }
-    <0> $digit+                          { token (\ai l -> Int . read . T.unpack $ getCurrentToken ai l) }
-    <0> [\+\-\*\/\%\-\=\!\<\>\&\|\:\[\]] { token (\ai l -> Sym . T.head $ getCurrentToken ai l) }
-    <0> $alpha [$alpha $digit \_ \']*    { token (\ai l -> Var $ getCurrentToken ai l ) }
+    <0> var                              { \_ _ -> return $ KeywordToken Var }
+    <0> Void                             { \_ _ -> return $ KeywordToken Void }
+    <0> if                               { \_ _ -> return $ KeywordToken If }
+    <0> else                             { \_ _ -> return $ KeywordToken Else }
+    <0> while                            { \_ _ -> return $ KeywordToken While }
+    <0> return                           { \_ _ -> return $ KeywordToken Return }
+    <0> $digit+                          { token (\ai l -> IntToken . read . T.unpack $ getCurrentToken ai l) }
+--    <0> [\+\-\*\/\%\-\=\!\<\>\&\|\:\[\]] { token (\ai l -> Sym . T.head $ getCurrentToken ai l) }
+    <0> $alpha [$alpha $digit \_ \']*    { token (\ai l -> IdentifierToken $ getCurrentToken ai l ) }
 
 {
 
 data Token = 
-      Keyword
-    | Type 
-    | Symbol
-    | Var T.Text
-    | Int Int
+      KeywordToken Keyword
+    | TypeToken Type 
+    | SymToken Symbol
+    | IdentifierToken T.Text
+    | IntToken Int
     | EOF
     deriving (Eq, Show)
 
@@ -57,13 +69,14 @@ data Keyword =
     | Else
     | While
     | Return
+    deriving (Eq, Show)
 
 data Type =
       IntType
     | BoolType
     | CharType
+    deriving (Eq, Show)
 
--- ; { } 
 data Symbol = 
       SquareBracketOpen
     | SquareBracketClosed
@@ -72,11 +85,15 @@ data Symbol =
     | RightArrow
     | SingleColon
     | DoubleColon
+    | Separator
+    deriving (Eq, Show)
 
+-- ; { } 
 data Separator =
       Semicolon
     | CurlyBraceOpen
     | CurlyBraceClosed
+    deriving (Eq, Show)
 
 
 alexEOF = return EOF
@@ -109,23 +126,6 @@ data AlexUserState = AlexUserState {
     contents :: B.ByteString 
 }
 
--- Runner of the lexer.
--- Takes the filepath and its contents
--- and returns a failure message or a list of tokens
-runAlex' :: FilePath -> B.ByteString -> Either T.Text [Token]
-runAlex' fp input = 
-    case (unAlex getAllResults) state of
-        Left msg -> Left . T.pack $ msg
-        Right ( _, a ) -> Right a
-    where
-        state = AlexState { 
-            alex_bpos = 0, 
-            alex_pos  = alexStartPos, 
-            alex_inp  = input, 
-            alex_chr  = '\n', 
-            alex_ust = AlexUserState fp input, 
-            alex_scd = 0 
-        } 
 
 -- Parse a single token.
 -- Identical to generated alexMonadScan function
@@ -173,12 +173,30 @@ alexGetContent =
 -- Note that we don't use that function thus it can be left undefined
 alexInitUserState = undefined
 
+-- Runner of the lexer.
+-- Takes the filepath and its contents
+-- and returns a failure message or a list of tokens
+tokenize :: FilePath -> B.ByteString -> Either T.Text [Token]
+tokenize fp input = 
+    case (unAlex getAllResults) state of
+        Left msg -> Left . T.pack $ msg
+        Right ( _, a ) -> Right a
+    where
+        state = AlexState { 
+            alex_bpos = 0, 
+            alex_pos  = alexStartPos, 
+            alex_inp  = input, 
+            alex_chr  = '\n', 
+            alex_ust = AlexUserState fp input, 
+            alex_scd = 0 
+        } 
+
 -- Parse the file given by the first cli argument 
 main = do
     args <- getArgs
     let file = head args
     s <- B.readFile file
-    case (runAlex' file s) of
+    case (tokenize file s) of
         Left err -> TIO.putStr err
         Right tokens -> print tokens
 }

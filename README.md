@@ -9,10 +9,7 @@ Make sure you have stack installed
 
 ## Running the lexer generator
 
-1. `cd src`
-2. `alex grammar.x`
+1. `cd src/SPL/Compiler/Lexer`
+2. `alex AlexLex.x -o AlexLexGen.hs `
 
-You should now see the generated `grammar.hs` file.
-
-
-
+You should now see the generated `AlexLex.hs` file.
