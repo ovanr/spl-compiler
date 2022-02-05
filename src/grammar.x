@@ -73,6 +73,8 @@ data Symbol =
     | BracketClosed
     | RightArrow
     | DoubleColon
+    | Comma
+    | Dot
 
 data Operator =
       Plus
