@@ -45,14 +45,15 @@ data Token =
       Keyword
     | Type 
     | Symbol
+    | Operator
     | Var T.Text
     | Int Int
+    | Id String
     | EOF
     deriving (Eq, Show)
 
 data Keyword =
       Var
-    | Void
     | If
     | Else
     | While
@@ -62,6 +63,7 @@ data Type =
       IntType
     | BoolType
     | CharType
+    | VoidType
 
 -- ; { } 
 data Symbol = 
@@ -70,8 +72,25 @@ data Symbol =
     | BracketOpen
     | BracketClosed
     | RightArrow
-    | SingleColon
     | DoubleColon
+
+data Operator =
+      Plus
+    | Minus
+    | Star
+    | Percent
+    | Equal
+    | DoubleEqual
+    | Less
+    | Greater
+    | LessOrEqual
+    | GreaterOrEqual
+    | NotEqual
+    | DoubleAnd
+    | DoublePipe
+    | SingleColon
+    | ExclamationMark
+
 
 data Separator =
       Semicolon
