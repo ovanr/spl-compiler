@@ -8,7 +8,8 @@ module SPL.Compiler.Lexer.AlexLexGen
     Symbol(..), 
     Type(..),
     Keyword(..), 
-    Separator(..)
+    Separator(..),
+    Operator(..)
     ) where
 
 import Control.Applicative
@@ -42,7 +43,7 @@ tokens :-
     <0> $white+                          { skip }
     <0> "--".*                           { skip }
     <0> var                              { \_ _ -> return $ KeywordToken Var }
-    <0> Void                             { \_ _ -> return $ KeywordToken Void }
+    <0> Void                             { \_ _ -> return $ TypeToken VoidType }
     <0> if                               { \_ _ -> return $ KeywordToken If }
     <0> else                             { \_ _ -> return $ KeywordToken Else }
     <0> while                            { \_ _ -> return $ KeywordToken While }
@@ -55,16 +56,16 @@ tokens :-
 
 data Token = 
       KeywordToken Keyword
-    | TypeToken Type 
-    | SymToken Symbol
-    | IdentifierToken T.Text
+    | TypeToken Type
+    | SymbolToken Symbol
+    | OperatorToken Operator
     | IntToken Int
+    | IdentifierToken T.Text
     | EOF
     deriving (Eq, Show)
 
 data Keyword =
       Var
-    | Void
     | If
     | Else
     | While
@@ -75,6 +76,7 @@ data Type =
       IntType
     | BoolType
     | CharType
+    | VoidType
     deriving (Eq, Show)
 
 data Symbol = 
@@ -83,9 +85,28 @@ data Symbol =
     | BracketOpen
     | BracketClosed
     | RightArrow
-    | SingleColon
     | DoubleColon
     | Separator
+    | Comma
+    | Dot
+    deriving (Eq, Show)
+
+data Operator =
+      Plus
+    | Minus
+    | Star
+    | Percent
+    | Equal
+    | DoubleEqual
+    | Less
+    | Greater
+    | LessOrEqual
+    | GreaterOrEqual
+    | NotEqual
+    | DoubleAnd
+    | DoublePipe
+    | SingleColon
+    | ExclamationMark
     deriving (Eq, Show)
 
 -- ; { } 

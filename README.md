@@ -10,6 +10,10 @@ Make sure you have stack installed
 ## Running the lexer generator
 
 1. `cd src/SPL/Compiler/Lexer`
-2. `alex AlexLex.x -o AlexLexGen.hs `
+2. `alex AlexLexGen.x -o AlexLexGen.hs `
 
 You should now see the generated `AlexLex.hs` file.
+
+## Running the tests
+
+`stack test`
