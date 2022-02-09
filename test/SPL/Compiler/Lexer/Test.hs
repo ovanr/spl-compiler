@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module SPL.Compiler.Lexer.Test (htf_SPL_Compiler_Lexer_Test_thisModulesTests) where
+module SPL.Compiler.Lexer.Test (htf_thisModulesTests) where
 
 import Test.Framework
 import SPL.Compiler.Lexer.AlexLexGen (tokenize, Token(..), Keyword(..))

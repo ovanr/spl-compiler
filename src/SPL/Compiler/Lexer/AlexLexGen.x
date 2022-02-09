@@ -5,11 +5,8 @@ module SPL.Compiler.Lexer.AlexLexGen
     (
     tokenize, 
     Token(..), 
-    Symbol(..), 
     Type(..),
     Keyword(..), 
-    Separator(..),
-    Operator(..)
     ) where
 
 import Control.Applicative
@@ -19,6 +16,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 }
+
+-- TODO: support nestsed nested block-comments
 
 -- this wrapper generates the Alex data type 
 -- which is a state monad with possibility of failure
@@ -59,52 +58,21 @@ tokens :-
     <0> "Int"                            { \_ _ -> return $ TypeToken IntType }
 
     -- symbols
-    <0> "["                              { \_ _ -> return $ SymbolToken SquareBracketOpen}
-    <0> "]"                              { \_ _ -> return $ SymbolToken SquareBracketClosed}
-    <0> "("                              { \_ _ -> return $ SymbolToken BracketOpen}
-    <0> ")"                              { \_ _ -> return $ SymbolToken BracketClosed}
-    <0> "->"                             { \_ _ -> return $ SymbolToken RightArrow}
-    <0> "::"                             { \_ _ -> return $ SymbolToken DoubleColon}
-    <0> ","                              { \_ _ -> return $ SymbolToken Comma}
-    <0> "."                              { \_ _ -> return $ SymbolToken Dot}
-
-    -- separator
-    <0> ";"                              { \_ _ -> return $ SeparatorToken Semicolon}
-    <0> "{"                              { \_ _ -> return $ SeparatorToken CurlyBraceOpen}
-    <0> "}"                              { \_ _ -> return $ SeparatorToken CurlyBraceClosed}
-
-    -- operator
-    <0> "+"                              { \_ _ -> return $ OperatorToken Plus}
-    <0> "-"                              { \_ _ -> return $ OperatorToken Minus}
-    <0> "*"                              { \_ _ -> return $ OperatorToken Star}
-    <0> "/"                              { \_ _ -> return $ OperatorToken Slash}
-    <0> "%"                              { \_ _ -> return $ OperatorToken Percent}
-    <0> "="                              { \_ _ -> return $ OperatorToken Equal}
-    <0> "=="                             { \_ _ -> return $ OperatorToken DoubleEqual}
-    <0> "<"                              { \_ _ -> return $ OperatorToken Less}
-    <0> ">"                              { \_ _ -> return $ OperatorToken Greater}
-    <0> "<="                             { \_ _ -> return $ OperatorToken LessOrEqual}
-    <0> ">="                             { \_ _ -> return $ OperatorToken GreaterOrEqual}
-    <0> "!="                             { \_ _ -> return $ OperatorToken NotEqual}
-    <0> "&&"                             { \_ _ -> return $ OperatorToken DoubleAnd}
-    <0> "||"                             { \_ _ -> return $ OperatorToken DoublePipe}
-    <0> ":"                              { \_ _ -> return $ OperatorToken SingleColon}
-    <0> "!"                              { \_ _ -> return $ OperatorToken ExclamationMark}
+    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len ) }
 
     -- int
-    <0> "-"?$digit+                      { token (\ai l -> IntToken . read . T.unpack $ getCurrentToken ai l) }
+    <0> $digit+                          { token (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len) }
 
     -- id
-    <0> $alpha [$alpha $digit \_ \']*    { token (\ai l -> IdentifierToken $ getCurrentToken ai l ) }
+    <0> $alpha [$alpha $digit \_ \']*    { token (\ctx len -> IdentifierToken $ getCurrentToken ctx len ) }
 
 {
+
 
 data Token = 
       KeywordToken Keyword
     | TypeToken Type
-    | SymbolToken Symbol
-    | SeparatorToken Separator
-    | OperatorToken Operator
+    | SymbolToken Char
     | IntToken Int
     | IdentifierToken T.Text
     | EOF
@@ -124,44 +92,6 @@ data Type =
     | CharType
     | VoidType
     deriving (Eq, Show)
-
-data Symbol = 
-      SquareBracketOpen
-    | SquareBracketClosed
-    | BracketOpen
-    | BracketClosed
-    | RightArrow
-    | DoubleColon
-    | Comma
-    | Dot
-    deriving (Eq, Show)
-
--- ; { } 
-data Separator =
-      Semicolon
-    | CurlyBraceOpen
-    | CurlyBraceClosed
-    deriving (Eq, Show)
-
-data Operator =
-      Plus
-    | Minus
-    | Star
-    | Slash
-    | Percent
-    | Equal
-    | DoubleEqual
-    | Less
-    | Greater
-    | LessOrEqual
-    | GreaterOrEqual
-    | NotEqual
-    | DoubleAnd
-    | DoublePipe
-    | SingleColon
-    | ExclamationMark
-    deriving (Eq, Show)
-
 
 alexEOF = return EOF
 

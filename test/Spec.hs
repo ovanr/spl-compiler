@@ -3,6 +3,7 @@
 
 import Test.Framework
 import {-@ HTF_TESTS @-} SPL.Compiler.Lexer.Test
+import {-@ HTF_TESTS @-} SPL.Compiler.Parser.Test
 
 main :: IO ()
 main = htfMain htf_importedTests
