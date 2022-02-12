@@ -4688,11 +4688,15 @@ alex_actions = array (0 :: Int, 16)
 
 
 -- produce Token with position
-produceToken = \f ctx len -> MkToken $ getCurrentPosn ctx $ f ctx len
+produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
+produceToken f ctx len = MkToken $ getCurrentPosn ctx $ f ctx len
 
 
 
-data Token = MkToken AlexPosn SPLToken
+data Token =
+      MkToken AlexPosn SPLToken
+    | EOF
+    deriving (Eq, Show)
 
 data SPLToken = 
       KeywordToken Keyword
@@ -4700,7 +4704,6 @@ data SPLToken =
     | SymbolToken Char
     | IntToken Int
     | IdentifierToken T.Text
-    | EOF
     deriving (Eq, Show)
 
 data Keyword =

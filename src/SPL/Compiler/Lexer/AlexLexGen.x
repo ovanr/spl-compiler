@@ -59,22 +59,26 @@ tokens :-
     <0> "Int"                            { return $ produceToken (\_ _ -> TypeToken IntType) }
 
     -- symbols
-    --<0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token $ produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len ) }
+    --<0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
     -- int
-    --<0> $digit+                          { token $ produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len) }
+    --<0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
 
     -- id
-    --<0> $alpha [$alpha $digit \_ \']*    { token $ prdouceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len ) }
+    --<0> $alpha [$alpha $digit \_ \']*    { token (prdouceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
 
 {
 
 -- produce Token with position
-produceToken = \f ctx len -> MkToken $ getCurrentPosn ctx $ f ctx len
+produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
+produceToken f ctx len = MkToken $ getCurrentPosn ctx $ f ctx len
 
 
 
-data Token = MkToken AlexPosn SPLToken
+data Token =
+      MkToken AlexPosn SPLToken
+    | EOF
+    deriving (Eq, Show)
 
 data SPLToken = 
       KeywordToken Keyword
@@ -82,7 +86,6 @@ data SPLToken =
     | SymbolToken Char
     | IntToken Int
     | IdentifierToken T.Text
-    | EOF
     deriving (Eq, Show)
 
 data Keyword =
