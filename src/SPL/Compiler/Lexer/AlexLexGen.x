@@ -71,7 +71,7 @@ tokens :-
 
 -- produce Token with position
 produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
-produceToken f ctx len = MkToken $ getCurrentPosn ctx $ f ctx len
+produceToken f ctx len = MkToken (getCurrentPosn ctx) (f ctx len)
 
 
 
