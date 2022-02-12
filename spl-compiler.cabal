@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
       SPL.Compiler.Lexer.AlexLexGen
-      SPL.Compiler.Parser.ParserCombinator
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -60,7 +59,6 @@ test-suite spl-compiler-test
   main-is: Spec.hs
   other-modules:
       SPL.Compiler.Lexer.Test
-      SPL.Compiler.Parser.Test
       Paths_spl_compiler
   hs-source-dirs:
       test
