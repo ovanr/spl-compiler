@@ -4,23 +4,13 @@
 module SPL.Compiler.Parser.ParserCombinator where
 
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), Keyword(..), Type(..))
+import SPL.Compiler.Parser.AST (ASTType(..), toASTType)
 import Data.Functor (($>))
 import qualified Data.Text as T
 import Control.Applicative
 import Data.Maybe (maybeToList)
 
 newtype Parser s a = Parser { runParser :: [s] -> [(a, [s])] }
-
-data ASTType =
-        ASTFunType [ASTType]
-    |   ASTTupleType ASTType ASTType
-    |   ASTListType ASTType
-    |   ASTVarType T.Text
-    |   ASTIntType
-    |   ASTBoolType
-    |   ASTCharType
-    |   ASTVoidType
-    deriving (Eq, Show)
 
 instance Functor (Parser s) where
     fmap :: (a -> b) -> Parser s a -> Parser s b
@@ -88,11 +78,21 @@ pIdentifier =
                 (IdentifierToken _) -> True
                 _ -> False
 
-toASTType :: Type -> ASTType
-toASTType VoidType = ASTVoidType
-toASTType IntType = ASTIntType
-toASTType BoolType = ASTBoolType
-toASTType CharType = ASTCharType
+pIsSymbol :: Char -> Parser Token Token
+pIsSymbol c =
+    satisfy $ \case
+                (SymbolToken c2) | c == c2 -> True
+                _ -> False
+
+pTwice :: Parser s a -> Parser s [a]
+pTwice p = p <:> (pure <$> p)
+
+pMaybe :: Parser s a -> Parser s (Maybe a)
+pMaybe p = (Just <$> p) <<|> pure Nothing
+
+-- note that: (someParser $> a) == someParser *> pure a 
+pArrow :: Parser Token ()
+pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
 
 pBasicType :: Parser Token ASTType
 pBasicType =
@@ -109,24 +109,8 @@ pVoidType =
                         (TypeToken VoidType) -> True
                         _ -> False)
 
-pIsSymbol :: Char -> Parser Token Token
-pIsSymbol c =
-    satisfy $ \case
-                (SymbolToken c2) | c == c2 -> True
-                _ -> False
-
 pFargs :: Parser Token [Token]
 pFargs = many' (pIdentifier <* pIsSymbol ',') <++> (pure <$> pIdentifier)
-
-pTwice :: Parser s a -> Parser s [a]
-pTwice p = p <:> (pure <$> p)
-
-pMaybe :: Parser s a -> Parser s (Maybe a)
-pMaybe p = (Just <$> p) <<|> pure Nothing
-
--- note that: (someParser $> a) == someParser *> pure a 
-pArrow :: Parser Token ()
-pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
 
 pType :: Parser Token ASTType
 pType = pBasicType
