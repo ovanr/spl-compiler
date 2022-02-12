@@ -46,26 +46,26 @@ tokens :-
     <0> "//".*                           { skip }
 
     -- keywords
-    <0> "var"                            { return $ produceToken (\_ _ -> KeywordToken Var) }
-    <0> "if"                             { return $ produceToken (\_ _ -> KeywordToken If) }
-    <0> "else"                           { return $ produceToken (\_ _ -> KeywordToken Else) }
-    <0> "while"                          { return $ produceToken (\_ _ -> KeywordToken While) }
-    <0> "return"                         { return $ produceToken (\_ _ -> KeywordToken Return)}
+    <0> "var"                            { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Var) ctx len}
+    <0> "if"                             { \ctx len -> return $ produceToken (\_ _ -> KeywordToken If) ctx len}
+    <0> "else"                           { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Else) ctx len}
+    <0> "while"                          { \ctx len -> return $ produceToken (\_ _ -> KeywordToken While) ctx len}
+    <0> "return"                         { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Return)ctx len}
 
     -- types
-    <0> "Void"                           { return $ produceToken (\_ _ -> TypeToken VoidType) }
-    <0> "Char"                           { return $ produceToken (\_ _ -> TypeToken CharType) }
-    <0> "Bool"                           { return $ produceToken (\_ _ -> TypeToken BoolType) }
-    <0> "Int"                            { return $ produceToken (\_ _ -> TypeToken IntType) }
+    <0> "Void"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken VoidType) ctx len}
+    <0> "Char"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken CharType) ctx len}
+    <0> "Bool"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken BoolType) ctx len}
+    <0> "Int"                            { \ctx len -> return $ produceToken (\_ _ -> TypeToken IntType) ctx len}
 
     -- symbols
-    --<0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
+    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
     -- int
-    --<0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
+    <0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
 
     -- id
-    --<0> $alpha [$alpha $digit \_ \']*    { token (prdouceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
+    <0> $alpha [$alpha $digit \_ \']*    { token (produceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
 
 {
 
