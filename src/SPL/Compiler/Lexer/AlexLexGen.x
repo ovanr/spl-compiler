@@ -8,6 +8,7 @@ module SPL.Compiler.Lexer.AlexLexGen
     SPLToken(..), 
     Type(..),
     Keyword(..), 
+    AlexPosn(..),
     ) where
 
 import Control.Applicative

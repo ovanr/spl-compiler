@@ -10,6 +10,7 @@ module SPL.Compiler.Lexer.AlexLexGen
     SPLToken(..), 
     Type(..),
     Keyword(..), 
+    AlexPosn(..),
     ) where
 
 import Control.Applicative
@@ -10407,7 +10408,7 @@ alex_actions = array (0 :: Int, 45)
   , (0,alex_action_2)
   ]
 
-{-# LINE 70 "AlexLexGen.x" #-}
+{-# LINE 71 "AlexLexGen.x" #-}
 -- produce Token with position
 produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
 produceToken f ctx len = MkToken (getCurrentPosn ctx) (f ctx len)

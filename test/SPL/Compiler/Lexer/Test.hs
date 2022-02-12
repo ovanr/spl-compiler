@@ -9,7 +9,7 @@ module SPL.Compiler.Lexer.Test (htf_thisModulesTests) where
 
 
 import Test.Framework
-import SPL.Compiler.Lexer.AlexLexGen (tokenize, Token(..), Keyword(..), SPLToken(..), Type(..))
+import SPL.Compiler.Lexer.AlexLexGen (tokenize, Token(..), Keyword(..), SPLToken(..), Type(..), AlexPosn(..))
 import qualified Data.ByteString.Lazy as B
 
 
