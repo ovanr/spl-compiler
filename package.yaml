@@ -25,6 +25,7 @@ dependencies:
 - bytestring
 - text
 - HTF
+- lens
 
 library:
   source-dirs: src

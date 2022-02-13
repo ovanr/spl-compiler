@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       SPL.Compiler.Lexer.AlexLexGen
+      SPL.Compiler.Parser.AST
       SPL.Compiler.Parser.ParserCombinator
   other-modules:
       Paths_spl_compiler
@@ -36,6 +37,7 @@ library
     , array
     , base >=4.7 && <5
     , bytestring
+    , lens
     , text
   default-language: Haskell2010
 
@@ -51,6 +53,7 @@ executable spl-compiler-exe
     , array
     , base >=4.7 && <5
     , bytestring
+    , lens
     , spl-compiler
     , text
   default-language: Haskell2010
@@ -70,6 +73,7 @@ test-suite spl-compiler-test
     , array
     , base >=4.7 && <5
     , bytestring
+    , lens
     , spl-compiler
     , text
   default-language: Haskell2010

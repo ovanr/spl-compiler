@@ -2,20 +2,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module SPL.Compiler.Parser.Test (htf_thisModulesTests) where
 
 import Test.Framework
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), Type(..), Keyword(..))
-import SPL.Compiler.Parser.ParserCombinator (Parser(..), ASTType(..), pType, pFargs, pFunType)
+import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), pType, pFargs, pFunType)
+import SPL.Compiler.Parser.AST (ASTType(..))
 import qualified Data.ByteString.Lazy as B
+import Data.Text (Text)
 import Control.Monad (forM_)
+import Control.Applicative ((<|>))
 
+executeMultipleTests :: (Eq b, Show b) => Parser Token Text b -> [([Token], Maybe b)] -> IO ()
 executeMultipleTests parser tests = 
-    forM_ tests $ \(input, expected) ->
+    forM_ tests $ \(input, expected) -> do
+        let actual = runParser parser (ParserState 0 input)
         case expected of
-            Just value -> assertEqual (runParser parser input) [(value,[])]
-            _ -> assertEmpty (runParser parser input) 
+            Just value -> assertEqual actual [Right (value, ParserState (length input) [])]
+            _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 input))
 
 -- Shorthand operator to create an (input, expected output) pair
 infixl 1 -->
@@ -34,7 +40,8 @@ test_parse_type = do
             [SymbolToken '(', IdentifierToken "b", SymbolToken ',', TypeToken IntType, SymbolToken ')'] 
                 --> ASTTupleType (ASTVarType "b") ASTIntType,
             [SymbolToken '[', IdentifierToken "b", SymbolToken ']'] --> ASTListType (ASTVarType "b"),
-            failure [SymbolToken '[', IdentifierToken "b", TypeToken IntType, SymbolToken ']']
+            failure [SymbolToken '[', IdentifierToken "b", TypeToken IntType, SymbolToken ']'],
+            failure [SymbolToken '(', IdentifierToken "b", TypeToken IntType, SymbolToken ')']
             ]
     executeMultipleTests pType tests
 
