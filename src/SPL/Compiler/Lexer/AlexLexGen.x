@@ -71,6 +71,8 @@ tokens :-
     -- id
     <0> $alpha [$alpha $digit \_ \']*    { token (produceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
 
+    -- character
+    <0> \'.\'                            { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
 {
 
 -- token :: (AlexInput -> Int64 -> token) -> AlexAction token
@@ -89,6 +91,7 @@ data SPLToken =
     | TypeToken Type
     | SymbolToken Char
     | IntToken Int
+    | CharToken Char
     | IdentifierToken T.Text
     deriving (Eq, Show)
 

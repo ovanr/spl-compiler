@@ -29,3 +29,15 @@ test_tokenize_multi_line_comment = do
                     EOF]
     
     assertEqual actual (Right expected)
+
+test_tokenize_characters = do
+    actual <- tokenize_file "test/SPL/Compiler/Lexer/characters.spl"
+    let expected = [MkToken (AlexPn 1 1 2) (IdentifierToken "in"),
+                    MkToken (AlexPn 4 1 5) (CharToken 'o'),
+                    MkToken (AlexPn 10 2 2) (IdentifierToken "then"),
+                    MkToken (AlexPn 15 2 7) (IdentifierToken "how"),
+                    MkToken (AlexPn 20 3 2) (IdentifierToken "about"),
+                    MkToken (AlexPn 26 3 8) (CharToken '\\'), 
+                    EOF]    
+
+    assertEqual actual (Right expected)
