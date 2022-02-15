@@ -4,9 +4,11 @@
 module SPL.Compiler.Lexer.AlexLexGen 
     (
     tokenize, 
-    Token(..), 
+    Token(..),
+    SPLToken(..), 
     Type(..),
     Keyword(..), 
+    AlexPosn(..),
     ) where
 
 import Control.Applicative
@@ -45,37 +47,46 @@ tokens :-
     <0> "//".*                           { skip }
 
     -- keywords
-    <0> "var"                            { \_ _ -> return $ KeywordToken Var }
-    <0> "if"                             { \_ _ -> return $ KeywordToken If }
-    <0> "else"                           { \_ _ -> return $ KeywordToken Else }
-    <0> "while"                          { \_ _ -> return $ KeywordToken While }
-    <0> "return"                         { \_ _ -> return $ KeywordToken Return }
+    <0> "var"                            { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Var) ctx len}
+    <0> "if"                             { \ctx len -> return $ produceToken (\_ _ -> KeywordToken If) ctx len}
+    <0> "else"                           { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Else) ctx len}
+    <0> "while"                          { \ctx len -> return $ produceToken (\_ _ -> KeywordToken While) ctx len}
+    <0> "return"                         { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Return)ctx len}
 
     -- types
-    <0> "Void"                           { \_ _ -> return $ TypeToken VoidType }
-    <0> "Char"                           { \_ _ -> return $ TypeToken CharType }
-    <0> "Bool"                           { \_ _ -> return $ TypeToken BoolType }
-    <0> "Int"                            { \_ _ -> return $ TypeToken IntType }
+    <0> "Void"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken VoidType) ctx len}
+    <0> "Char"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken CharType) ctx len}
+    <0> "Bool"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken BoolType) ctx len}
+    <0> "Int"                            { \ctx len -> return $ produceToken (\_ _ -> TypeToken IntType) ctx len}
 
     -- symbols
-    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len ) }
+    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
     -- int
-    <0> $digit+                          { token (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len) }
+    <0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
 
     -- id
-    <0> $alpha [$alpha $digit \_ \']*    { token (\ctx len -> IdentifierToken $ getCurrentToken ctx len ) }
+    <0> $alpha [$alpha $digit \_ \']*    { token (produceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
 
 {
 
+-- produce Token with position
+produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
+produceToken f ctx len = MkToken (getCurrentPosn ctx) (f ctx len)
 
-data Token = 
+
+
+data Token =
+      MkToken AlexPosn SPLToken
+    | EOF
+    deriving (Eq, Show)
+
+data SPLToken = 
       KeywordToken Keyword
     | TypeToken Type
     | SymbolToken Char
     | IntToken Int
     | IdentifierToken T.Text
-    | EOF
     deriving (Eq, Show)
 
 data Keyword =
@@ -102,6 +113,9 @@ lazyBStoText = TE.decodeUtf8 . B.toStrict
 -- Get the current parsed token as T.Text
 getCurrentToken :: AlexInput -> Int64 -> T.Text
 getCurrentToken (_,_,s,_) l = T.take (fromIntegral l) $ lazyBStoText s
+
+getCurrentPosn :: AlexInput -> AlexPosn
+getCurrentPosn (pos,_,_,_) = pos
 
 -- Retrieve all tokens.
 -- Note that failures are automatically captured by the Alex monad instance.
