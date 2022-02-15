@@ -15,6 +15,12 @@
 
 image: haskell:8
 
+cache:
+  paths:
+    - .stack
+    - .stack-work
+    - target
+
 stages:          # List of stages for jobs, and their order of execution
   - test
 
