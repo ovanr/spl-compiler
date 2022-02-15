@@ -5,7 +5,7 @@ module SPL.Compiler.Parser.AST
         toASTType
     ) where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), Keyword(..), Type(..))
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..))
 import qualified Data.Text as T
 
 data ASTType =

@@ -59,6 +59,9 @@ tokens :-
     <0> "Bool"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken BoolType) ctx len}
     <0> "Int"                            { \ctx len -> return $ produceToken (\_ _ -> TypeToken IntType) ctx len}
 
+    -- `token` function simply takes passes the lexer context and token length
+    -- to the function given and liftes the result to AlexAction
+
     -- symbols
     <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
@@ -70,11 +73,11 @@ tokens :-
 
 {
 
+-- token :: (AlexInput -> Int64 -> token) -> AlexAction token
+
 -- produce Token with position
 produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
 produceToken f ctx len = MkToken (getCurrentPosn ctx) (f ctx len)
-
-
 
 data Token =
       MkToken AlexPosn SPLToken

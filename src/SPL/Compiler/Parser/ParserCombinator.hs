@@ -4,7 +4,7 @@
 
 module SPL.Compiler.Parser.ParserCombinator where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), Keyword(..), Type(..))
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..))
 import SPL.Compiler.Parser.AST (ASTType(..), toASTType)
 import Control.Applicative
 import Control.Lens ((%~), _1, _Left, _Right, traversed, folded, maximumOf)
@@ -115,7 +115,7 @@ many' fa = some' fa <<|> pure []
 pIdentifier :: Parser Token T.Text Token
 pIdentifier =
     satisfy (\case
-                (IdentifierToken _) -> True
+                (MkToken _ (IdentifierToken _)) -> True
                 _ -> False
     ) <<|> pError (\case
         (ParserState _ (s:_)) ->
@@ -127,7 +127,7 @@ pIdentifier =
 pIsSymbol :: Char -> Parser Token Text Token
 pIsSymbol c =
     satisfy ( \case
-                (SymbolToken c2) | c == c2 -> True
+                (MkToken _ (SymbolToken c2)) | c == c2 -> True
                 _ -> False
     ) <<|> pError (\case
         (ParserState _ (s:_)) ->
@@ -164,10 +164,10 @@ pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
 
 pBasicType :: Parser Token Text ASTType
 pBasicType =
-    (\(TypeToken t) -> toASTType t) <$>
+    (\(MkToken _ (TypeToken t)) -> toASTType t) <$>
             satisfy (\case
-                        (TypeToken VoidType) -> False
-                        (TypeToken _) -> True
+                        (MkToken _ (TypeToken VoidType)) -> False
+                        (MkToken _ (TypeToken _)) -> True
                         _ -> False)
     <<|> pError (\case
         (ParserState _ (s:_)) ->
@@ -179,9 +179,9 @@ pBasicType =
 
 pVoidType :: Parser Token e ASTType
 pVoidType =
-    (\(TypeToken t) -> toASTType t) <$>
+    (\(MkToken _ (TypeToken t)) -> toASTType t) <$>
             satisfy (\case
-                        (TypeToken VoidType) -> True
+                        (MkToken _ (TypeToken VoidType)) -> True
                         _ -> False)
 
 pFargs :: Parser Token Text [Token]
@@ -189,7 +189,7 @@ pFargs = many' (pIdentifier <* pIsSymbol ',') <++> (pure <$> pIdentifier)
 
 pType :: Parser Token Text ASTType
 pType = pBasicType
-        <<|> ((\(IdentifierToken v) -> ASTVarType v) <$> pIdentifier)
+        <<|> ((\(MkToken _ (IdentifierToken v)) -> ASTVarType v) <$> pIdentifier)
         <<|> tupError (liftA2 ASTTupleType (pIsSymbol '(' *> pType) (pIsSymbol ',' *> pType <* pIsSymbol ')'))
         <<|> listError (ASTListType <$> (pIsSymbol '[' *> pType <* pIsSymbol ']'))
     where
