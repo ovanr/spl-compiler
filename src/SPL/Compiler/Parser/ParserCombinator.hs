@@ -4,13 +4,14 @@
 
 module SPL.Compiler.Parser.ParserCombinator where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..))
-import SPL.Compiler.Parser.AST (ASTType(..), toASTType)
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..), AlexPosn(..))
+import SPL.Compiler.Parser.AST
 import Control.Applicative
-import Control.Lens ((%~), _1, _Left, _Right, traversed, folded, maximumOf)
+import Control.Lens ((%~), _1, _2, _Left, _Right, traversed, folded, maximumOf)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Functor (($>))
+import Data.Function ((&))
 import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, listToMaybe)
 
@@ -112,6 +113,94 @@ some' fa = (:) <$> fa <*> (some' fa <<|> pure [])
 many' :: Parser s e a -> Parser s e [a]
 many' fa = some' fa <<|> pure []
 
+pTwice :: Parser s e a -> Parser s e [a]
+pTwice p = p <:> (pure <$> p)
+
+pMaybe :: Parser s e a -> Parser s e (Maybe a)
+pMaybe p = (Just <$> p) <<|> pure Nothing
+
+pError :: (ParserState s -> e) -> Parser s e a
+pError err = Parser $ \s@(ParserState cnt _) -> [Left (Error cnt (err s))]
+
+pWrapErrors :: Semigroup e => (ParserState s -> e) -> Parser s e a -> Parser s e a
+pWrapErrors err p =
+    Parser $ \s ->
+        let xs = runParser p s in
+            traversed . _Left %~ (\(Error i e) -> Error i $ err s <> e) $ xs
+
+
+-- Parse sentences of the following format in a left associative way: 
+-- p (`op` p)* => (p `op` (p `op` (p `op` p)))
+pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
+pChainl op p = foldl (&) <$> p <*> many (flip <$> op <*> p)
+
+-- Parse sentences of the following format in a right associative way: 
+-- p (`op` p)* => (((p `op` p) `op` p) `op` p)
+pChainr :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
+pChainr op p = (&) <$> p <*> (flip <$> op <*> pChainr op p) <<|> p
+
+-------------------------------------------------------------------
+
+pParens :: Parser Token Text a -> Parser Token Text a
+pParens p = pIsSymbol '(' *> p <* pIsSymbol ')'
+
+pBinOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr -> ASTExpr)
+pBinOp op =     foldl1 (*>) (map pIsSymbol op)
+            $>
+                (\e1 e2 -> Op2Expr (EntityLoc (getStartLoc e1) (getEndLoc e2)) e1 (getOperator op) e2)
+    where
+        getOperator "+" = Plus
+        getOperator "-" = Minus
+        getOperator "*" = Mul
+        getOperator "/" = Div
+        getOperator "%" = Mod
+        getOperator "^" = Pow
+        getOperator "==" = Equal
+        getOperator "<" = Less
+        getOperator ">" = Greater
+        getOperator "<=" = LessEq
+        getOperator ">=" = GreaterEq
+        getOperator "!=" = Nequal
+        getOperator "&&" = LogAnd
+        getOperator "||" = LogOr
+        getOperator _ = error "Binary operator not defined"
+
+pUnaryOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr)
+pUnaryOp "!" = pIsSymbol '!' $> (\e1 -> OpExpr (EntityLoc (getStartLoc e1) (getEndLoc e1)) UnNeg e1)
+pUnaryOp "-" = pIsSymbol '-' $> (\e1 -> OpExpr (EntityLoc (getStartLoc e1) (getEndLoc e1)) UnMinus e1)
+pUnaryOp _ = error "Unary operator not defined"
+
+pExpr :: Parser Token Text ASTExpr
+pExpr = foldr ($) baseExpr
+        [ 
+          pChainl (pBinOp "||")
+        , pChainl (pBinOp "&&")
+        , pChainl (pBinOp "==" <|> pBinOp "!=")
+        , pChainl (pBinOp "<=" <|> pBinOp ">=" <|> pBinOp "<" <|> pBinOp ">")
+        , pChainl (pBinOp "+" <|> pBinOp "-")
+        , pChainl (pBinOp "*" <|> pBinOp "/" <|> pBinOp "%")
+        ]
+
+    where
+        baseExpr = pParens pExpr
+                   <<|> pUnaryOp "-" <*> pExpr
+                   <<|> pUnaryOp "!" <*> pExpr
+                   <<|> pIntExpr
+                   <<|> pBoolExpr
+                   <<|> pFunCallExpr
+                   <<|> pEmptyListExpr
+                   <<|> pTupExpr
+                   <<|> pCharExpr
+                   <<|> pIdentifierExpr
+
+tokLoc :: Token -> Location
+tokLoc (MkToken (AlexPn ln col _) _) = (ln,col)
+tokLoc EOF = (0,0)
+
+pEmptyListExpr :: Parser Token Text ASTExpr
+pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) (pIsSymbol '[') (pIsSymbol ']')
+
+
 pIdentifier :: Parser Token T.Text Token
 pIdentifier =
     satisfy (\case
@@ -137,20 +226,6 @@ pIsSymbol c =
             "Expected character '" <> T.singleton c <> "' but instead got EOF"
     )
 
-pTwice :: Parser s e a -> Parser s e [a]
-pTwice p = p <:> (pure <$> p)
-
-pMaybe :: Parser s e a -> Parser s e (Maybe a)
-pMaybe p = (Just <$> p) <<|> pure Nothing
-
-pError :: (ParserState s -> e) -> Parser s e a
-pError err = Parser $ \s@(ParserState cnt _) -> [Left (Error cnt (err s))]
-
-pWrapErrors :: Semigroup e => (ParserState s -> e) -> Parser s e a -> Parser s e a
-pWrapErrors err p = 
-    Parser $ \s -> 
-        let xs = runParser p s in 
-            traversed . _Left %~ (\(Error i e) -> Error i $ err s <> e) $ xs 
 
 -- note that: (someParser $> a) == someParser *> pure a 
 pArrow :: Parser Token Text ()
@@ -175,7 +250,7 @@ pBasicType =
         (ParserState _ []) ->
             "Expected a basic type but instead got EOF"
     )
-    
+
 
 pVoidType :: Parser Token e ASTType
 pVoidType =
@@ -185,7 +260,7 @@ pVoidType =
                         _ -> False)
 
 pFargs :: Parser Token Text [Token]
-pFargs = many' (pIdentifier <* pIsSymbol ',') <++> (pure <$> pIdentifier)
+pFargs = (many' (pIdentifier <* pIsSymbol ',') <++> (maybeToList <$> pMaybe pIdentifier))
 
 pType :: Parser Token Text ASTType
 pType = pBasicType
@@ -194,7 +269,7 @@ pType = pBasicType
         <<|> listError (ASTListType <$> (pIsSymbol '[' *> pType <* pIsSymbol ']'))
     where
         tupError = pWrapErrors (const "Unable to parse tuple type: ")
-        listError = pWrapErrors (const "Unable to parse list type: ") 
+        listError = pWrapErrors (const "Unable to parse list type: ")
 
 pFunType :: Parser Token Text ASTType
 pFunType = ASTFunType <$>
@@ -204,5 +279,4 @@ pFunType = ASTFunType <$>
         pFtype = concat . maybeToList <$> pMaybe (some pType)
         pRetType :: Parser Token Text ASTType
         pRetType = pType <<|> pVoidType
-
 

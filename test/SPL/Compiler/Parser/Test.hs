@@ -20,7 +20,7 @@ executeMultipleTests parser tests =
     forM_ tests $ \(input, expected) -> do
         let actual = runParser parser (ParserState 0 input)
         case expected of
-            Just value -> assertEqual actual [Right (value, ParserState (length input) [])]
+            Just value -> assertEqual [Right (value, ParserState (length input) [])] actual
             _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 input))
 
 -- Shorthand operator to create an (input, expected output) pair
@@ -55,6 +55,7 @@ test_parse_fargs = do
             map mkToken [IdentifierToken "a", SymbolToken ',', IdentifierToken "b"] 
                 --> map mkToken [IdentifierToken "a", IdentifierToken "b"],
             map mkToken [IdentifierToken "a"] --> map mkToken [IdentifierToken "a"],
+            [] --> [],
             failure . map mkToken $ [IdentifierToken "a", SymbolToken ','],
             failure . map mkToken $ [KeywordToken Var]
             ]
