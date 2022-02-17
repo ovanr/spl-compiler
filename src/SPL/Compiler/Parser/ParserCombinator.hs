@@ -4,8 +4,8 @@
 
 module SPL.Compiler.Parser.ParserCombinator where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..))
-import SPL.Compiler.Parser.AST (ASTType(..), toASTType)
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..), AlexPosn(..))
+import SPL.Compiler.Parser.AST (ASTType(..), ASTExpr(..), toASTType, EntityLoc(..), ASTFunCall(..), ASTIdentifier(..))
 import Control.Applicative
 import Control.Lens ((%~), _1, _Left, _Right, traversed, folded, maximumOf)
 import Data.Text (Text)
@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import Data.Functor (($>))
 import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, listToMaybe)
+import Data.Char (isSymbol)
 
 newtype Parser s e a = Parser { runParser :: ParserState s -> [Either (Error e) (a, ParserState s)] }
 
@@ -205,4 +206,44 @@ pFunType = ASTFunType <$>
         pRetType :: Parser Token Text ASTType
         pRetType = pType <<|> pVoidType
 
+alexPosnToEntityLoc :: Token -> EntityLoc
+alexPosnToEntityLoc token@(MkToken (AlexPn t l c) splToken) = EntityLoc (l,c) (l,c + lengthOfToken token)
+    where
+        lengthOfToken :: Token -> Int -- Add proper implementation later
+        lengthOfToken token = 0
+alexPosnToEntityLoc _ = EntityLoc (0,0) (0,0)
 
+pInt :: Parser Token Text ASTExpr 
+pInt = (\token@(MkToken loc (IntToken i)) -> IntExpr (alexPosnToEntityLoc token) i) <$>
+                satisfy (\case
+                            MkToken _ (IntToken _) -> True
+                            _ -> False)
+
+pChar :: Parser Token Text ASTExpr
+pChar = (\token@(MkToken loc (CharToken c)) -> CharExpr (alexPosnToEntityLoc token) c) <$>
+                satisfy (\case
+                            MkToken _ (CharToken _) -> True
+                            _ -> False)
+
+pBool :: Parser Token Text ASTExpr
+pBool = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (alexPosnToEntityLoc token) b) <$>
+                satisfy (\case
+                            MkToken _ (BoolToken _) -> True
+                            _ -> False)
+
+pFunCallExpr :: Parser Token Text ASTExpr 
+pFunCallExpr = FunCallExpr <$> pFunCall
+
+locationRange :: EntityLoc -> EntityLoc -> EntityLoc 
+locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
+
+pFunCall :: Parser Token Text ASTFunCall 
+pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args) <$> pIdentifier <*> (isSymbol '(' *> pList pExpr (isSymbol ',') <* isSymbol ')')
+
+
+pList :: Parser s e a -> Parser s e a -> Parser s e [a]
+pList pElement pDelimiter = (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
+
+
+pExpr :: Parser Token Text ASTExpr 
+pExpr = undefined

@@ -65,6 +65,11 @@ tokens :-
     -- symbols
     <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
+
+    -- Bool
+    <0> "True"                            { \ctx len -> return $ produceToken (\_ _ -> BoolToken True) ctx len}
+    <0> "False"                           { \ctx len -> return $ produceToken (\_ _ -> BoolToken False) ctx len}
+
     -- int
     <0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
 
@@ -92,6 +97,7 @@ data SPLToken =
     | SymbolToken Char
     | IntToken Int
     | CharToken Char
+    | BoolToken Bool
     | IdentifierToken T.Text
     deriving (Eq, Show)
 

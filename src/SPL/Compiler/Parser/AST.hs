@@ -2,7 +2,11 @@
 module SPL.Compiler.Parser.AST 
     (
         ASTType(..),
-        toASTType
+        toASTType,
+        ASTExpr(..),
+        EntityLoc(..),
+        ASTFunCall(..),
+        ASTIdentifier(..)
     ) where
 
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..))
@@ -45,7 +49,7 @@ data ASTExpr =
     |   IntExpr EntityLoc Int
     |   CharExpr EntityLoc Char
     |   BoolExpr EntityLoc Bool
-    |   ExprFunCall ASTFunCall
+    |   FunCallExpr ASTFunCall
     |   OpExpr EntityLoc ASTOpUnary ASTExpr  
     |   Op2Expr EntityLoc ASTExpr ASTOpBin ASTExpr  
     |   EmptyListExpr EntityLoc
