@@ -19,7 +19,9 @@ cache:
   paths:
     - .stack
     - .stack-work
-    - target
+
+variables:
+  STACK_ROOT: "$CI_PROJECT_DIR/.stack"
 
 stages:          # List of stages for jobs, and their order of execution
   - test

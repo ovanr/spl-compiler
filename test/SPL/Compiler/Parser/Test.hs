@@ -9,7 +9,7 @@ module SPL.Compiler.Parser.Test (htf_thisModulesTests) where
 import Test.Framework
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), pType, pFargs, pFunType)
-import SPL.Compiler.Parser.AST (ASTType(..))
+import SPL.Compiler.Parser.AST
 import qualified Data.ByteString.Lazy as B
 import Data.Text (Text)
 import Control.Monad (forM_)
@@ -53,11 +53,11 @@ test_parse_type = do
 test_parse_fargs = do
     let tests = [
             map mkToken [IdentifierToken "a", SymbolToken ',', IdentifierToken "b"] 
-                --> map mkToken [IdentifierToken "a", IdentifierToken "b"],
-            map mkToken [IdentifierToken "a"] --> map mkToken [IdentifierToken "a"],
+                --> [ASTIdentifier (EntityLoc (1,1) (1,1)) "a", ASTIdentifier (EntityLoc (1,1) (1,1)) "b"],
+            map mkToken [IdentifierToken "a"] --> [ASTIdentifier (EntityLoc (1,1) (1,1)) "a"],
             [] --> [],
-            failure . map mkToken $ [IdentifierToken "a", SymbolToken ','],
-            failure . map mkToken $ [KeywordToken Var]
+            map mkToken [IdentifierToken "a", SymbolToken ','] --> [ASTIdentifier (EntityLoc (1,1) (1,1)) "a"],
+            [mkToken (KeywordToken Var)] --> []
             ]
     executeMultipleTests pFargs tests
 

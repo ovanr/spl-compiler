@@ -14,6 +14,7 @@ import Data.Functor (($>))
 import Data.Function ((&))
 import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, listToMaybe)
+import Data.Char (isSymbol)
 
 newtype Parser s e a = Parser { runParser :: ParserState s -> [Either (Error e) (a, ParserState s)] }
 
@@ -119,6 +120,9 @@ pTwice p = p <:> (pure <$> p)
 pMaybe :: Parser s e a -> Parser s e (Maybe a)
 pMaybe p = (Just <$> p) <<|> pure Nothing
 
+pList :: Parser s e a -> Parser s e b -> Parser s e [a]
+pList pElement pDelimiter = (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
+
 pError :: (ParserState s -> e) -> Parser s e a
 pError err = Parser $ \s@(ParserState cnt _) -> [Left (Error cnt (err s))]
 
@@ -189,20 +193,45 @@ pExpr = foldr ($) baseExpr
                    <<|> pBoolExpr
                    <<|> pFunCallExpr
                    <<|> pEmptyListExpr
-                   <<|> pTupExpr
+                   -- <<|> pTupExpr
                    <<|> pCharExpr
                    <<|> pIdentifierExpr
 
-tokLoc :: Token -> Location
-tokLoc (MkToken (AlexPn ln col _) _) = (ln,col)
-tokLoc EOF = (0,0)
+pIdentifierExpr :: Parser Token Text ASTExpr
+pIdentifierExpr = IdentifierExpr <$> pIdentifier 
+
+pIntExpr :: Parser Token Text ASTExpr 
+pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (tokenToEntityLoc token) i) <$>
+                satisfy (\case
+                            MkToken _ (IntToken _) -> True
+                            _ -> False)
+
+pCharExpr :: Parser Token Text ASTExpr
+pCharExpr = (\token@(MkToken loc (CharToken c)) -> CharExpr (tokenToEntityLoc token) c) <$>
+                satisfy (\case
+                            MkToken _ (CharToken _) -> True
+                            _ -> False)
+
+pBoolExpr :: Parser Token Text ASTExpr
+pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (tokenToEntityLoc token) b) <$>
+                satisfy (\case
+                            MkToken _ (BoolToken _) -> True
+                            _ -> False)
+
+pFunCallExpr :: Parser Token Text ASTExpr 
+pFunCallExpr = FunCallExpr <$> pFunCall
+
+pFunCall :: Parser Token Text ASTFunCall 
+pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args) 
+                <$> pIdentifier 
+                <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
 
 pEmptyListExpr :: Parser Token Text ASTExpr
 pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) (pIsSymbol '[') (pIsSymbol ']')
 
-
-pIdentifier :: Parser Token T.Text Token
+pIdentifier :: Parser Token T.Text ASTIdentifier
 pIdentifier =
+    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (tokenToEntityLoc t) val) <$> 
     satisfy (\case
                 (MkToken _ (IdentifierToken _)) -> True
                 _ -> False
@@ -259,12 +288,12 @@ pVoidType =
                         (MkToken _ (TypeToken VoidType)) -> True
                         _ -> False)
 
-pFargs :: Parser Token Text [Token]
+pFargs :: Parser Token Text [ASTIdentifier]
 pFargs = (many' (pIdentifier <* pIsSymbol ',') <++> (maybeToList <$> pMaybe pIdentifier))
 
 pType :: Parser Token Text ASTType
 pType = pBasicType
-        <<|> ((\(MkToken _ (IdentifierToken v)) -> ASTVarType v) <$> pIdentifier)
+        <<|> ((\(ASTIdentifier _ v) -> ASTVarType v) <$> pIdentifier)
         <<|> tupError (liftA2 ASTTupleType (pIsSymbol '(' *> pType) (pIsSymbol ',' *> pType <* pIsSymbol ')'))
         <<|> listError (ASTListType <$> (pIsSymbol '[' *> pType <* pIsSymbol ']'))
     where
@@ -279,4 +308,3 @@ pFunType = ASTFunType <$>
         pFtype = concat . maybeToList <$> pMaybe (some pType)
         pRetType :: Parser Token Text ASTType
         pRetType = pType <<|> pVoidType
-
