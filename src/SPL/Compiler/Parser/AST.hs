@@ -23,9 +23,9 @@ data ASTLeaf =
         ASTLeft ASTVarDecl
     |   ASTRight ASTFunDecl
 
-data ASTFunDecl = ASTFunDecl ASTIdentifer [ASTIdentifer] ASTFunBody
+data ASTFunDecl = ASTFunDecl ASTIdentifer [ASTIdentifer] ASTType ASTFunBody
 
-data ASTVarDecl = ASTVarDecl ASTIdentifer ASTExpr
+data ASTVarDecl = ASTVarDecl ASTType ASTIdentifer ASTExpr
 
 data ASTIdentifer = ASTIdentifer EntityLoc Text 
 
@@ -46,10 +46,31 @@ data ASTExpr =
     |   CharExpr EntityLoc Char
     |   BoolExpr EntityLoc Bool
     |   ExprFunCall ASTFunCall
-    |   OpExpr EntityLoc 
+    |   OpExpr EntityLoc ASTOpUnary ASTExpr  
+    |   Op2Expr EntityLoc ASTExpr ASTOpBin ASTExpr  
+    |   EmptyListExpr EntityLoc
+    |   TupExpr EntityLoc ASTExpr ASTExpr
+
+data ASTOpUnary = UnNeg | UnMinus
+data ASTOpBin = 
+      Plus 
+    | Minus 
+    | Mul 
+    | Div 
+    | Mod 
+    | Equal 
+    | Less 
+    | Greater 
+    | LessEq 
+    | GreaterEq 
+    | Nequal 
+    | LogAnd 
+    | LogOr 
+    | Cons 
 
 data ASTType =
-        ASTFunType [ASTType]
+        ASTUnknownType
+    |   ASTFunType [ASTType]
     |   ASTTupleType ASTType ASTType
     |   ASTListType ASTType
     |   ASTVarType T.Text
