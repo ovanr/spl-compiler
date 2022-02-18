@@ -30,5 +30,6 @@ stages:          # List of stages for jobs, and their order of execution
 unit-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
   script:
+    - echo "Start pipeline"
     - stack build alex
     - stack test
