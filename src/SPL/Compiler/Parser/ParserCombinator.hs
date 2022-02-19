@@ -141,3 +141,9 @@ pChainl2 op pc p = foldl (&) <$> p <*> many' (flip <$> op <*> pc)
 -- p (`op` p)* => (((p `op` p) `op` p) `op` p)
 pChainr :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
 pChainr op p = (&) <$> p <*> (flip <$> op <*> pChainr op p) <<|> p
+
+-- Parse sentences of the following format in a right associative way: 
+-- op* p => op (op (op p))
+pChainr1 :: Parser s e (a -> a) -> Parser s e a -> Parser s e a
+pChainr1 op p = (op <*> pChainr1 op p) <<|> p
+

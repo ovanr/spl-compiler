@@ -57,12 +57,12 @@ pExpr = foldr ($) baseExpr
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
         , pFieldSelect
+        , pChainr1 (pUnaryOp "!")
+        , pChainr1 (pUnaryOp "-")
         ]
 
     where
         baseExpr = pParens pExpr
-                   <<|> (pUnaryOp "-" <*> pExpr)
-                   <<|> (pUnaryOp "!" <*> pExpr)
                    <<|> pIntExpr
                    <<|> pBoolExpr
                    <<|> pFunCallExpr

@@ -6,7 +6,7 @@ import SPL.Compiler.Parser.AST
 import qualified Data.Text as T
 import Control.Lens ((^.), _Just)
 
-class Locateble a where
+class Locatable a where
     -- setLoc :: EntityLoc -> a
     getLoc :: a -> EntityLoc
 
@@ -16,13 +16,13 @@ class Locateble a where
     getEndLoc :: a -> Location
     getEndLoc a = getLoc a ^. locEnd
 
-instance Locateble ASTIdentifier where
+instance Locatable ASTIdentifier where
     getLoc (ASTIdentifier l _) = l
 
-instance Locateble ASTFunCall where
+instance Locatable ASTFunCall where
     getLoc (ASTFunCall l _ _) = l
 
-instance Locateble ASTExpr where
+instance Locatable ASTExpr where
     getLoc (IdentifierExpr (ASTIdentifier l _)) = l
     getLoc (IntExpr l _) = l
     getLoc (CharExpr l _) = l
@@ -33,7 +33,7 @@ instance Locateble ASTExpr where
     getLoc (EmptyListExpr l) = l
     getLoc (TupExpr l _ _) = l
     
-instance Locateble Token where
+instance Locatable Token where
     getLoc (MkToken (AlexPn _ l c) t) = EntityLoc (l,c) (l, c + tokenLength t)
         where
             tokenLength (KeywordToken v) = length $ show v

@@ -53,7 +53,7 @@ instance Testable ASTExpr where
     toTestForm (EmptyListExpr _ ) = EmptyListExpr def
 
 instance Testable a => Testable [a] where
-    toTestForm = map toTestForm 
+    toTestForm = map toTestForm
 
 executeMultipleTests :: (Testable b, Eq b, Show b) => Parser Token Text b -> [([SPLToken], Maybe b)] -> IO ()
 executeMultipleTests parser tests =
@@ -106,12 +106,19 @@ test_parse_ftype = do
     let tests = [
             [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', TypeToken IntType]
                 --> ASTFunType [ASTIntType],
-            [SymbolToken ':', SymbolToken ':', TypeToken IntType, IdentifierToken "a", SymbolToken '-', SymbolToken '>', TypeToken CharType]
+            [SymbolToken ':', SymbolToken ':',
+                TypeToken IntType, IdentifierToken "a",
+                SymbolToken '-', SymbolToken '>', TypeToken CharType]
                 --> ASTFunType [ASTIntType, ASTVarType "a", ASTCharType],
-            [SymbolToken ':', SymbolToken ':', TypeToken IntType, IdentifierToken "a", SymbolToken '-', SymbolToken '>', TypeToken CharType]
+            [SymbolToken ':', SymbolToken ':',
+                TypeToken IntType, IdentifierToken "a",
+                SymbolToken '-', SymbolToken '>', TypeToken CharType]
                 --> ASTFunType [ASTIntType, ASTVarType "a", ASTCharType],
-            [SymbolToken ':', SymbolToken ':', TypeToken IntType, SymbolToken '[', IdentifierToken "a", SymbolToken ']', SymbolToken '-', SymbolToken '>', TypeToken CharType]
-                --> ASTFunType [ASTIntType, ASTListType (ASTVarType "a"), ASTCharType],
+            [SymbolToken ':', SymbolToken ':',
+                TypeToken IntType, SymbolToken '[', IdentifierToken "a", SymbolToken ']',
+                SymbolToken '-', SymbolToken '>',
+                TypeToken CharType
+            ] --> ASTFunType [ASTIntType, ASTListType (ASTVarType "a"), ASTCharType],
             failure [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', SymbolToken '{'],
             failure [SymbolToken ':', SymbolToken ':', TypeToken CharType]
             ]
@@ -208,15 +215,110 @@ test_parse_pexpr_list = do
             -- 'h':'e':'l':'l':'o':[]
             [CharToken 'h',SymbolToken ':',CharToken 'e',SymbolToken ':',CharToken 'l',SymbolToken ':',
              CharToken 'l',SymbolToken ':',CharToken 'o',SymbolToken ':',SymbolToken '[',SymbolToken ']']
-                --> Op2Expr def (CharExpr def 'h') 
-                    Cons (Op2Expr def (CharExpr def 'e') 
-                        Cons (Op2Expr def (CharExpr def 'l') 
-                            Cons (Op2Expr def (CharExpr def 'l') 
-                                Cons (Op2Expr def (CharExpr def 'o') 
+                --> Op2Expr def (CharExpr def 'h')
+                    Cons (Op2Expr def (CharExpr def 'e')
+                        Cons (Op2Expr def (CharExpr def 'l')
+                            Cons (Op2Expr def (CharExpr def 'l')
+                                Cons (Op2Expr def (CharExpr def 'o')
                                     Cons (EmptyListExpr def)))))
                 ]
 
     executeMultipleTests pExpr tests
 
+test_parse_pexpr_complex = do
+    let tests =
+            -- list.hd || sum(list.tl)
+            [ [ IdentifierToken "list" , SymbolToken '.' , IdentifierToken "hd" ,
+                SymbolToken '|' , SymbolToken '|' ,
+                IdentifierToken "sum" ,
+                SymbolToken '(' ,
+                    IdentifierToken "list" , SymbolToken '.' , IdentifierToken "tl" ,
+                SymbolToken ')'
+              ] -->
+              Op2Expr def
+                   (FunCallExpr (ASTFunCall def (ASTIdentifier def "hd") [IdentifierExpr (ASTIdentifier def "list")]))
+                   LogOr (FunCallExpr
+                        (ASTFunCall def (ASTIdentifier def "sum")
+                             [ FunCallExpr
+                                   (ASTFunCall def (ASTIdentifier def "tl")
+                                        [ IdentifierExpr (ASTIdentifier def "list") ])
+                             ]
+                        ))
 
+            -- list.hd && sum(list.tl)
+            , [ IdentifierToken "list" , SymbolToken '.' , IdentifierToken "hd"
+              , SymbolToken '&' , SymbolToken '&'
+              , IdentifierToken "sum"
+              , SymbolToken '('
+              , IdentifierToken "list" , SymbolToken '.' , IdentifierToken "tl"
+              , SymbolToken ')'
+              ] -->
+              Op2Expr def
+                   (FunCallExpr
+                        (ASTFunCall def (ASTIdentifier def "hd") [IdentifierExpr (ASTIdentifier def "list")]))
+                   LogAnd
+                   (FunCallExpr
+                        (ASTFunCall def (ASTIdentifier def "sum")
+                             [ FunCallExpr
+                                   (ASTFunCall def (ASTIdentifier def "tl")
+                                        [ IdentifierExpr (ASTIdentifier def "list") ])
+                             ]
+                        )
+                   )
 
+            -- ( facN != facI ( n ) || facN != facL ( n ))
+            , [ SymbolToken '('
+              , IdentifierToken "facN" , SymbolToken '!' , SymbolToken '='
+              , IdentifierToken "facI" , SymbolToken '(' , IdentifierToken "n" , SymbolToken ')'
+              , SymbolToken '|' , SymbolToken '|'
+              , IdentifierToken "facN"
+              , SymbolToken '!' , SymbolToken '='
+              , IdentifierToken "facL" , SymbolToken '(' , IdentifierToken "n" , SymbolToken ')'
+              , SymbolToken ')'
+              ] -->
+              Op2Expr def
+                   (Op2Expr def (IdentifierExpr (ASTIdentifier def "facN"))
+                        Nequal
+                        (FunCallExpr
+                             (ASTFunCall def (ASTIdentifier def "facI")
+                                  [IdentifierExpr (ASTIdentifier def "n")])))
+                   LogOr
+                   (Op2Expr def (IdentifierExpr (ASTIdentifier def "facN"))
+                        Nequal
+                        (FunCallExpr
+                             (ASTFunCall def (ASTIdentifier def "facL")
+                                  [IdentifierExpr (ASTIdentifier def "n")])
+                        )
+                   )
+
+            -- ! ! isEmpty (list) && list.hd % 2 == 0
+            , [ SymbolToken '!', SymbolToken '!'
+              , IdentifierToken "isEmpty" , SymbolToken '(' , IdentifierToken "list" , SymbolToken ')'
+              , SymbolToken '&' , SymbolToken '&'
+              , IdentifierToken "list" , SymbolToken '.' , IdentifierToken "hd"
+              , SymbolToken '%' , IntToken 2
+              , SymbolToken '=' , SymbolToken '=' , IntToken 0
+              ] -->
+              Op2Expr def
+                (OpExpr def
+                   UnNeg
+                        (OpExpr def
+                            UnNeg
+                            (FunCallExpr
+                                 (ASTFunCall def (ASTIdentifier def "isEmpty")
+                                    [IdentifierExpr (ASTIdentifier def "list")]))
+                        )
+                )
+                LogAnd
+                (Op2Expr def
+                     (Op2Expr def
+                          (FunCallExpr
+                               (ASTFunCall def (ASTIdentifier def "hd")
+                                    [ IdentifierExpr (ASTIdentifier def "list") ]))
+                          Mod
+                          (IntExpr def 2))
+                     Equal
+                     (IntExpr def 0)
+                )
+            ]
+    executeMultipleTests pExpr tests

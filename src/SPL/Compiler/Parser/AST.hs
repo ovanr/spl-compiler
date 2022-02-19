@@ -51,7 +51,7 @@ data ASTStmt =
 
 data ASTExpr = 
         IdentifierExpr ASTIdentifier
-    |   IntExpr EntityLoc Int
+    |   IntExpr EntityLoc Integer
     |   CharExpr EntityLoc Char
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall

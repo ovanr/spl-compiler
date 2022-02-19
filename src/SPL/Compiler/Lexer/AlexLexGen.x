@@ -93,7 +93,7 @@ data SPLToken =
       KeywordToken Keyword
     | TypeToken Type
     | SymbolToken Char
-    | IntToken Int
+    | IntToken Integer
     | CharToken Char
     | BoolToken Bool
     | IdentifierToken T.Text
