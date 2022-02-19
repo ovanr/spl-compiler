@@ -25,11 +25,16 @@ cache:
     - target
 
 stages:          # List of stages for jobs, and their order of execution
+  - build
   - test
+
+build-job:   # This job runs in the test stage.
+  stage: build    # It only starts when the job in the build stage completes successfully.
+  script:
+    - stack build alex
+    - stack build
 
 unit-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
   script:
-    - echo "Start pipeline"
-    - stack build alex
     - stack test
