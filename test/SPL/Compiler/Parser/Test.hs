@@ -119,3 +119,23 @@ test_parse_pexpr_tuple = do
 
             -- ((p1.fst + p2.fst), (p1.snd.fst + p2.snd.fst, p1.snd.snd + p2.snd.snd))
     executeMultipleTests pExpr tests
+
+test_parse_list_operations = do
+    let tests = [
+            -- 3:[]
+            [IntToken 3,SymbolToken ':',SymbolToken '[',SymbolToken ']']
+                --> Op2Expr def (IntExpr def 3) Cons (EmptyListExpr def),
+            -- 'h':'e':'l':'l':'o':[]
+            [CharToken 'h',SymbolToken ':',CharToken 'e',SymbolToken ':',CharToken 'l',SymbolToken ':',
+             CharToken 'l',SymbolToken ':',CharToken 'o',SymbolToken ':',SymbolToken '[',SymbolToken ']']
+                --> Op2Expr def (CharExpr def 'h') Cons 
+                        (Op2Expr def (CharExpr def 'e') Cons 
+                            (Op2Expr def (CharExpr def 'l') Cons 
+                                (Op2Expr def (CharExpr def 'l') Cons 
+                                    (Op2Expr def (CharExpr def 'o') Cons 
+                                        (EmptyListExpr def)))))
+                ]
+
+    executeMultipleTests pExpr tests
+
+
