@@ -37,6 +37,7 @@ library
     , array
     , base >=4.7 && <5
     , bytestring
+    , data-default
     , lens
     , text
   default-language: Haskell2010
@@ -53,6 +54,7 @@ executable spl-compiler-exe
     , array
     , base >=4.7 && <5
     , bytestring
+    , data-default
     , lens
     , spl-compiler
     , text
@@ -73,6 +75,7 @@ test-suite spl-compiler-test
     , array
     , base >=4.7 && <5
     , bytestring
+    , data-default
     , lens
     , spl-compiler
     , text

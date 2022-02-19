@@ -45,24 +45,19 @@ instance Functor (Parser s e) where
 instance Applicative (Parser s e) where
     pure a = Parser $ \s -> [Right (a, s)]
 
+    -- The <*> operator selectively chooses which errors to keep
+    -- if the `pab` parser returns only errors then it will return all those errors
+    -- otherwise it will select only the successfully parsed results from `pab` and
+    -- propagate those to the `pa` parser
     (<*>) :: Parser s e (a -> b) -> Parser s e a -> Parser s e b
-    pab <*> pa = pab >>= (\ab -> ab <$> pa)
-
-instance Monad (Parser s e) where
-    return = pure
-
-    -- The bind operator selectively chooses which errors to keep
-    -- if the `pa` parser returns only errors then it will return all those errors
-    -- otherwise it will select only the successfully parsed results from `pa` and
-    -- propagate those to the `apb` function
-    pa >>= apb =
+    pab <*> pa =
         Parser $ \s ->
-            let as = runParser pa s in
-                if null (rights as) then
+            let abs = runParser pab s in
+                if null (rights abs) then
                     -- useless map needed for typechecking
-                    map (\(Left e) -> Left e) as
+                    map (\(Left e) -> Left e) abs
                 else
-                    concat [ runParser (apb a) s' | (a, s') <- rights as ]
+                    concat [ runParser (ab <$> pa) s' | (ab, s') <- rights abs ]
 
 instance Alternative (Parser s e) where
     -- note the identity law:
@@ -138,7 +133,7 @@ pWrapErrors err p =
 -- Parse sentences of the following format in a left associative way: 
 -- p (`op` p)* => (p `op` (p `op` (p `op` p)))
 pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
-pChainl op p = foldl (&) <$> p <*> many (flip <$> op <*> p)
+pChainl op p = foldl (&) <$> p <*> many' (flip <$> op <*> p)
 
 -- Parse sentences of the following format in a right associative way: 
 -- p (`op` p)* => (((p `op` p) `op` p) `op` p)
@@ -181,16 +176,17 @@ pExpr = foldr ($) baseExpr
         [
           pChainl (pBinOp "||")
         , pChainl (pBinOp "&&")
-        , pChainl (pBinOp "==" <|> pBinOp "!=")
-        , pChainl (pBinOp "<=" <|> pBinOp ">=" <|> pBinOp "<" <|> pBinOp ">")
-        , pChainl (pBinOp "+" <|> pBinOp "-")
-        , pChainl (pBinOp "*" <|> pBinOp "/" <|> pBinOp "%")
+        , pChainl (pBinOp "==" <<|> pBinOp "!=")
+        , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
+        , pChainl (pBinOp "+" <<|> pBinOp "-")
+        , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
+        , \p -> pFieldSelect p <<|> p
         ]
 
     where
         baseExpr = pParens pExpr
-                   <<|> pUnaryOp "-" <*> pExpr
-                   <<|> pUnaryOp "!" <*> pExpr
+                   <<|> (pUnaryOp "-" <*> pExpr)
+                   <<|> (pUnaryOp "!" <*> pExpr)
                    <<|> pIntExpr
                    <<|> pBoolExpr
                    <<|> pFunCallExpr
@@ -232,8 +228,14 @@ pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args)
                 <$> pIdentifier
                 <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
 
+pFieldSelect :: Parser Token Text ASTExpr -> Parser Token Text ASTExpr
+pFieldSelect p = (\expr id@(ASTIdentifier loc1 _) -> FunCallExpr $ ASTFunCall loc1 id [expr])
+                <$> p
+                <*> (pIsSymbol '.' *> pIdentifier)
+
 pEmptyListExpr :: Parser Token Text ASTExpr
-pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) (pIsSymbol '[') (pIsSymbol ']')
+pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) 
+                        (pIsSymbol '[') (pIsSymbol ']')
 
 pIdentifier :: Parser Token T.Text ASTIdentifier
 pIdentifier =

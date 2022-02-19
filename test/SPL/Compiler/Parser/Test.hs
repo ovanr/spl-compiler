@@ -8,10 +8,11 @@ module SPL.Compiler.Parser.Test (htf_thisModulesTests) where
 
 import Test.Framework
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
-import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), pType, pFargs, pFunType)
+import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), pType, pFargs, pFunType, pExpr, pTupExpr)
 import SPL.Compiler.Parser.AST
 import qualified Data.ByteString.Lazy as B
 import Data.Text (Text)
+import Data.Default
 import Control.Monad (forM_)
 import Control.Applicative ((<|>))
 import Control.Lens ((^..), (^?), _Right, ix, _1)
@@ -34,12 +35,17 @@ input --> expected = (input, Just expected)
 
 -- data AlexPosn = AlexPn !Int !Int !Int
 
+instance Default EntityLoc where
+    def = EntityLoc (1,1) (1,1)
+
+instance Default AlexPosn where
+    def = AlexPn 0 1 1
+
 mkToken :: SPLToken -> Token
-mkToken = MkToken (AlexPn 0 1 1)
+mkToken = MkToken def
 
 failure :: a -> (a, Maybe b) 
 failure input = (input, Nothing)
-
 
 test_parse_type = do
     let tests = [
@@ -58,8 +64,8 @@ test_parse_type = do
 test_parse_fargs = do
     let tests = [
             [IdentifierToken "a", SymbolToken ',', IdentifierToken "b"] 
-                --> [ASTIdentifier (EntityLoc (1,1) (1,1)) "a", ASTIdentifier (EntityLoc (1,1) (1,1)) "b"],
-            [IdentifierToken "a"] --> [ASTIdentifier (EntityLoc (1,1) (1,1)) "a"],
+                --> [ASTIdentifier def "a", ASTIdentifier def "b"],
+            [IdentifierToken "a"] --> [ASTIdentifier def "a"],
             [] --> [],
             [IdentifierToken "a", SymbolToken ','] --> [],
             [KeywordToken Var] --> []
@@ -80,3 +86,33 @@ test_parse_ftype = do
             failure [SymbolToken ':', SymbolToken ':', TypeToken CharType]
             ]
     executeMultipleTests pFunType tests
+
+test_parse_pexpr_tuple = do
+    let tests = [
+            -- (2, 2)
+            [SymbolToken '(', IntToken 2, SymbolToken ',', IntToken 2, SymbolToken ')']
+                --> TupExpr def (IntExpr def 2) (IntExpr def 2),
+                
+            -- ((p1.fst + p2.fst), (p1.snd - p2.snd))
+            [SymbolToken '(', 
+                SymbolToken '(', 
+                    IdentifierToken "p1", SymbolToken '.', IdentifierToken "fst", SymbolToken '+', 
+                    IdentifierToken "p2", SymbolToken '.', IdentifierToken "fst", 
+                SymbolToken ')', SymbolToken ',', SymbolToken '(', 
+                    IdentifierToken "p1", SymbolToken '.', IdentifierToken "snd", SymbolToken '-', 
+                    IdentifierToken "p2", SymbolToken '.', IdentifierToken "snd", SymbolToken ')', 
+                SymbolToken ')', 
+            SymbolToken ')']
+                --> TupExpr def 
+                        (Op2Expr def
+                            (FunCallExpr $ ASTFunCall def (ASTIdentifier def "fst") [IdentifierExpr (ASTIdentifier def "p1")])
+                            Plus 
+                            (FunCallExpr $ ASTFunCall def (ASTIdentifier def "fst") [IdentifierExpr (ASTIdentifier def "p2")])
+                        ) 
+                        (Op2Expr def
+                            (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p1")])
+                            Minus
+                            (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])
+                        )
+                ]
+    executeMultipleTests pExpr tests
