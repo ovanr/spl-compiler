@@ -180,7 +180,7 @@ pExpr = foldr ($) baseExpr
         , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
-        , \p -> pFieldSelect p <<|> p
+        , pFieldSelect
         ]
 
     where
@@ -229,9 +229,9 @@ pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args)
                 <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
 
 pFieldSelect :: Parser Token Text ASTExpr -> Parser Token Text ASTExpr
-pFieldSelect p = (\expr id@(ASTIdentifier loc1 _) -> FunCallExpr $ ASTFunCall loc1 id [expr])
-                <$> p
-                <*> (pIsSymbol '.' *> pIdentifier)
+pFieldSelect p = (&) <$> p <*> ((pIsSymbol '.' *> (mkFunCallExpr <$> pIdentifier)) <<|> pure id)
+    where
+        mkFunCallExpr id@(ASTIdentifier loc1 _) expr = FunCallExpr $ ASTFunCall loc1 id [expr]
 
 pEmptyListExpr :: Parser Token Text ASTExpr
 pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) 
