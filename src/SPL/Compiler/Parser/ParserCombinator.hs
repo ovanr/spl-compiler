@@ -16,7 +16,9 @@ import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, listToMaybe)
 import Data.Char (isSymbol)
 
-newtype Parser s e a = Parser { runParser :: ParserState s -> [Either (Error e) (a, ParserState s)] }
+newtype Parser s e a = Parser {
+    runParser :: ParserState s -> [Either (Error e) (a, ParserState s)]
+}
 
 data ParserState s = ParserState {
     tokensParsed :: Int,
@@ -176,7 +178,7 @@ pUnaryOp _ = error "Unary operator not defined"
 
 pExpr :: Parser Token Text ASTExpr
 pExpr = foldr ($) baseExpr
-        [ 
+        [
           pChainl (pBinOp "||")
         , pChainl (pBinOp "&&")
         , pChainl (pBinOp "==" <|> pBinOp "!=")
@@ -198,9 +200,9 @@ pExpr = foldr ($) baseExpr
                    <<|> pIdentifierExpr
 
 pIdentifierExpr :: Parser Token Text ASTExpr
-pIdentifierExpr = IdentifierExpr <$> pIdentifier 
+pIdentifierExpr = IdentifierExpr <$> pIdentifier
 
-pIntExpr :: Parser Token Text ASTExpr 
+pIntExpr :: Parser Token Text ASTExpr
 pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (tokenToEntityLoc token) i) <$>
                 satisfy (\case
                             MkToken _ (IntToken _) -> True
@@ -218,12 +220,12 @@ pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (tokenToEntityLoc to
                             MkToken _ (BoolToken _) -> True
                             _ -> False)
 
-pFunCallExpr :: Parser Token Text ASTExpr 
+pFunCallExpr :: Parser Token Text ASTExpr
 pFunCallExpr = FunCallExpr <$> pFunCall
 
-pFunCall :: Parser Token Text ASTFunCall 
-pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args) 
-                <$> pIdentifier 
+pFunCall :: Parser Token Text ASTFunCall
+pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args)
+                <$> pIdentifier
                 <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
 
 pEmptyListExpr :: Parser Token Text ASTExpr
@@ -231,7 +233,7 @@ pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (
 
 pIdentifier :: Parser Token T.Text ASTIdentifier
 pIdentifier =
-    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (tokenToEntityLoc t) val) <$> 
+    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (tokenToEntityLoc t) val) <$>
     satisfy (\case
                 (MkToken _ (IdentifierToken _)) -> True
                 _ -> False
@@ -289,7 +291,7 @@ pVoidType =
                         _ -> False)
 
 pFargs :: Parser Token Text [ASTIdentifier]
-pFargs = (many' (pIdentifier <* pIsSymbol ',') <++> (maybeToList <$> pMaybe pIdentifier))
+pFargs = pList pIdentifier $ pIsSymbol ','
 
 pType :: Parser Token Text ASTType
 pType = pBasicType
