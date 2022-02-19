@@ -1,15 +1,22 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module SPL.Compiler.Parser.AST where
 
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Control.Lens
 
 -- Location is (LineNum, ColumnNum)
 type Location = (Int, Int)
 
 -- EntityLoc is StartLocation and EndLocation in source file
-data EntityLoc = EntityLoc Location Location
-    deriving (Eq, Show)
+data EntityLoc = EntityLoc {
+    _locStart :: Location,
+    _locEnd :: Location
+} deriving (Eq, Show)
+
+makeLenses ''EntityLoc
 
 data AST = 
       ASTNil
@@ -91,41 +98,3 @@ toASTType VoidType = ASTVoidType
 toASTType IntType = ASTIntType
 toASTType BoolType = ASTBoolType
 toASTType CharType = ASTCharType
-
-getStartLoc :: ASTExpr -> Location
-getStartLoc (IdentifierExpr (ASTIdentifier (EntityLoc start _) _)) = start
-getStartLoc (IntExpr (EntityLoc start _) _) = start
-getStartLoc (CharExpr (EntityLoc start _) _) = start
-getStartLoc (BoolExpr (EntityLoc start _) _) = start
-getStartLoc (FunCallExpr (ASTFunCall (EntityLoc start _) _ _)) = start
-getStartLoc (OpExpr (EntityLoc start _) _ _) = start 
-getStartLoc (Op2Expr (EntityLoc start _) _ _ _) = start  
-getStartLoc (EmptyListExpr (EntityLoc start _)) = start
-getStartLoc (TupExpr (EntityLoc start _) _ _) = start
-
-getEndLoc :: ASTExpr -> Location
-getEndLoc (IdentifierExpr (ASTIdentifier (EntityLoc _ end) _)) = end
-getEndLoc (IntExpr (EntityLoc _ end) _) = end
-getEndLoc (CharExpr (EntityLoc _ end) _) = end
-getEndLoc (BoolExpr (EntityLoc _ end) _) = end
-getEndLoc (FunCallExpr (ASTFunCall (EntityLoc _ end) _ _)) = end
-getEndLoc (OpExpr (EntityLoc _ end) _ _) = end 
-getEndLoc (Op2Expr (EntityLoc _ end) _ _ _) = end  
-getEndLoc (EmptyListExpr (EntityLoc _ end)) = end
-getEndLoc (TupExpr (EntityLoc _ end) _ _) = end
-
-tokenToEntityLoc :: Token -> EntityLoc
-tokenToEntityLoc token@(MkToken (AlexPn t l c) splToken) = EntityLoc (l,c) (l,c + lengthOfToken token)
-    where
-        -- TODO: Add proper implementation later
-        lengthOfToken :: Token -> Int 
-        lengthOfToken token = 0
-tokenToEntityLoc _ = EntityLoc (0,0) (0,0)
-
-locationRange :: EntityLoc -> EntityLoc -> EntityLoc 
-locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
-
-tokLoc :: Token -> Location
-tokLoc (MkToken (AlexPn ln col _) _) = (ln,col)
-tokLoc EOF = (0,0)
-

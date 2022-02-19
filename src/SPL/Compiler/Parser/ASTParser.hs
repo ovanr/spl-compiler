@@ -7,6 +7,7 @@ import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..))
 import qualified SPL.Compiler.Lexer.AlexLexGen as Lex (Keyword(..), Type(..))
 import SPL.Compiler.Parser.ParserCombinator
 import SPL.Compiler.Parser.AST 
+import SPL.Compiler.Parser.ASTEntityLocation
 import Control.Applicative
 import Control.Lens ((%~), _1, _2)
 import qualified Data.Text as T
@@ -52,7 +53,7 @@ pExpr = foldr ($) baseExpr
         , pChainl (pBinOp "&&")
         , pChainl (pBinOp "==" <<|> pBinOp "!=")
         , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
-        , pChainl (pBinOp ":") 
+        , pChainr (pBinOp ":") 
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
         , pFieldSelect
@@ -78,19 +79,19 @@ pIdentifierExpr :: Parser Token Text ASTExpr
 pIdentifierExpr = IdentifierExpr <$> pIdentifier
 
 pIntExpr :: Parser Token Text ASTExpr
-pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (tokenToEntityLoc token) i) <$>
+pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (getLoc token) i) <$>
                 satisfy (\case
                             MkToken _ (IntToken _) -> True
                             _ -> False)
 
 pCharExpr :: Parser Token Text ASTExpr
-pCharExpr = (\token@(MkToken loc (CharToken c)) -> CharExpr (tokenToEntityLoc token) c) <$>
+pCharExpr = (\token@(MkToken loc (CharToken c)) -> CharExpr (getLoc token) c) <$>
                 satisfy (\case
                             MkToken _ (CharToken _) -> True
                             _ -> False)
 
 pBoolExpr :: Parser Token Text ASTExpr
-pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (tokenToEntityLoc token) b) <$>
+pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$>
                 satisfy (\case
                             MkToken _ (BoolToken _) -> True
                             _ -> False)
@@ -109,12 +110,12 @@ pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
         mkFunCallExpr expr id@(ASTIdentifier loc1 _) = FunCallExpr $ ASTFunCall loc1 id [expr]
 
 pEmptyListExpr :: Parser Token Text ASTExpr
-pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) 
+pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (getStartLoc t1) (_2 %~ (+1) $ getEndLoc t2))) 
                         (pIsSymbol '[') (pIsSymbol ']')
 
 pIdentifier :: Parser Token T.Text ASTIdentifier
 pIdentifier =
-    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (tokenToEntityLoc t) val) <$>
+    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (getLoc t) val) <$>
     satisfy (\case
                 (MkToken _ (IdentifierToken _)) -> True
                 _ -> False
@@ -214,7 +215,7 @@ pIfElseStmt =
 
 pWhileStmt :: Parser Token Text ASTStmt 
 pWhileStmt = 
-    (\cond body -> SPL.Compiler.Parser.AST.While (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond body) <$>
+    (\cond body -> While (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond body) <$>
     (pWhile *> pExpr) <*> pBody
     where
         pWhile = satisfy ( \case

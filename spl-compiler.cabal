@@ -27,6 +27,7 @@ library
   exposed-modules:
       SPL.Compiler.Lexer.AlexLexGen
       SPL.Compiler.Parser.AST
+      SPL.Compiler.Parser.ASTEntityLocation
       SPL.Compiler.Parser.ASTParser
       SPL.Compiler.Parser.ParserCombinator
   other-modules:
