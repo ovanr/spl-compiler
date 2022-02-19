@@ -316,3 +316,50 @@ pFunType = ASTFunType <$>
         pFtype = concat . maybeToList <$> pMaybe (some pType)
         pRetType :: Parser Token Text ASTType
         pRetType = pType <<|> pVoidType
+
+pStmt :: Parser Token Text ASTStmt 
+pStmt = pIfElseStmt
+        <<|> pWhileStmt
+        <<|> pAssignStmt
+        <<|> pFunCallStmt
+        <<|> pReturnStmt 
+
+pIfElseStmt :: Parser Token Text ASTStmt 
+pIfElseStmt =
+    (\cond ifDo elseDo -> IfElse (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond ifDo elseDo) <$>
+    (pIf *> pExpr) <*> pBody <*> (pElse *> pBody)
+    where
+        pIf = satisfy ( \case
+                (MkToken _ (KeywordToken If)) -> True
+                _ -> False)
+        pElse = satisfy ( \case
+                (MkToken _ (KeywordToken Else)) -> True
+                _ -> False)
+        pBody = pIsSymbol '{' *> many' pStmt <* pIsSymbol '}'
+
+pWhileStmt :: Parser Token Text ASTStmt 
+pWhileStmt = 
+    (\cond body -> SPL.Compiler.Parser.AST.While (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond body) <$>
+    (pWhile *> pExpr) <*> pBody
+    where
+        pWhile = satisfy ( \case
+                (MkToken _ (KeywordToken SPL.Compiler.Lexer.AlexLexGen.While)) -> True
+                _ -> False)
+        pBody = pIsSymbol '{' *> many' pStmt <* pIsSymbol '}'
+
+pAssignStmt :: Parser Token Text ASTStmt
+pAssignStmt =
+    (\id@(ASTIdentifier loc _) val -> Assign loc id val) <$>
+    pIdentifier <* pIsSymbol '=' <*> pExpr <* pIsSymbol ';'
+
+pFunCallStmt :: Parser Token Text ASTStmt 
+pFunCallStmt = FunCallStmt <$> pFunCall <* pIsSymbol ';'
+
+pReturnStmt :: Parser Token Text ASTStmt
+pReturnStmt = pReturn *> (pReturnNoValue <<|> pReturnValue) 
+    where
+        pReturn = satisfy ( \case
+                (MkToken _ (KeywordToken SPL.Compiler.Lexer.AlexLexGen.Return)) -> True
+                _ -> False)
+        pReturnNoValue = (\(MkToken (AlexPn _ l c) _) -> SPL.Compiler.Parser.AST.Return (EntityLoc (l,c) (l,c)) Nothing) <$> pIsSymbol ';' 
+        pReturnValue = (\val (MkToken (AlexPn _ l c) _) -> SPL.Compiler.Parser.AST.Return (EntityLoc (l,c) (l,c)) Nothing) <$> pIdentifier <*> pIsSymbol ';' 

@@ -35,7 +35,7 @@ data ASTFunCall = ASTFunCall EntityLoc ASTIdentifier [ASTExpr]
     deriving (Eq, Show)
 
 data ASTStmt = 
-        If EntityLoc ASTExpr [ASTStmt] [ASTStmt]
+        IfElse EntityLoc ASTExpr [ASTStmt] [ASTStmt]
     |   While EntityLoc ASTExpr [ASTStmt]
     |   Assign EntityLoc ASTIdentifier ASTExpr
     |   FunCallStmt ASTFunCall
