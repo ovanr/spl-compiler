@@ -33,7 +33,7 @@ haskell-hlint:
   stage: linting
   image: registry.gitlab.com/pipeline-components/haskell-hlint:latest
   script:
-    - hlint -j .
+    - hlint -j src
 
 
 build-job:   # This job runs in the test stage.
