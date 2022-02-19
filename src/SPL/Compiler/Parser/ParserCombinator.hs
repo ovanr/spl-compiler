@@ -200,8 +200,8 @@ pExpr = foldr ($) baseExpr
                    <<|> pIdentifierExpr
 
 pTupExpr :: Parser Token Text ASTExpr 
-pTupExpr = (\fst snd -> TupExpr (EntityLoc (getStartLoc fst) (getEndLoc  snd)) fst snd) <$>
-                (pIsSymbol '(' *> pExpr <* pIsSymbol ',') <*> (pExpr <* pIsSymbol ')')
+pTupExpr = (\fst snd -> TupExpr (EntityLoc (getStartLoc fst) (getEndLoc snd)) fst snd) <$>
+                (pIsSymbol '(' *> pExpr <* pIsSymbol ',') <*> pExpr <* pIsSymbol ')'
 
 pIdentifierExpr :: Parser Token Text ASTExpr
 pIdentifierExpr = IdentifierExpr <$> pIdentifier
