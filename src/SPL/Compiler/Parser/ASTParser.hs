@@ -29,6 +29,7 @@ pBinOp op =     foldl1 (*>) (map pIsSymbol op)
         getOperator "/" = Div
         getOperator "%" = Mod
         getOperator "^" = Pow
+        getOperator ":" = Cons
         getOperator "==" = Equal
         getOperator "<" = Less
         getOperator ">" = Greater
@@ -51,6 +52,7 @@ pExpr = foldr ($) baseExpr
         , pChainl (pBinOp "&&")
         , pChainl (pBinOp "==" <<|> pBinOp "!=")
         , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
+        , pChainl (pBinOp ":") 
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
         , pFieldSelect
@@ -101,10 +103,10 @@ pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args)
                 <$> pIdentifier
                 <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
 
-pFieldSelect :: Parser Token Text ASTExpr -> Parser Token Text ASTExpr
-pFieldSelect p = (&) <$> p <*> ((pIsSymbol '.' *> (mkFunCallExpr <$> pIdentifier)) <<|> pure id)
+pFieldSelect :: Parser Token Text ASTExpr -> Parser Token T.Text ASTExpr
+pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
     where
-        mkFunCallExpr id@(ASTIdentifier loc1 _) expr = FunCallExpr $ ASTFunCall loc1 id [expr]
+        mkFunCallExpr expr id@(ASTIdentifier loc1 _) = FunCallExpr $ ASTFunCall loc1 id [expr]
 
 pEmptyListExpr :: Parser Token Text ASTExpr
 pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (tokLoc t1) (_2 %~ (+1) $ tokLoc t2))) 

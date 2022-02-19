@@ -114,8 +114,28 @@ test_parse_pexpr_tuple = do
                             (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p1")])
                             Minus
                             (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])
-                        )
-                ]
+                        ),
 
             -- ((p1.fst + p2.fst), (p1.snd.fst + p2.snd.fst, p1.snd.snd + p2.snd.snd))
+            [SymbolToken '(',
+                SymbolToken '(',
+                    IdentifierToken "p1", SymbolToken '.', IdentifierToken "fst", SymbolToken '+',
+                    IdentifierToken "p2", SymbolToken '.', IdentifierToken "fst",
+                SymbolToken ')', 
+                SymbolToken ',', 
+                SymbolToken '(',
+                    IdentifierToken "p1", SymbolToken '.', IdentifierToken "snd", 
+                                          SymbolToken '.', IdentifierToken "fst", SymbolToken '+',
+                    IdentifierToken "p2", SymbolToken '.', IdentifierToken "snd", 
+                                          SymbolToken '.', IdentifierToken "fst",
+                    SymbolToken ',', 
+                    IdentifierToken "p1", SymbolToken '.', IdentifierToken "snd",
+                                          SymbolToken '.', IdentifierToken "snd", SymbolToken '+',
+                    IdentifierToken "p2", SymbolToken '.', IdentifierToken "snd",
+                                          SymbolToken '.', IdentifierToken "snd",
+                SymbolToken ')',
+            SymbolToken ')']
+                -->  
+
+            ]
     executeMultipleTests pExpr tests
