@@ -152,7 +152,7 @@ test_parse_pexpr_tuple = do
                             (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])
                         ),
 
-            -- ((p1.fst + p2.fst), (p1.snd.fst + p2.snd.fst, p1.snd.snd + p2.snd.snd))
+            -- ((p1.fst + p2.fst), (p1.snd.fst / p2.snd.fst, p1.snd.snd * p2.snd.snd))
             [SymbolToken '(',
                 SymbolToken '(',
                     IdentifierToken "p1", SymbolToken '.', IdentifierToken "fst", SymbolToken '+',
@@ -161,12 +161,12 @@ test_parse_pexpr_tuple = do
                 SymbolToken ',',
                 SymbolToken '(',
                     IdentifierToken "p1", SymbolToken '.', IdentifierToken "snd",
-                                          SymbolToken '.', IdentifierToken "fst", SymbolToken '+',
+                                          SymbolToken '.', IdentifierToken "fst", SymbolToken '/',
                     IdentifierToken "p2", SymbolToken '.', IdentifierToken "snd",
                                           SymbolToken '.', IdentifierToken "fst",
                     SymbolToken ',',
                     IdentifierToken "p1", SymbolToken '.', IdentifierToken "snd",
-                                          SymbolToken '.', IdentifierToken "snd", SymbolToken '+',
+                                          SymbolToken '.', IdentifierToken "snd", SymbolToken '*',
                     IdentifierToken "p2", SymbolToken '.', IdentifierToken "snd",
                                           SymbolToken '.', IdentifierToken "snd",
                 SymbolToken ')',
@@ -188,7 +188,7 @@ test_parse_pexpr_tuple = do
                                         [FunCallExpr (ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p1")])]
                                     )
                                 )
-                            Plus
+                            Div
                             (FunCallExpr
                                 (ASTFunCall def (ASTIdentifier def "fst")
                                             [FunCallExpr (ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])]
@@ -198,7 +198,7 @@ test_parse_pexpr_tuple = do
                                 (FunCallExpr (ASTFunCall def (ASTIdentifier def "snd")
                                     [FunCallExpr (ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p1")])])
                                 )
-                            Plus
+                            Mul
                             (FunCallExpr
                                 (ASTFunCall def (ASTIdentifier def "snd")
                                     [FunCallExpr (ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])])
@@ -319,6 +319,26 @@ test_parse_pexpr_complex = do
                           (IntExpr def 2))
                      Equal
                      (IntExpr def 0)
-                )
+                ),
+
+            -- f((x, x)).fst
+            [ IdentifierToken "f" , SymbolToken '('
+            , SymbolToken '(' , IdentifierToken "x" , SymbolToken ',' , IdentifierToken "x"
+            , SymbolToken ')' , SymbolToken ')'
+            , SymbolToken '.' , IdentifierToken "fst"
+            ] -->
+                FunCallExpr
+                     (ASTFunCall def
+                          (ASTIdentifier def "fst")
+                          [ FunCallExpr (ASTFunCall def
+                                     (ASTIdentifier def "f")
+                                     [ TupExpr def
+                                           (IdentifierExpr (ASTIdentifier def "x"))
+                                           (IdentifierExpr (ASTIdentifier def "x"))
+                                     ])
+                          ]
+                     )
+
+-- (([] : -(1*[])-(2*[]-3*[])-4/[]/-5): (1*[])-(2+[]) 3*(4+[])) 
             ]
     executeMultipleTests pExpr tests
