@@ -8,7 +8,8 @@ module SPL.Compiler.Parser.Test (htf_thisModulesTests) where
 
 import Test.Framework
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
-import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), pType, pFargs, pFunType, pExpr, pTupExpr)
+import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..))
+import SPL.Compiler.Parser.ASTParser (pType, pFargs, pFunType, pExpr, pTupExpr)
 import SPL.Compiler.Parser.AST
 import qualified Data.ByteString.Lazy as B
 import Data.Text (Text)
@@ -115,4 +116,6 @@ test_parse_pexpr_tuple = do
                             (FunCallExpr $ ASTFunCall def (ASTIdentifier def "snd") [IdentifierExpr (ASTIdentifier def "p2")])
                         )
                 ]
+
+            -- ((p1.fst + p2.fst), (p1.snd.fst + p2.snd.fst, p1.snd.snd + p2.snd.snd))
     executeMultipleTests pExpr tests

@@ -27,6 +27,7 @@ library
   exposed-modules:
       SPL.Compiler.Lexer.AlexLexGen
       SPL.Compiler.Parser.AST
+      SPL.Compiler.Parser.ASTParser
       SPL.Compiler.Parser.ParserCombinator
   other-modules:
       Paths_spl_compiler
@@ -37,6 +38,7 @@ library
     , array
     , base >=4.7 && <5
     , bytestring
+    , containers
     , data-default
     , lens
     , text
@@ -54,6 +56,7 @@ executable spl-compiler-exe
     , array
     , base >=4.7 && <5
     , bytestring
+    , containers
     , data-default
     , lens
     , spl-compiler
@@ -75,6 +78,7 @@ test-suite spl-compiler-test
     , array
     , base >=4.7 && <5
     , bytestring
+    , containers
     , data-default
     , lens
     , spl-compiler

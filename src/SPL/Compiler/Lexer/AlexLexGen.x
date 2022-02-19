@@ -12,10 +12,8 @@ module SPL.Compiler.Lexer.AlexLexGen
     ) where
 
 import Control.Applicative
-import System.Environment
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import qualified Data.Text.Encoding as TE
 }
 
@@ -214,12 +212,4 @@ tokenize fp input =
             alex_scd = 0 
         } 
 
--- Parse the file given by the first cli argument 
-main = do
-    args <- getArgs
-    let file = head args
-    s <- B.readFile file
-    case (tokenize file s) of
-        Left err -> TIO.putStr err
-        Right tokens -> print tokens
 }
