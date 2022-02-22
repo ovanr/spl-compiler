@@ -7,7 +7,7 @@ import qualified Data.Text as T
 import Control.Lens ((^.), _Just)
 
 class Locatable a where
-    -- setLoc :: EntityLoc -> a
+    --setLoc :: EntityLoc -> a            Does not make sense for debugging later on
     getLoc :: a -> EntityLoc
 
     getStartLoc :: a -> Location
@@ -45,5 +45,12 @@ instance Locatable Token where
             tokenLength (SymbolToken _) = 1
     getLoc _ = error "Match on EOF"
 
+instance Locatable a => Locatable [a] where
+    getLoc list = EntityLoc (getStartLoc $ head list) (getEndLoc $ last list)
+
 locationRange :: EntityLoc -> EntityLoc -> EntityLoc 
 locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
+
+infixr 5 |-|
+(|-|) :: Locatable a => a -> a -> EntityLoc
+start |-| end = EntityLoc (getStartLoc start) (getEndLoc end)

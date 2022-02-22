@@ -238,4 +238,4 @@ pReturnStmt = pReturn *> (pReturnNoValue <<|> pReturnValue)
                 (MkToken _ (KeywordToken Lex.Return)) -> True
                 _ -> False)
         pReturnNoValue = (\(MkToken (AlexPn _ l c) _) -> Return (EntityLoc (l,c) (l,c)) Nothing) <$> pIsSymbol ';' 
-        pReturnValue = (\val (MkToken (AlexPn _ l c) _) -> Return (EntityLoc (l,c) (l,c)) Nothing) <$> pIdentifier <*> pIsSymbol ';' 
+        pReturnValue = (\val (MkToken (AlexPn _ l c) _) -> Return (EntityLoc (l,c) (l,c)) (Just val)) <$> pExpr <*> pIsSymbol ';' 
