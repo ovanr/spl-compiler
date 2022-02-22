@@ -18,7 +18,7 @@ image: haskell:8
 variables:
   STACK_ROOT: "$CI_PROJECT_DIR/.stack"
 
-cache:
+cache: &dependency-cache
   key:
     files:
     - package.yaml
@@ -40,6 +40,7 @@ build-dependencies-job:   # This job runs in the test stage.
   only:
     changes: [package.json]
   cache:
+    <<: *dependency-cache
     policy: push
 
 build-app-job:   # This job runs in the test stage.
@@ -47,6 +48,7 @@ build-app-job:   # This job runs in the test stage.
   script:
     - stack build
   cache:
+    <<: *dependency-cache
     policy: pull
 
 unit-test-job:   # This job runs in the test stage.
@@ -54,4 +56,5 @@ unit-test-job:   # This job runs in the test stage.
   script:
     - stack test
   cache:
+    <<: *dependency-cache
     policy: pull
