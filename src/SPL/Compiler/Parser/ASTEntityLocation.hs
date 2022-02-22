@@ -7,7 +7,6 @@ import qualified Data.Text as T
 import Control.Lens ((^.), _Just)
 
 class Locatable a where
-    --setLoc :: EntityLoc -> a            Does not make sense for debugging later on
     getLoc :: a -> EntityLoc
 
     getStartLoc :: a -> Location
@@ -40,6 +39,20 @@ instance Locatable ASTStmt where
     getLoc (FunCallStmt l _) = l
     getLoc (ReturnStmt l _) = l
     
+instance Locatable ASTType where
+    getLoc (ASTUnknownType l) = l
+    getLoc (ASTFunType l _) = l
+    getLoc (ASTTupleType l _ _) = l
+    getLoc (ASTListType l _) = l
+    getLoc (ASTVarType l _) = l
+    getLoc (ASTIntType l) = l
+    getLoc (ASTBoolType l) = l
+    getLoc (ASTCharType l) = l
+    getLoc (ASTVoidType l) = l
+
+instance Locatable ASTFunBody where
+    getLoc (ASTFunBody l  _ _) = l
+
 instance Locatable Token where
     getLoc (MkToken (AlexPn _ l c) t) = EntityLoc (l,c) (l, c + tokenLength t)
         where
@@ -59,5 +72,5 @@ locationRange :: EntityLoc -> EntityLoc -> EntityLoc
 locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
 
 infixr 5 |-|
-(|-|) :: Locatable a => Locatable b => a -> b -> EntityLoc
+(|-|) :: (Locatable a, Locatable b) => a -> b -> EntityLoc
 start |-| end = EntityLoc (getStartLoc start) (getEndLoc end)

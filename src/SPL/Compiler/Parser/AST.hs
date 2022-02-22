@@ -18,24 +18,22 @@ data EntityLoc = EntityLoc {
 
 makeLenses ''EntityLoc
 
-data AST = 
-      ASTNil
-    | ASTCons ASTLeaf AST
+newtype AST = AST [ASTLeaf]
 
 data ASTLeaf = 
-        ASTLeft ASTVarDecl
-    |   ASTRight ASTFunDecl
+        ASTVar ASTVarDecl
+    |   ASTFun ASTFunDecl
 
-data ASTFunDecl = ASTFunDecl ASTIdentifier [ASTIdentifier] ASTType ASTFunBody
+data ASTFunDecl = ASTFunDecl EntityLoc ASTIdentifier [ASTIdentifier] ASTType ASTFunBody
     deriving (Eq, Show)
 
-data ASTVarDecl = ASTVarDecl ASTType ASTIdentifier ASTExpr
+data ASTVarDecl = ASTVarDecl EntityLoc ASTType ASTIdentifier ASTExpr
     deriving (Eq, Show)
 
 data ASTIdentifier = ASTIdentifier EntityLoc Text 
     deriving (Eq, Show)
 
-data ASTFunBody = ASTFunBody [ASTVarDecl] [ASTStmt]
+data ASTFunBody = ASTFunBody EntityLoc [ASTVarDecl] [ASTStmt]
     deriving (Eq, Show)
 
 data ASTFunCall = ASTFunCall EntityLoc ASTIdentifier [ASTExpr]
@@ -82,19 +80,14 @@ data ASTOpBin =
     deriving (Eq, Show)
 
 data ASTType =
-        ASTUnknownType
-    |   ASTFunType [ASTType]
-    |   ASTTupleType ASTType ASTType
-    |   ASTListType ASTType
-    |   ASTVarType T.Text
-    |   ASTIntType
-    |   ASTBoolType
-    |   ASTCharType
-    |   ASTVoidType
+        ASTUnknownType EntityLoc
+    |   ASTFunType EntityLoc [ASTType]
+    |   ASTTupleType EntityLoc ASTType ASTType
+    |   ASTListType EntityLoc ASTType
+    |   ASTVarType EntityLoc T.Text
+    |   ASTIntType EntityLoc 
+    |   ASTBoolType EntityLoc 
+    |   ASTCharType EntityLoc 
+    |   ASTVoidType EntityLoc 
     deriving (Eq, Show)
 
-toASTType :: Type -> ASTType
-toASTType VoidType = ASTVoidType
-toASTType IntType = ASTIntType
-toASTType BoolType = ASTBoolType
-toASTType CharType = ASTCharType
