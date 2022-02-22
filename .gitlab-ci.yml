@@ -19,6 +19,9 @@ variables:
   STACK_ROOT: "$CI_PROJECT_DIR/.stack"
 
 cache:
+  key:
+    files:
+    - package.yaml
   paths:
     - .stack
     - .stack-work
