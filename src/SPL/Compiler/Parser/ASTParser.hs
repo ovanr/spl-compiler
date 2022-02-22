@@ -72,8 +72,8 @@ pExpr = foldr ($) baseExpr
                    <<|> pIdentifierExpr
 
 pTupExpr :: Parser Token Text ASTExpr 
-pTupExpr = (\fst snd -> TupExpr (EntityLoc (getStartLoc fst) (getEndLoc snd)) fst snd) <$>
-                (pIsSymbol '(' *> pExpr <* pIsSymbol ',') <*> pExpr <* pIsSymbol ')'
+pTupExpr = (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd) <$>
+                pIsSymbol '(' <*> pExpr <*> (pIsSymbol ',' *> pExpr) <*> pIsSymbol ')'
 
 pIdentifierExpr :: Parser Token Text ASTExpr
 pIdentifierExpr = IdentifierExpr <$> pIdentifier
@@ -100,17 +100,17 @@ pFunCallExpr :: Parser Token Text ASTExpr
 pFunCallExpr = FunCallExpr <$> pFunCall
 
 pFunCall :: Parser Token Text ASTFunCall
-pFunCall = (\id@(ASTIdentifier loc1 _) args -> ASTFunCall loc1 id args)
+pFunCall = (\id args rParen -> ASTFunCall (id |-| rParen) id args)
                 <$> pIdentifier
-                <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',') <* pIsSymbol ')')
+                <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',')) <*> pIsSymbol ')'
 
 pFieldSelect :: Parser Token Text ASTExpr -> Parser Token T.Text ASTExpr
 pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
     where
-        mkFunCallExpr expr id@(ASTIdentifier loc1 _) = FunCallExpr $ ASTFunCall loc1 id [expr]
+        mkFunCallExpr expr id = FunCallExpr $ ASTFunCall (expr |-| id) id [expr]
 
 pEmptyListExpr :: Parser Token Text ASTExpr
-pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (EntityLoc (getStartLoc t1) (_2 %~ (+1) $ getEndLoc t2))) 
+pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2)) 
                         (pIsSymbol '[') (pIsSymbol ']')
 
 pIdentifier :: Parser Token T.Text ASTIdentifier
@@ -202,8 +202,8 @@ pStmt = pIfElseStmt
 
 pIfElseStmt :: Parser Token Text ASTStmt 
 pIfElseStmt =
-    (\cond ifDo elseDo -> IfElse (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond ifDo elseDo) <$>
-    (pIf *> pExpr) <*> pBody <*> (pElse *> pBody)
+    (\kIf cond ifDo elseDo rParen-> IfElse (kIf |-| rParen) cond ifDo elseDo) <$>
+    pIf <*> pExpr <*> pBody <*> (pElse *> pBody) <*> pIsSymbol '}'
     where
         pIf = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.If)) -> True
@@ -211,31 +211,35 @@ pIfElseStmt =
         pElse = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.Else)) -> True
                 _ -> False)
-        pBody = pIsSymbol '{' *> many' pStmt <* pIsSymbol '}'
+        pBody = pIsSymbol '{' *> many' pStmt
 
 pWhileStmt :: Parser Token Text ASTStmt 
 pWhileStmt = 
-    (\cond body -> While (EntityLoc (getStartLoc cond) (getEndLoc cond)) cond body) <$>
-    (pWhile *> pExpr) <*> pBody
+    (\kWhile cond body rParen -> While (kWhile |-| rParen) cond body) <$>
+    pWhile <*> pExpr <*> pBody <*> pIsSymbol '}'
     where
         pWhile = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.While)) -> True
                 _ -> False)
-        pBody = pIsSymbol '{' *> many' pStmt <* pIsSymbol '}'
+        pBody = pIsSymbol '{' *> many' pStmt
 
 pAssignStmt :: Parser Token Text ASTStmt
 pAssignStmt =
-    (\id@(ASTIdentifier loc _) val -> Assign loc id val) <$>
-    pIdentifier <* pIsSymbol '=' <*> pExpr <* pIsSymbol ';'
+    (\id val semic -> Assign (id |-| semic) id val) <$>
+    pIdentifier <* pIsSymbol '=' <*> pExpr <*> pIsSymbol ';'
 
 pFunCallStmt :: Parser Token Text ASTStmt 
 pFunCallStmt = FunCallStmt <$> pFunCall <* pIsSymbol ';'
 
-pReturnStmt :: Parser Token Text ASTStmt
-pReturnStmt = pReturn *> (pReturnNoValue <<|> pReturnValue) 
-    where
-        pReturn = satisfy ( \case
+pReturn :: Parser Token e Token
+pReturn = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.Return)) -> True
                 _ -> False)
-        pReturnNoValue = (\(MkToken (AlexPn _ l c) _) -> Return (EntityLoc (l,c) (l,c)) Nothing) <$> pIsSymbol ';' 
-        pReturnValue = (\val (MkToken (AlexPn _ l c) _) -> Return (EntityLoc (l,c) (l,c)) (Just val)) <$> pExpr <*> pIsSymbol ';' 
+
+pReturnStmt :: Parser Token Text ASTStmt
+pReturnStmt = pReturnNoValue <<|> pReturnValue
+    where
+        pReturnNoValue = (\kReturn semic -> Return (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';' 
+        pReturnValue = (\kReturn val semic -> Return (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';' 
+
+            

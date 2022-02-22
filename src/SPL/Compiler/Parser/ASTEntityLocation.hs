@@ -52,5 +52,5 @@ locationRange :: EntityLoc -> EntityLoc -> EntityLoc
 locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
 
 infixr 5 |-|
-(|-|) :: Locatable a => a -> a -> EntityLoc
+(|-|) :: Locatable a => Locatable b => a -> b -> EntityLoc
 start |-| end = EntityLoc (getStartLoc start) (getEndLoc end)
