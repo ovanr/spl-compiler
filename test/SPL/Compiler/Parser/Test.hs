@@ -9,7 +9,7 @@ module SPL.Compiler.Parser.Test (htf_SPL_Compiler_Parser_Test_thisModulesTests) 
 import Test.Framework hiding (Testable)
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..))
-import SPL.Compiler.Parser.ASTParser (pType, pFargs, pFunType, pExpr, pTupExpr)
+import SPL.Compiler.Parser.ASTParser (pType, pFargs, pFunType, pExpr, pTupExpr, pStmt)
 import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
 import qualified Data.ByteString.Lazy as B
@@ -54,6 +54,18 @@ instance Testable ASTExpr where
 
 instance Testable a => Testable [a] where
     toTestForm = map toTestForm
+
+instance Testable ASTStmt where
+    toTestForm (IfElseStmt _ val1 val2 val3) = IfElseStmt def (toTestForm val1) (toTestForm val2) (toTestForm val3)
+    toTestForm (WhileStmt _ val1 val2) = WhileStmt def (toTestForm val1) (toTestForm val2)
+    toTestForm (AssignStmt _ val1 val2) = AssignStmt def (toTestForm val1) (toTestForm val2)
+    toTestForm (FunCallStmt _ val1) = FunCallStmt def (toTestForm val1)
+    toTestForm (ReturnStmt _ val1) = ReturnStmt def (toTestForm val1)
+
+instance Testable a => Testable (Maybe a) where
+    toTestForm (Just val) = Just (toTestForm val)
+    toTestForm Nothing = Nothing
+
 
 executeMultipleTests :: (Testable b, Eq b, Show b) => Parser Token Text b -> [([SPLToken], Maybe b)] -> IO ()
 executeMultipleTests parser tests =
@@ -342,3 +354,28 @@ test_parse_pexpr_complex = do
 -- (([] : -(1*[])-(2*[]-3*[])-4/[]/-5): (1*[])-(2+[]) 3*(4+[])) 
             ]
     executeMultipleTests pExpr tests
+
+test_parse_stmts = do
+    let tests = [
+            -- foo();
+            [IdentifierToken "foo",SymbolToken '(',SymbolToken ')',SymbolToken ';']
+            --> FunCallStmt def (ASTFunCall def (ASTIdentifier def "foo") []),
+            -- return;
+            [KeywordToken Return, SymbolToken ';']
+            --> ReturnStmt def Nothing,
+            -- while (True) {return;}
+            [KeywordToken While,SymbolToken '(',BoolToken True,SymbolToken ')'
+            ,SymbolToken '{',KeywordToken Return,SymbolToken ';',SymbolToken '}']
+            --> WhileStmt def (BoolExpr def True) [ReturnStmt def Nothing],
+            -- a = b;
+            [IdentifierToken "a",SymbolToken '=',IdentifierToken "b",SymbolToken ';']
+            --> AssignStmt def (ASTIdentifier def "a") (IdentifierExpr (ASTIdentifier def "b")),
+            -- if (3 == x) {function();} else {return;}
+            [KeywordToken If,SymbolToken '(',IntToken 3,SymbolToken '=',SymbolToken '=',IdentifierToken "x",SymbolToken ')'
+            ,SymbolToken '{',IdentifierToken "function",SymbolToken '(',SymbolToken ')',SymbolToken ';',SymbolToken '}'
+            ,KeywordToken Else,SymbolToken '{',KeywordToken Return,SymbolToken ';',SymbolToken '}']
+            --> IfElseStmt def (Op2Expr def (IntExpr def 3) Equal (IdentifierExpr (ASTIdentifier def "x")))
+                    [FunCallStmt def (ASTFunCall def (ASTIdentifier def "function") [])] [ReturnStmt def Nothing]
+                ]
+
+    executeMultipleTests pStmt tests

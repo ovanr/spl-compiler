@@ -203,7 +203,7 @@ pStmt = pIfElseStmt
 pIfElseStmt :: Parser Token Text ASTStmt 
 pIfElseStmt =
     (\kIf cond ifDo elseDo rParen-> IfElseStmt (kIf |-| rParen) cond ifDo elseDo) <$>
-    pIf <*> pExpr <*> pBody <*> (pElse *> pBody) <*> pIsSymbol '}'
+    pIf <*> pExpr <* pIsSymbol '{' <*> pBody <* pIsSymbol '}' <*> (pElse *> pIsSymbol '{' *> pBody) <*> pIsSymbol '}'
     where
         pIf = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.If)) -> True
@@ -211,17 +211,17 @@ pIfElseStmt =
         pElse = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.Else)) -> True
                 _ -> False)
-        pBody = pIsSymbol '{' *> many' pStmt
+        pBody = many' pStmt
 
 pWhileStmt :: Parser Token Text ASTStmt 
 pWhileStmt = 
     (\kWhile cond body rParen -> WhileStmt (kWhile |-| rParen) cond body) <$>
-    pWhile <*> pExpr <*> pBody <*> pIsSymbol '}'
+    pWhile <*> pExpr <* pIsSymbol '{' <*> pBody <*> pIsSymbol '}'
     where
         pWhile = satisfy ( \case
                 (MkToken _ (KeywordToken Lex.While)) -> True
                 _ -> False)
-        pBody = pIsSymbol '{' *> many' pStmt
+        pBody = many' pStmt
 
 pAssignStmt :: Parser Token Text ASTStmt
 pAssignStmt =
