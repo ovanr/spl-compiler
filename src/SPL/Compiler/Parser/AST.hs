@@ -42,11 +42,11 @@ data ASTFunCall = ASTFunCall EntityLoc ASTIdentifier [ASTExpr]
     deriving (Eq, Show)
 
 data ASTStmt = 
-        IfElse EntityLoc ASTExpr [ASTStmt] [ASTStmt]
-    |   While EntityLoc ASTExpr [ASTStmt]
-    |   Assign EntityLoc ASTIdentifier ASTExpr
-    |   FunCallStmt ASTFunCall
-    |   Return EntityLoc (Maybe ASTExpr)  
+        IfElseStmt EntityLoc ASTExpr [ASTStmt] [ASTStmt]
+    |   WhileStmt EntityLoc ASTExpr [ASTStmt]
+    |   AssignStmt EntityLoc ASTIdentifier ASTExpr
+    |   FunCallStmt EntityLoc ASTFunCall
+    |   ReturnStmt EntityLoc (Maybe ASTExpr)  
     deriving (Eq, Show)
 
 data ASTExpr = 

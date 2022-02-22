@@ -32,6 +32,14 @@ instance Locatable ASTExpr where
     getLoc (Op2Expr l _ _ _) = l  
     getLoc (EmptyListExpr l) = l
     getLoc (TupExpr l _ _) = l
+
+instance Locatable ASTStmt where
+    getLoc (IfElseStmt l _ _ _) = l
+    getLoc (WhileStmt l _ _) = l
+    getLoc (AssignStmt l _ _) = l
+    getLoc (FunCallStmt l _) = l
+    getLoc (ReturnStmt l _) = l
+
     
 instance Locatable Token where
     getLoc (MkToken (AlexPn _ l c) t) = EntityLoc (l,c) (l, c + tokenLength t)

@@ -202,7 +202,7 @@ pStmt = pIfElseStmt
 
 pIfElseStmt :: Parser Token Text ASTStmt 
 pIfElseStmt =
-    (\kIf cond ifDo elseDo rParen-> IfElse (kIf |-| rParen) cond ifDo elseDo) <$>
+    (\kIf cond ifDo elseDo rParen-> IfElseStmt (kIf |-| rParen) cond ifDo elseDo) <$>
     pIf <*> pExpr <*> pBody <*> (pElse *> pBody) <*> pIsSymbol '}'
     where
         pIf = satisfy ( \case
@@ -215,7 +215,7 @@ pIfElseStmt =
 
 pWhileStmt :: Parser Token Text ASTStmt 
 pWhileStmt = 
-    (\kWhile cond body rParen -> While (kWhile |-| rParen) cond body) <$>
+    (\kWhile cond body rParen -> WhileStmt (kWhile |-| rParen) cond body) <$>
     pWhile <*> pExpr <*> pBody <*> pIsSymbol '}'
     where
         pWhile = satisfy ( \case
@@ -225,21 +225,19 @@ pWhileStmt =
 
 pAssignStmt :: Parser Token Text ASTStmt
 pAssignStmt =
-    (\id val semic -> Assign (id |-| semic) id val) <$>
+    (\id val semic -> AssignStmt (id |-| semic) id val) <$>
     pIdentifier <* pIsSymbol '=' <*> pExpr <*> pIsSymbol ';'
 
 pFunCallStmt :: Parser Token Text ASTStmt 
-pFunCallStmt = FunCallStmt <$> pFunCall <* pIsSymbol ';'
-
-pReturn :: Parser Token e Token
-pReturn = satisfy ( \case
-                (MkToken _ (KeywordToken Lex.Return)) -> True
-                _ -> False)
+pFunCallStmt = (\funCall semic -> FunCallStmt (funCall |-| semic) funCall) <$> pFunCall <*> pIsSymbol ';'
 
 pReturnStmt :: Parser Token Text ASTStmt
 pReturnStmt = pReturnNoValue <<|> pReturnValue
     where
-        pReturnNoValue = (\kReturn semic -> Return (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';' 
-        pReturnValue = (\kReturn val semic -> Return (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';' 
+        pReturn = satisfy ( \case
+                (MkToken _ (KeywordToken Lex.Return)) -> True
+                _ -> False)
+        pReturnNoValue = (\kReturn semic -> ReturnStmt (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';' 
+        pReturnValue = (\kReturn val semic -> ReturnStmt (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';' 
 
             
