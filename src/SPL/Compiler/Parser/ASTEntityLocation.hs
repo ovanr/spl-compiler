@@ -39,7 +39,6 @@ instance Locatable ASTStmt where
     getLoc (AssignStmt l _ _) = l
     getLoc (FunCallStmt l _) = l
     getLoc (ReturnStmt l _) = l
-
     
 instance Locatable Token where
     getLoc (MkToken (AlexPn _ l c) t) = EntityLoc (l,c) (l, c + tokenLength t)
