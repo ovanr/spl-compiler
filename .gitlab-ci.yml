@@ -28,17 +28,30 @@ cache:
     - target
 
 stages:        # List of stages for jobs, and their order of execution
-  - build
+  - build-dependencies
+  - build-app
   - test
 
-
-build-job:   # This job runs in the test stage.
-  stage: build    # It only starts when the job in the build stage completes successfully.
+build-dependencies-job:   # This job runs in the test stage.
+  stage: build-dependencies    # It only starts when the job in the build stage completes successfully.
   script:
     - stack build alex
+    - stack build --only-dependencies
+  only:
+    changes: [package.json]
+  cache:
+    policy: push
+
+build-app-job:   # This job runs in the test stage.
+  stage: build-app    # It only starts when the job in the build stage completes successfully.
+  script:
     - stack build
+  cache:
+    policy: pull
 
 unit-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
   script:
     - stack test
+  cache:
+    policy: pull
