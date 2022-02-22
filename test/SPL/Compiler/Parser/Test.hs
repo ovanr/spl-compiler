@@ -39,7 +39,15 @@ instance Testable ASTFunCall where
     toTestForm (ASTFunCall _ i e) = ASTFunCall def (toTestForm i) (toTestForm e)
 
 instance Testable ASTType where
-    toTestForm a = a
+    toTestForm (ASTUnknownType l) = ASTUnknownType def
+    toTestForm (ASTFunType _ t) = ASTFunType def (toTestForm t)
+    toTestForm (ASTTupleType _ t1 t2) = ASTTupleType def (toTestForm t1) (toTestForm t2)
+    toTestForm (ASTListType _ t) = ASTListType def (toTestForm t)
+    toTestForm (ASTVarType _ v) = ASTVarType def v
+    toTestForm (ASTIntType _) = ASTIntType def
+    toTestForm (ASTBoolType _) = ASTBoolType def
+    toTestForm (ASTCharType _) = ASTCharType def
+    toTestForm (ASTVoidType _) = ASTVoidType def
 
 instance Testable ASTExpr where
     toTestForm (TupExpr _ p1 p2) = TupExpr def (toTestForm p1) (toTestForm p2)
@@ -79,13 +87,13 @@ failure input = (input, Nothing)
 
 test_parse_type = do
     let tests = [
-            [TypeToken IntType] --> ASTIntType,
-            [TypeToken BoolType] --> ASTBoolType,
-            [TypeToken CharType] --> ASTCharType,
-            [IdentifierToken "a"] --> ASTVarType "a",
+            [TypeToken IntType] --> ASTIntType def,
+            [TypeToken BoolType] --> ASTBoolType def,
+            [TypeToken CharType] --> ASTCharType def,
+            [IdentifierToken "a"] --> ASTVarType def "a",
             [ SymbolToken '(', IdentifierToken "b", SymbolToken ',', TypeToken IntType, SymbolToken ')']
-                --> ASTTupleType (ASTVarType "b") ASTIntType,
-            [SymbolToken '[', IdentifierToken "b", SymbolToken ']'] --> ASTListType (ASTVarType "b"),
+                --> ASTTupleType def (ASTVarType def "b") (ASTIntType def),
+            [SymbolToken '[', IdentifierToken "b", SymbolToken ']'] --> ASTListType def (ASTVarType def "b"),
             failure [SymbolToken '[', IdentifierToken "b", TypeToken IntType, SymbolToken ']'],
             failure [SymbolToken '(', IdentifierToken "b", TypeToken IntType, SymbolToken ')']
             ]
@@ -105,22 +113,24 @@ test_parse_fargs = do
 test_parse_ftype = do
     let tests = [
             [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', TypeToken IntType]
-                --> ASTFunType [ASTIntType],
+                --> ASTFunType def [ASTIntType def],
             [SymbolToken ':', SymbolToken ':',
                 TypeToken IntType, IdentifierToken "a",
                 SymbolToken '-', SymbolToken '>', TypeToken CharType]
-                --> ASTFunType [ASTIntType, ASTVarType "a", ASTCharType],
+                --> ASTFunType def [ASTIntType def, ASTVarType def "a", ASTCharType def],
             [SymbolToken ':', SymbolToken ':',
                 TypeToken IntType, IdentifierToken "a",
                 SymbolToken '-', SymbolToken '>', TypeToken CharType]
-                --> ASTFunType [ASTIntType, ASTVarType "a", ASTCharType],
+                --> ASTFunType def [ASTIntType def, ASTVarType def "a", ASTCharType def],
             [SymbolToken ':', SymbolToken ':',
                 TypeToken IntType, SymbolToken '[', IdentifierToken "a", SymbolToken ']',
                 SymbolToken '-', SymbolToken '>',
                 TypeToken CharType
-            ] --> ASTFunType [ASTIntType, ASTListType (ASTVarType "a"), ASTCharType],
-            failure [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', SymbolToken '{'],
-            failure [SymbolToken ':', SymbolToken ':', TypeToken CharType]
+            ] --> ASTFunType def [ASTIntType def, ASTListType def (ASTVarType def "a"), ASTCharType def],
+            [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', SymbolToken '{'] 
+                --> ASTUnknownType def,
+            [SymbolToken ':', SymbolToken ':', TypeToken CharType]
+                --> ASTUnknownType def
             ]
     executeMultipleTests pFunType tests
 

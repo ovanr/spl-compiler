@@ -3,10 +3,10 @@
 
 module SPL.Compiler.Parser.ASTParser where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..)) 
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..))
 import qualified SPL.Compiler.Lexer.AlexLexGen as Lex (Keyword(..), Type(..))
 import SPL.Compiler.Parser.ParserCombinator
-import SPL.Compiler.Parser.AST 
+import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
 import Control.Applicative
 import Control.Lens ((%~), _1, _2)
@@ -53,7 +53,7 @@ pExpr = foldr ($) baseExpr
         , pChainl (pBinOp "&&")
         , pChainl (pBinOp "==" <<|> pBinOp "!=")
         , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
-        , pChainr (pBinOp ":") 
+        , pChainr (pBinOp ":")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
         , pFieldSelect
@@ -71,7 +71,7 @@ pExpr = foldr ($) baseExpr
                    <<|> pCharExpr
                    <<|> pIdentifierExpr
 
-pTupExpr :: Parser Token Text ASTExpr 
+pTupExpr :: Parser Token Text ASTExpr
 pTupExpr = (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd) <$>
                 pIsSymbol '(' <*> pExpr <*> (pIsSymbol ',' *> pExpr) <*> pIsSymbol ')'
 
@@ -110,7 +110,7 @@ pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
         mkFunCallExpr expr id = FunCallExpr $ ASTFunCall (expr |-| id) id [expr]
 
 pEmptyListExpr :: Parser Token Text ASTExpr
-pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2)) 
+pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2))
                         (pIsSymbol '[') (pIsSymbol ']')
 
 pIdentifier :: Parser Token T.Text ASTIdentifier
@@ -128,9 +128,9 @@ pIdentifier =
 
 pIsSymbol :: Char -> Parser Token Text Token
 pIsSymbol c =
-    satisfy ( \case
-                (MkToken _ (SymbolToken c2)) | c == c2 -> True
-                _ -> False
+    satisfy (\case
+               (MkToken _ (SymbolToken c2)) | c == c2 -> True
+               _ -> False
     ) <<|> pError (\case
         (ParserState _ (s:_)) ->
             "Expected character '" <> T.singleton c <>
@@ -150,57 +150,100 @@ pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
             "Expected '->' but instead got EOF"
     )
 
+
+
 pBasicType :: Parser Token Text ASTType
 pBasicType =
-    (\(MkToken _ (TypeToken t)) -> toASTType t) <$>
-            satisfy (\case
-                        (MkToken _ (TypeToken Lex.VoidType)) -> False
-                        (MkToken _ (TypeToken _)) -> True
-                        _ -> False)
+        satisfyAs (\case
+                    t@(MkToken _ (TypeToken _)) -> toASTBasicType t
+                    _ -> Nothing)
     <<|> pError (\case
         (ParserState _ (s:_)) ->
             "Expected a basic type but instead got '" <> T.pack (show s) <> "'"
         (ParserState _ []) ->
             "Expected a basic type but instead got EOF"
     )
-
+    where
+        toASTBasicType :: Token -> Maybe ASTType
+        toASTBasicType t@(MkToken _ (TypeToken Lex.IntType)) = Just . ASTIntType $ getLoc t
+        toASTBasicType t@(MkToken _ (TypeToken Lex.BoolType)) = Just . ASTBoolType $ getLoc t
+        toASTBasicType t@(MkToken _ (TypeToken Lex.CharType)) = Just . ASTCharType $ getLoc t
+        toASTBasicType _ = Nothing
 
 pVoidType :: Parser Token e ASTType
 pVoidType =
-    (\(MkToken _ (TypeToken t)) -> toASTType t) <$>
-            satisfy (\case
-                        (MkToken _ (TypeToken Lex.VoidType)) -> True
-                        _ -> False)
+        satisfyAs (\case
+                    t@(MkToken _ (TypeToken Lex.VoidType)) -> Just $ ASTVoidType (getLoc t)
+                    _ -> Nothing)
 
 pFargs :: Parser Token Text [ASTIdentifier]
 pFargs = pList pIdentifier $ pIsSymbol ','
 
+
 pType :: Parser Token Text ASTType
 pType = pBasicType
-        <<|> ((\(ASTIdentifier _ v) -> ASTVarType v) <$> pIdentifier)
-        <<|> tupError (liftA2 ASTTupleType (pIsSymbol '(' *> pType) (pIsSymbol ',' *> pType <* pIsSymbol ')'))
-        <<|> listError (ASTListType <$> (pIsSymbol '[' *> pType <* pIsSymbol ']'))
+        <<|> ((\i@(ASTIdentifier _ v) -> ASTVarType (getLoc i) v) <$> pIdentifier)
+        <<|> tupError ((\start t1 t2 end -> ASTTupleType (start |-| end) t1 t2) 
+                            <$> pIsSymbol '('
+                            <*> pType
+                            <*> (pIsSymbol ',' *> pType)
+                            <*> pIsSymbol ')')
+        <<|> listError ((\start t end -> ASTListType (start |-| end) t) 
+                            <$> pIsSymbol '[' 
+                            <*> pType 
+                            <*> pIsSymbol ']')
     where
         tupError = pWrapErrors (const "Unable to parse tuple type: ")
         listError = pWrapErrors (const "Unable to parse list type: ")
 
 pFunType :: Parser Token Text ASTType
-pFunType = ASTFunType <$>
-             (pTwice (pIsSymbol ':') *> pFtype <* pArrow <++> (pure <$> pRetType))
+pFunType = (\t r -> ASTFunType (t |-| r) (t ++ [r])) 
+                <$> (pTwice (pIsSymbol ':') *> pFtype <* pArrow)
+                <*> pRetType
+            <<|> ((\t -> let start = getStartLoc t in ASTUnknownType (EntityLoc start start)) <$> peek)
     where
         pFtype :: Parser Token Text [ASTType]
         pFtype = concat . maybeToList <$> pMaybe (some pType)
         pRetType :: Parser Token Text ASTType
         pRetType = pType <<|> pVoidType
 
-pStmt :: Parser Token Text ASTStmt 
+pAST :: Parser Token Text AST
+pAST = AST <$> many' pASTLeaf
+    where
+        pASTLeaf = (ASTVar <$> pVarDecl) <<|> (ASTFun <$> pFunDecl)
+
+pFunDecl :: Parser Token Text ASTFunDecl
+pFunDecl = (\i fargs t body -> ASTFunDecl (i |-| body) i fargs t body)
+                <$> pIdentifier 
+                <*> (pIsSymbol '(' *> pFargs <* pIsSymbol ')')
+                <*> pFunType
+                <*> pFunBody
+
+    where
+        pFunBody = (\start v s end -> ASTFunBody (start |-| end) v s)
+                        <$> pIsSymbol '{' 
+                        <*> many' pVarDecl 
+                        <*> many' pStmt
+                        <*> pIsSymbol '}'
+
+pVarDecl :: Parser Token Text ASTVarDecl
+pVarDecl = (\t id expr end -> ASTVarDecl (t |-| end) t id expr) 
+             <$> (pIsVar <<|> pType)
+             <*> pIdentifier
+             <*> pExpr
+             <*> pIsSymbol ';'
+    where
+        pIsVar = ASTUnknownType . getLoc <$>
+                    satisfy (\case (MkToken _ (KeywordToken Lex.Var)) -> True; _ -> False)
+
+pStmt :: Parser Token Text ASTStmt
 pStmt = pIfElseStmt
         <<|> pWhileStmt
         <<|> pAssignStmt
         <<|> pFunCallStmt
-        <<|> pReturnStmt 
+        <<|> pReturnStmt
 
-pIfElseStmt :: Parser Token Text ASTStmt 
+pIfElseStmt :: Parser Token Text ASTStmt
 pIfElseStmt =
     (\kIf cond ifDo elseDo rParen-> IfElse (kIf |-| rParen) cond ifDo elseDo) <$>
     pIf <*> pExpr <*> pBody <*> (pElse *> pBody) <*> pIsSymbol '}'
@@ -213,8 +256,8 @@ pIfElseStmt =
                 _ -> False)
         pBody = pIsSymbol '{' *> many' pStmt
 
-pWhileStmt :: Parser Token Text ASTStmt 
-pWhileStmt = 
+pWhileStmt :: Parser Token Text ASTStmt
+pWhileStmt =
     (\kWhile cond body rParen -> While (kWhile |-| rParen) cond body) <$>
     pWhile <*> pExpr <*> pBody <*> pIsSymbol '}'
     where
@@ -228,7 +271,7 @@ pAssignStmt =
     (\id val semic -> Assign (id |-| semic) id val) <$>
     pIdentifier <* pIsSymbol '=' <*> pExpr <*> pIsSymbol ';'
 
-pFunCallStmt :: Parser Token Text ASTStmt 
+pFunCallStmt :: Parser Token Text ASTStmt
 pFunCallStmt = FunCallStmt <$> pFunCall <* pIsSymbol ';'
 
 pReturn :: Parser Token e Token
@@ -239,7 +282,7 @@ pReturn = satisfy ( \case
 pReturnStmt :: Parser Token Text ASTStmt
 pReturnStmt = pReturnNoValue <<|> pReturnValue
     where
-        pReturnNoValue = (\kReturn semic -> Return (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';' 
-        pReturnValue = (\kReturn val semic -> Return (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';' 
+        pReturnNoValue = (\kReturn semic -> Return (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';'
+        pReturnValue = (\kReturn val semic -> Return (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';'
 
-            
+
