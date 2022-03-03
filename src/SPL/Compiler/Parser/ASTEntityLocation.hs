@@ -38,7 +38,6 @@ instance Locatable ASTStmt where
     getLoc (AssignStmt l _ _) = l
     getLoc (FunCallStmt l _) = l
     getLoc (ReturnStmt l _) = l
-
     
 instance Locatable ASTType where
     getLoc (ASTUnknownType l) = l
