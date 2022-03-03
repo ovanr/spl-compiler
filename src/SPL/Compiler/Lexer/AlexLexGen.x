@@ -97,7 +97,7 @@ data SPLToken =
     | CharToken Char
     | BoolToken Bool
     | IdentifierToken T.Text
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data Keyword =
       Var
@@ -105,14 +105,36 @@ data Keyword =
     | Else
     | While
     | Return
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data Type =
       IntType
     | BoolType
     | CharType
     | VoidType
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show Type where
+    show IntType = "Int"
+    show BoolType = "Bool"
+    show CharType = "Char"
+    show VoidType = "Void"
+
+instance Show Keyword where
+    show Var = "var"
+    show If = "if"
+    show Else = "else"
+    show While = "while"
+    show Return = "return"
+
+instance Show SPLToken where
+    show (KeywordToken k) = show k
+    show (TypeToken t) = show t
+    show (SymbolToken c) = [c]
+    show (IntToken i) = show i
+    show (CharToken c) = show c
+    show (BoolToken b) = show b
+    show (IdentifierToken i) = T.unpack i
 
 alexEOF = return EOF
 
@@ -146,7 +168,6 @@ data AlexUserState = AlexUserState {
     filePath :: FilePath, 
     contents :: B.ByteString 
 }
-
 
 -- Parse a single token.
 -- Identical to generated alexMonadScan function

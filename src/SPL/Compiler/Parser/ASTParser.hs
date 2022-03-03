@@ -12,39 +12,223 @@ import Control.Applicative
 import Control.Lens ((%~), _1, _2)
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import Data.Function ((&))
 import Data.Maybe (maybeToList)
 
 pParens :: Parser Token Text a -> Parser Token Text a
-pParens p = pIsSymbol '(' *> p <* pIsSymbol ')'
+pParens p =
+    pIsSymbol '('
+    *> p <* pReplaceError (const "Parse error: Unclosed bracket") (pIsSymbol ')')
 
-pBinOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr -> ASTExpr)
-pBinOp op =     foldl1 (*>) (map pIsSymbol op)
-            $>
-                (\e1 e2 -> Op2Expr (EntityLoc (getStartLoc e1) (getEndLoc e2)) e1 (getOperator op) e2)
+pIsSymbol :: Char -> Parser Token Text Token
+pIsSymbol c =
+    satisfy (\case
+               (MkToken _ (SymbolToken c2)) | c == c2 -> True
+               _ -> False
+    ) <<|> pError (mkError $ 
+        "Expected character '" <> T.singleton c <> "' but instead got "
+    )
+
+pIdentifier :: Parser Token T.Text ASTIdentifier
+pIdentifier =
+    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (getLoc t) val) <$>
+    satisfy (\case
+               (MkToken _ (IdentifierToken _)) -> True
+               _ -> False
+    ) <<|> pError (mkError "Expected an identifier but instead got ")
+
+mkError :: T.Text -> ParserState Token -> T.Text
+mkError err (ParserState _ []) = err
+mkError err (ParserState _ (s@(MkToken _ t):_)) =
+    let line = fst $ getStartLoc s
+        col = snd $ getStartLoc s
+     in "<" <> T.pack (show line) <> "," <> T.pack (show col) <> ">:" <>
+        err <> "'" <> T.pack (show t) <> "'"
+     
+pAST :: Parser Token Text AST
+pAST = AST <$> (many' pASTLeaf <* pEnd)
     where
-        getOperator "+" = Plus
-        getOperator "-" = Minus
-        getOperator "*" = Mul
-        getOperator "/" = Div
-        getOperator "%" = Mod
-        getOperator "^" = Pow
-        getOperator ":" = Cons
-        getOperator "==" = Equal
-        getOperator "<" = Less
-        getOperator ">" = Greater
-        getOperator "<=" = LessEq
-        getOperator ">=" = GreaterEq
-        getOperator "!=" = Nequal
-        getOperator "&&" = LogAnd
-        getOperator "||" = LogOr
-        getOperator _ = error "Binary operator not defined"
+        pASTLeaf = (ASTVar <$> pVarDecl) <<|> (ASTFun <$> pFunDecl)
+        pEnd = pReplaceError (mkError "Expected end of file but instead got ") $
+                    satisfy (\case EOF -> True; _ -> False)
 
-pUnaryOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr)
-pUnaryOp "!" = pIsSymbol '!' $> (\e1 -> OpExpr (EntityLoc (getStartLoc e1) (getEndLoc e1)) UnNeg e1)
-pUnaryOp "-" = pIsSymbol '-' $> (\e1 -> OpExpr (EntityLoc (getStartLoc e1) (getEndLoc e1)) UnMinus e1)
-pUnaryOp _ = error "Unary operator not defined"
+pFunDecl :: Parser Token Text ASTFunDecl
+pFunDecl = (\i fargs t body -> ASTFunDecl (i |-| body) i fargs t body)
+                <$> pIdentifier
+                <*> (pIsSymbol '(' *> pFargs <* pIsSymbol ')')
+                <*> pFunType
+                <*> pFunBody
+
+    where
+        pFunBody = (\start v s end -> ASTFunBody (start |-| end) v s)
+                        <$> pIsSymbol '{'
+                        <*> many' pVarDecl
+                        <*> many' pStmt
+                        <*> pIsSymbol '}'
+
+pFargs :: Parser Token Text [ASTIdentifier]
+pFargs = pList pIdentifier $ pIsSymbol ','
+
+pBasicType :: Parser Token Text ASTType
+pBasicType =
+        satisfyAs (\case
+                     t@(MkToken _ (TypeToken _)) -> toASTBasicType t
+                     _ -> Nothing)
+    <<|> pError (\case
+        (ParserState _ (s:_)) ->
+            "Expected a basic type but instead got '" <> T.pack (show s) <> "'"
+        (ParserState _ []) ->
+            "Expected a basic type but instead got EOF"
+    )
+    where
+        toASTBasicType :: Token -> Maybe ASTType
+        toASTBasicType t@(MkToken _ (TypeToken Lex.IntType)) =
+            Just . ASTIntType $ getLoc t
+        toASTBasicType t@(MkToken _ (TypeToken Lex.BoolType)) =
+            Just . ASTBoolType $ getLoc t
+        toASTBasicType t@(MkToken _ (TypeToken Lex.CharType)) =
+            Just . ASTCharType $ getLoc t
+        toASTBasicType _ = Nothing
+
+pVoidType :: Parser Token e ASTType
+pVoidType =
+    satisfyAs $
+        \case
+            t@(MkToken _ (TypeToken Lex.VoidType)) -> Just $ ASTVoidType (getLoc t)
+            _ -> Nothing
+
+
+pType :: Parser Token Text ASTType
+pType =
+    pWrapErrors (\_ -> (<>) "Type parse error: ") $
+        pBasicType
+        <<|> (identifierToVar <$> pIdentifier)
+        <<|> tupError ((\start t1 t2 end -> ASTTupleType (start |-| end) t1 t2)
+                            <$> pIsSymbol '('
+                            <*> pType
+                            <*> (pIsSymbol ',' *> pType)
+                            <*> pIsSymbol ')')
+        <<|> listError ((\start t end -> ASTListType (start |-| end) t)
+                            <$> pIsSymbol '['
+                            <*> pType
+                            <*> pIsSymbol ']')
+    where
+        identifierToVar i@(ASTIdentifier _ v) = ASTVarType (getLoc i) v
+        tupError = pWrapErrors (\_ -> (<>) "Unable to parse tuple type: ")
+        listError = pWrapErrors (\_ -> (<>) "Unable to parse list type: ")
+
+-- note that: (someParser $> a) == someParser *> pure a 
+pArrow :: Parser Token Text ()
+pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
+    <<|> pError (\case
+        (ParserState _ (s:_)) ->
+            "Expected '->' but instead got '" <> T.pack (show s) <> "'"
+        (ParserState _ []) ->
+            "Expected '->' but instead got EOF"
+    )
+
+pFunType :: Parser Token Text ASTType
+pFunType =
+    pWrapErrors (\_ -> (<>) "Function type parse error: )") $
+            (\t r -> ASTFunType (t |-| r) (t ++ [r]))
+                <$> (pTwice (pIsSymbol ':') *> pFtype <* pArrow)
+                <*> pRetType
+            <<|> pUnknownType
+    where
+        pUnknownType =
+            peek <&>
+            \t -> let start = getStartLoc t
+                   in ASTUnknownType (EntityLoc start start)
+        pFtype :: Parser Token Text [ASTType]
+        pFtype = concat . maybeToList <$> pMaybe (some pType)
+        pRetType :: Parser Token Text ASTType
+        pRetType = pType <<|> pVoidType
+
+pVarDecl :: Parser Token Text ASTVarDecl
+pVarDecl = (\t id expr end -> ASTVarDecl (t |-| end) t id expr)
+             <$> (pIsVar <<|> pType)
+             <*> pIdentifier
+             <*> pExpr
+             <*> pIsSymbol ';'
+    where
+        pIsVar = ASTUnknownType . getLoc <$>
+                    satisfy (\case
+                               (MkToken _ (KeywordToken Lex.Var)) -> True
+                               _ -> False)
+
+pStmt :: Parser Token Text ASTStmt
+pStmt = pIfElseStmt
+        <<|> pWhileStmt
+        <<|> pAssignStmt
+        <<|> pFunCallStmt
+        <<|> pReturnStmt
+
+pIfElseStmt :: Parser Token Text ASTStmt
+pIfElseStmt =
+    (\kIf cond ifDo elseDo rParen-> IfElseStmt (kIf |-| rParen) cond ifDo elseDo)
+        <$> pIf
+        <*> pExpr <* pIsSymbol '{'
+        <*> pBody <* pIsSymbol '}'
+        <*> (pElse *> pIsSymbol '{' *> pBody)
+        <*> pIsSymbol '}'
+    where
+        pIf = satisfy (\case
+                         (MkToken _ (KeywordToken Lex.If)) -> True
+                         _ -> False)
+        pElse = satisfy (\case
+                           (MkToken _ (KeywordToken Lex.Else)) -> True
+                           _ -> False)
+        pBody = many' pStmt
+
+pWhileStmt :: Parser Token Text ASTStmt
+pWhileStmt =
+    (\kWhile cond body rParen -> WhileStmt (kWhile |-| rParen) cond body)
+        <$> pWhile
+        <*> pExpr <* pIsSymbol '{'
+        <*> pBody
+        <*> pIsSymbol '}'
+    where
+        pWhile = satisfy (\case
+                            (MkToken _ (KeywordToken Lex.While)) -> True
+                            _ -> False)
+        pBody = many' pStmt
+
+pAssignStmt :: Parser Token Text ASTStmt
+pAssignStmt =
+    (\id val semic -> AssignStmt (id |-| semic) id val)
+        <$> pIdentifier <* pIsSymbol '='
+        <*> pExpr
+        <*> pIsSymbol ';'
+
+pFunCallStmt :: Parser Token Text ASTStmt
+pFunCallStmt =
+    (\call col -> FunCallStmt (call |-| col) call)
+        <$> pFunCall
+        <*> pIsSymbol ';'
+
+pReturnStmt :: Parser Token Text ASTStmt
+pReturnStmt = pReturnNoValue <<|> pReturnValue
+    where
+        pReturn = satisfy (\case
+                             (MkToken _ (KeywordToken Lex.Return)) -> True
+                             _ -> False)
+        pReturnNoValue =
+            (\ret col -> ReturnStmt (ret |-| col) Nothing)
+                <$> pReturn
+                <*> pIsSymbol ';'
+        pReturnValue =
+            (\ret val col -> ReturnStmt (ret |-| col) (Just val))
+                <$> pReturn
+                <*> pExpr
+                <*> pIsSymbol ';'
+
+pFunCall :: Parser Token Text ASTFunCall
+pFunCall = (\id args rParen -> ASTFunCall (id |-| rParen) id args)
+                <$> pIdentifier
+                <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ','))
+                <*> pIsSymbol ')'
+
 
 pExpr :: Parser Token Text ASTExpr
 pExpr = foldr ($) baseExpr
@@ -71,9 +255,39 @@ pExpr = foldr ($) baseExpr
                    <<|> pCharExpr
                    <<|> pIdentifierExpr
 
+pUnaryOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr)
+pUnaryOp "!" = pIsSymbol '!' $> (\e1 -> OpExpr (e1 |-| e1) UnNeg e1)
+pUnaryOp "-" = pIsSymbol '-' $> (\e1 -> OpExpr (e1 |-| e1) UnMinus e1)
+pUnaryOp _ = error "Unary operator not defined"
+
+pBinOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr -> ASTExpr)
+pBinOp op = foldl1 (*>) (map pIsSymbol op)
+                $> (\e1 e2 -> Op2Expr (e1 |-| e2) e1 (getOperator op) e2)
+    where
+        getOperator "+" = Plus
+        getOperator "-" = Minus
+        getOperator "*" = Mul
+        getOperator "/" = Div
+        getOperator "%" = Mod
+        getOperator "^" = Pow
+        getOperator ":" = Cons
+        getOperator "==" = Equal
+        getOperator "<" = Less
+        getOperator ">" = Greater
+        getOperator "<=" = LessEq
+        getOperator ">=" = GreaterEq
+        getOperator "!=" = Nequal
+        getOperator "&&" = LogAnd
+        getOperator "||" = LogOr
+        getOperator _ = error "Binary operator not defined"
+
 pTupExpr :: Parser Token Text ASTExpr
-pTupExpr = (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd) <$>
-                pIsSymbol '(' <*> pExpr <*> (pIsSymbol ',' *> pExpr) <*> pIsSymbol ')'
+pTupExpr =
+    (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd)
+        <$> pIsSymbol '('
+        <*> pExpr
+        <*> (pIsSymbol ',' *> pExpr)
+        <*> pIsSymbol ')'
 
 pIdentifierExpr :: Parser Token Text ASTExpr
 pIdentifierExpr = IdentifierExpr <$> pIdentifier
@@ -99,11 +313,6 @@ pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$
 pFunCallExpr :: Parser Token Text ASTExpr
 pFunCallExpr = FunCallExpr <$> pFunCall
 
-pFunCall :: Parser Token Text ASTFunCall
-pFunCall = (\id args rParen -> ASTFunCall (id |-| rParen) id args)
-                <$> pIdentifier
-                <*> (pIsSymbol '(' *> pList pExpr (pIsSymbol ',')) <*> pIsSymbol ')'
-
 pFieldSelect :: Parser Token Text ASTExpr -> Parser Token T.Text ASTExpr
 pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
     where
@@ -111,175 +320,5 @@ pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
 
 pEmptyListExpr :: Parser Token Text ASTExpr
 pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2))
-                        (pIsSymbol '[') (pIsSymbol ']')
-
-pIdentifier :: Parser Token T.Text ASTIdentifier
-pIdentifier =
-    (\t@(MkToken _ (IdentifierToken val)) -> ASTIdentifier (getLoc t) val) <$>
-    satisfy (\case
-                (MkToken _ (IdentifierToken _)) -> True
-                _ -> False
-    ) <<|> pError (\case
-        (ParserState _ (s:_)) ->
-            "Expected an identifier but instead got '" <> T.pack (show s) <> "'"
-        (ParserState _ []) ->
-            "Expected an identifier but instead got EOF"
-    )
-
-pIsSymbol :: Char -> Parser Token Text Token
-pIsSymbol c =
-    satisfy (\case
-               (MkToken _ (SymbolToken c2)) | c == c2 -> True
-               _ -> False
-    ) <<|> pError (\case
-        (ParserState _ (s:_)) ->
-            "Expected character '" <> T.singleton c <>
-            "' but instead got '" <> T.pack (show s) <> "'"
-        (ParserState _ []) ->
-            "Expected character '" <> T.singleton c <> "' but instead got EOF"
-    )
-
-
--- note that: (someParser $> a) == someParser *> pure a 
-pArrow :: Parser Token Text ()
-pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
-    <<|> pError (\case
-        (ParserState _ (s:_)) ->
-            "Expected '->' but instead got '" <> T.pack (show s) <> "'"
-        (ParserState _ []) ->
-            "Expected '->' but instead got EOF"
-    )
-
-
-
-pBasicType :: Parser Token Text ASTType
-pBasicType =
-        satisfyAs (\case
-                    t@(MkToken _ (TypeToken _)) -> toASTBasicType t
-                    _ -> Nothing)
-    <<|> pError (\case
-        (ParserState _ (s:_)) ->
-            "Expected a basic type but instead got '" <> T.pack (show s) <> "'"
-        (ParserState _ []) ->
-            "Expected a basic type but instead got EOF"
-    )
-    where
-        toASTBasicType :: Token -> Maybe ASTType
-        toASTBasicType t@(MkToken _ (TypeToken Lex.IntType)) = Just . ASTIntType $ getLoc t
-        toASTBasicType t@(MkToken _ (TypeToken Lex.BoolType)) = Just . ASTBoolType $ getLoc t
-        toASTBasicType t@(MkToken _ (TypeToken Lex.CharType)) = Just . ASTCharType $ getLoc t
-        toASTBasicType _ = Nothing
-
-pVoidType :: Parser Token e ASTType
-pVoidType =
-        satisfyAs (\case
-                    t@(MkToken _ (TypeToken Lex.VoidType)) -> Just $ ASTVoidType (getLoc t)
-                    _ -> Nothing)
-
-pFargs :: Parser Token Text [ASTIdentifier]
-pFargs = pList pIdentifier $ pIsSymbol ','
-
-
-pType :: Parser Token Text ASTType
-pType = pBasicType
-        <<|> ((\i@(ASTIdentifier _ v) -> ASTVarType (getLoc i) v) <$> pIdentifier)
-        <<|> tupError ((\start t1 t2 end -> ASTTupleType (start |-| end) t1 t2) 
-                            <$> pIsSymbol '('
-                            <*> pType
-                            <*> (pIsSymbol ',' *> pType)
-                            <*> pIsSymbol ')')
-        <<|> listError ((\start t end -> ASTListType (start |-| end) t) 
-                            <$> pIsSymbol '[' 
-                            <*> pType 
-                            <*> pIsSymbol ']')
-    where
-        tupError = pWrapErrors (const "Unable to parse tuple type: ")
-        listError = pWrapErrors (const "Unable to parse list type: ")
-
-pFunType :: Parser Token Text ASTType
-pFunType = (\t r -> ASTFunType (t |-| r) (t ++ [r])) 
-                <$> (pTwice (pIsSymbol ':') *> pFtype <* pArrow)
-                <*> pRetType
-            <<|> ((\t -> let start = getStartLoc t in ASTUnknownType (EntityLoc start start)) <$> peek)
-    where
-        pFtype :: Parser Token Text [ASTType]
-        pFtype = concat . maybeToList <$> pMaybe (some pType)
-        pRetType :: Parser Token Text ASTType
-        pRetType = pType <<|> pVoidType
-
-pAST :: Parser Token Text AST
-pAST = AST <$> many' pASTLeaf
-    where
-        pASTLeaf = (ASTVar <$> pVarDecl) <<|> (ASTFun <$> pFunDecl)
-
-pFunDecl :: Parser Token Text ASTFunDecl
-pFunDecl = (\i fargs t body -> ASTFunDecl (i |-| body) i fargs t body)
-                <$> pIdentifier 
-                <*> (pIsSymbol '(' *> pFargs <* pIsSymbol ')')
-                <*> pFunType
-                <*> pFunBody
-
-    where
-        pFunBody = (\start v s end -> ASTFunBody (start |-| end) v s)
-                        <$> pIsSymbol '{' 
-                        <*> many' pVarDecl 
-                        <*> many' pStmt
-                        <*> pIsSymbol '}'
-
-pVarDecl :: Parser Token Text ASTVarDecl
-pVarDecl = (\t id expr end -> ASTVarDecl (t |-| end) t id expr) 
-             <$> (pIsVar <<|> pType)
-             <*> pIdentifier
-             <*> pExpr
-             <*> pIsSymbol ';'
-    where
-        pIsVar = ASTUnknownType . getLoc <$>
-                    satisfy (\case (MkToken _ (KeywordToken Lex.Var)) -> True; _ -> False)
-
-pStmt :: Parser Token Text ASTStmt
-pStmt = pIfElseStmt
-        <<|> pWhileStmt
-        <<|> pAssignStmt
-        <<|> pFunCallStmt
-        <<|> pReturnStmt
-
-pIfElseStmt :: Parser Token Text ASTStmt
-pIfElseStmt =
-    (\kIf cond ifDo elseDo rParen-> IfElseStmt (kIf |-| rParen) cond ifDo elseDo) <$>
-    pIf <*> pExpr <* pIsSymbol '{' <*> pBody <* pIsSymbol '}' <*> (pElse *> pIsSymbol '{' *> pBody) <*> pIsSymbol '}'
-    where
-        pIf = satisfy ( \case
-                (MkToken _ (KeywordToken Lex.If)) -> True
-                _ -> False)
-        pElse = satisfy ( \case
-                (MkToken _ (KeywordToken Lex.Else)) -> True
-                _ -> False)
-        pBody = many' pStmt
-
-pWhileStmt :: Parser Token Text ASTStmt 
-pWhileStmt = 
-    (\kWhile cond body rParen -> WhileStmt (kWhile |-| rParen) cond body) <$>
-    pWhile <*> pExpr <* pIsSymbol '{' <*> pBody <*> pIsSymbol '}'
-    where
-        pWhile = satisfy ( \case
-                (MkToken _ (KeywordToken Lex.While)) -> True
-                _ -> False)
-        pBody = many' pStmt
-
-pAssignStmt :: Parser Token Text ASTStmt
-pAssignStmt =
-    (\id val semic -> AssignStmt (id |-| semic) id val) <$>
-    pIdentifier <* pIsSymbol '=' <*> pExpr <*> pIsSymbol ';'
-
-pFunCallStmt :: Parser Token Text ASTStmt 
-pFunCallStmt = (\funCall semic -> FunCallStmt (funCall |-| semic) funCall) <$> pFunCall <*> pIsSymbol ';'
-
-pReturnStmt :: Parser Token Text ASTStmt
-pReturnStmt = pReturnNoValue <<|> pReturnValue
-    where
-        pReturn = satisfy ( \case
-                (MkToken _ (KeywordToken Lex.Return)) -> True
-                _ -> False)
-        pReturnNoValue = (\kReturn semic -> ReturnStmt (kReturn |-| semic) Nothing) <$> pReturn <*> pIsSymbol ';' 
-        pReturnValue = (\kReturn val semic -> ReturnStmt (kReturn |-| semic) (Just val)) <$> pReturn <*> pExpr <*> pIsSymbol ';' 
+                            (pIsSymbol '[') (pIsSymbol ']')
 

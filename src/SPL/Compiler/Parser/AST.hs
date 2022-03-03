@@ -24,7 +24,13 @@ data ASTLeaf =
         ASTVar ASTVarDecl
     |   ASTFun ASTFunDecl
 
-data ASTFunDecl = ASTFunDecl EntityLoc ASTIdentifier [ASTIdentifier] ASTType ASTFunBody
+data ASTFunDecl = 
+    ASTFunDecl 
+        EntityLoc 
+        ASTIdentifier 
+        [ASTIdentifier] 
+        ASTType 
+        ASTFunBody
     deriving (Eq, Show)
 
 data ASTVarDecl = ASTVarDecl EntityLoc ASTType ASTIdentifier ASTExpr
@@ -61,6 +67,7 @@ data ASTExpr =
 
 data ASTOpUnary = UnNeg | UnMinus
     deriving (Eq, Show)
+
 data ASTOpBin = 
       Plus 
     | Minus 
@@ -90,4 +97,3 @@ data ASTType =
     |   ASTCharType EntityLoc 
     |   ASTVoidType EntityLoc 
     deriving (Eq, Show)
-

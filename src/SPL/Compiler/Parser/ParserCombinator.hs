@@ -77,11 +77,9 @@ infixr 1 <<|>
 x <<|> y =
     Parser $ \s ->
         case runParser x s of
-            [] -> runParser y s
             xs | not $ null (rights xs) -> xs
                | otherwise ->
                     case runParser y s of
-                        [] -> xs
                         ys | not $ null (rights ys) -> ys
                            | otherwise -> getLongestError (xs ++ ys)
     where
@@ -94,12 +92,18 @@ peek =
                 (ParserState cnt st@(a:_)) -> [Right (a, ParserState cnt st)]
                 _ -> []
 
+-- Create a parser that returns the current
+-- token if `f` predicate is true
 satisfy :: (s -> Bool) -> Parser s e s
 satisfy f =
     Parser $ \case
-                (ParserState cnt (a:rest)) | f a -> [Right (a, ParserState (cnt + 1) rest) ]
+                (ParserState cnt (a:rest)) | f a -> 
+                    [Right (a, ParserState (cnt + 1) rest)]
                 _ -> []
 
+-- Create a parser that returns the result of applying `f` 
+-- to the current token. If Nothing is returned
+-- then parser will fail.
 satisfyAs :: (s -> Maybe b) -> Parser s e b
 satisfyAs f = fromJust . f <$> satisfy (isJust . f)
 
@@ -119,23 +123,33 @@ some' fa = (:) <$> fa <*> (some' fa <<|> pure [])
 many' :: Parser s e a -> Parser s e [a]
 many' fa = some' fa <<|> pure []
 
+-- Parse 2 elements exactly
 pTwice :: Parser s e a -> Parser s e [a]
 pTwice p = p <:> (pure <$> p)
 
+-- Parse 0 or 1 element
 pMaybe :: Parser s e a -> Parser s e (Maybe a)
 pMaybe p = (Just <$> p) <<|> pure Nothing
 
+-- Parse 0 or more elements 
 pList :: Parser s e a -> Parser s e b -> Parser s e [a]
-pList pElement pDelimiter = (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
+pList pElement pDelimiter = 
+    (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
 
+-- Parser that simply throws an error 
 pError :: (ParserState s -> e) -> Parser s e a
 pError err = Parser $ \s@(ParserState cnt _) -> [Left (Error cnt (err s))]
 
-pWrapErrors :: Semigroup e => (ParserState s -> e) -> Parser s e a -> Parser s e a
+-- Modify errors produced by the parser `p` using the function `err`
+pWrapErrors :: (ParserState s -> e -> e) -> Parser s e a -> Parser s e a
 pWrapErrors err p =
     Parser $ \s ->
         let xs = runParser p s in
-            traversed . _Left %~ (\(Error i e) -> Error i $ err s <> e) $ xs
+            traversed . _Left %~ (\(Error i e) -> Error i $ err s e) $ xs
+
+-- Replace errors produced by the parser `p` using the function `err`
+pReplaceError :: (ParserState s -> e) -> Parser s e a -> Parser s e a
+pReplaceError err = pWrapErrors (\st _ -> err st)
 
 -- Parse sentences of the following format in a left associative way: 
 -- p (`op` p)* => (p `op` (p `op` (p `op` p)))
@@ -156,4 +170,3 @@ pChainr op p = (&) <$> p <*> (flip <$> op <*> pChainr op p) <<|> p
 -- op* p => op (op (op p))
 pChainr1 :: Parser s e (a -> a) -> Parser s e a -> Parser s e a
 pChainr1 op p = (op <*> pChainr1 op p) <<|> p
-
