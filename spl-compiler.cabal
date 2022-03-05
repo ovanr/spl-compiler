@@ -29,6 +29,8 @@ library
       SPL.Compiler.Parser.AST
       SPL.Compiler.Parser.ASTEntityLocation
       SPL.Compiler.Parser.ASTParser
+      SPL.Compiler.Parser.ASTPrettyPrint
+      SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
   other-modules:
       Paths_spl_compiler
