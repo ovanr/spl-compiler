@@ -21,8 +21,17 @@ instance Locatable ASTIdentifier where
 instance Locatable ASTFunCall where
     getLoc (ASTFunCall l _ _) = l
 
+instance Locatable ASTField where
+    getLoc (Hd l) = l
+    getLoc (Tl l) = l
+    getLoc (Fst l) = l
+    getLoc (Snd l) = l
+
+instance Locatable ASTFieldSelector where
+    getLoc (ASTFieldSelector l _ _) = l
+
 instance Locatable ASTExpr where
-    getLoc (IdentifierExpr (ASTIdentifier l _)) = l
+    getLoc (FieldSelectExpr f) = getLoc f
     getLoc (IntExpr l _) = l
     getLoc (CharExpr l _) = l
     getLoc (BoolExpr l _) = l

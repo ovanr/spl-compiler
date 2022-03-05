@@ -26,7 +26,7 @@ pIsSymbol c =
     satisfy (\case
                (MkToken _ (SymbolToken c2)) | c == c2 -> True
                _ -> False
-    ) <<|> pError (mkError $ 
+    ) <<|> pError (mkError $
         "Expected character '" <> T.singleton c <> "' but instead got "
     )
 
@@ -39,13 +39,13 @@ pIdentifier =
     ) <<|> pError (mkError "Expected an identifier but instead got ")
 
 mkError :: T.Text -> ParserState Token -> T.Text
-mkError err (ParserState _ []) = err
 mkError err (ParserState _ (s@(MkToken _ t):_)) =
     let line = fst $ getStartLoc s
         col = snd $ getStartLoc s
      in "<" <> T.pack (show line) <> "," <> T.pack (show col) <> ">:" <>
         err <> "'" <> T.pack (show t) <> "'"
-     
+mkError err (ParserState _ _) = err
+
 pAST :: Parser Token Text AST
 pAST = AST <$> (many' pASTLeaf <* pEnd)
     where
@@ -196,7 +196,7 @@ pWhileStmt =
 pAssignStmt :: Parser Token Text ASTStmt
 pAssignStmt =
     (\id val semic -> AssignStmt (id |-| semic) id val)
-        <$> pIdentifier <* pIsSymbol '='
+        <$> pFieldSelect <* pIsSymbol '='
         <*> pExpr
         <*> pIsSymbol ';'
 
@@ -239,7 +239,6 @@ pExpr = foldr ($) baseExpr
         , pChainr (pBinOp ":")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
-        , pFieldSelect
         , pChainr1 (pUnaryOp "!")
         , pChainr1 (pUnaryOp "-")
         ]
@@ -252,7 +251,7 @@ pExpr = foldr ($) baseExpr
                    <<|> pEmptyListExpr
                    <<|> pTupExpr
                    <<|> pCharExpr
-                   <<|> pIdentifierExpr
+                   <<|> pFieldSelectExpr
 
 pUnaryOp :: String -> Parser Token T.Text (ASTExpr -> ASTExpr)
 pUnaryOp "!" = pIsSymbol '!' $> (\e1 -> OpExpr (e1 |-| e1) UnNeg e1)
@@ -288,8 +287,8 @@ pTupExpr =
         <*> (pIsSymbol ',' *> pExpr)
         <*> pIsSymbol ')'
 
-pIdentifierExpr :: Parser Token Text ASTExpr
-pIdentifierExpr = IdentifierExpr <$> pIdentifier
+pFieldSelectExpr :: Parser Token Text ASTExpr
+pFieldSelectExpr = FieldSelectExpr <$> pFieldSelect
 
 pIntExpr :: Parser Token Text ASTExpr
 pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (getLoc token) i) <$>
@@ -312,10 +311,20 @@ pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$
 pFunCallExpr :: Parser Token Text ASTExpr
 pFunCallExpr = FunCallExpr <$> pFunCall
 
-pFieldSelect :: Parser Token Text ASTExpr -> Parser Token T.Text ASTExpr
-pFieldSelect = pChainl2 (pIsSymbol '.' $> mkFunCallExpr) pIdentifier
+pFieldSelect :: Parser Token T.Text ASTFieldSelector
+pFieldSelect = liftA2 mkFieldSelector pIdentifier (many' (pIsSymbol '.' *> pField))
     where
-        mkFunCallExpr expr id = FunCallExpr $ ASTFunCall (expr |-| id) id [expr]
+        pField =
+            satisfyAs (\case
+                t@(MkToken _ (IdentifierToken "hd")) -> Just . Hd . getLoc $ t
+                t@(MkToken _ (IdentifierToken "tl")) -> Just . Tl . getLoc $ t
+                t@(MkToken _ (IdentifierToken "fst")) -> Just . Fst . getLoc $ t
+                t@(MkToken _ (IdentifierToken "snd")) -> Just . Snd . getLoc $ t
+                _ -> Nothing
+            )
+
+        mkFieldSelector id [] = ASTFieldSelector (id |-| id) id []
+        mkFieldSelector id fs = ASTFieldSelector (id |-| last fs) id fs
 
 pEmptyListExpr :: Parser Token Text ASTExpr
 pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2))

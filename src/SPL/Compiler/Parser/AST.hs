@@ -45,20 +45,26 @@ data ASTFunBody = ASTFunBody EntityLoc [ASTVarDecl] [ASTStmt]
 data ASTFunCall = ASTFunCall EntityLoc ASTIdentifier [ASTExpr]
     deriving (Eq, Show)
 
+data ASTFieldSelector = ASTFieldSelector EntityLoc ASTIdentifier [ASTField]
+    deriving (Eq, Show)
+
+data ASTField = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc 
+    deriving (Eq, Show)
+
 data ASTStmt = 
         IfElseStmt EntityLoc ASTExpr [ASTStmt] [ASTStmt]
     |   WhileStmt EntityLoc ASTExpr [ASTStmt]
-    |   AssignStmt EntityLoc ASTIdentifier ASTExpr
+    |   AssignStmt EntityLoc ASTFieldSelector ASTExpr
     |   FunCallStmt EntityLoc ASTFunCall
     |   ReturnStmt EntityLoc (Maybe ASTExpr)  
     deriving (Eq, Show)
 
 data ASTExpr = 
-        IdentifierExpr ASTIdentifier
-    |   IntExpr EntityLoc Integer
+        IntExpr EntityLoc Integer
     |   CharExpr EntityLoc Char
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall
+    |   FieldSelectExpr ASTFieldSelector
     |   OpExpr EntityLoc ASTOpUnary ASTExpr  
     |   Op2Expr EntityLoc ASTExpr ASTOpBin ASTExpr  
     |   EmptyListExpr EntityLoc

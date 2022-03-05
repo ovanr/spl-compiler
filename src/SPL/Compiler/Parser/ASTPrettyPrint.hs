@@ -7,6 +7,8 @@ import SPL.Compiler.Parser.AST
      ASTExpr(..),
      ASTStmt(..),
      ASTFunCall(..),
+     ASTFieldSelector(..),
+     ASTField(..),
      ASTFunBody(..),
      ASTIdentifier(..),
      ASTVarDecl(..),
@@ -41,8 +43,17 @@ instance PrettyPrint ASTFunDecl where
     toCode n (ASTFunDecl _ id args t body) =
         toCode n id <> " (" <> T.intercalate "," (map (toCode n) args) <> ")" <> toCode n t <> " " <> toCode (n + 1) body
 
+instance PrettyPrint ASTField where
+    toCode _ (Hd _) = "hd"
+    toCode _ (Tl _) = "tl"
+    toCode _ (Fst _) = "fst"
+    toCode _ (Snd _) = "snd"
+
+instance PrettyPrint ASTFieldSelector where
+    toCode n (ASTFieldSelector _ id fs) = toCode n id <> foldMap ((<>) "." .toCode n) fs
+
 instance PrettyPrint ASTExpr where
-    toCode n (IdentifierExpr id) = toCode n id
+    toCode n (FieldSelectExpr f) = toCode n f
     toCode _ (IntExpr _ i) = T.pack $ show i
     toCode _ (CharExpr _ c) = T.pack $ show c
     toCode _ (BoolExpr _ b) = T.pack $ show b

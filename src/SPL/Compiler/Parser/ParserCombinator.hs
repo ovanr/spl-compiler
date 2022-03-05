@@ -160,7 +160,7 @@ pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
 pChainl op p = foldl (&) <$> p <*> many' (flip <$> op <*> p)
 
 -- Parse sentences of the following format in a left associative way: 
--- p (`op` p)* => (p `op` (p `op` (p `op` p)))
+-- p (`op` pc)* => (p `op` (pc `op` (pc `op` pc)))
 pChainl2 :: Parser s e (a -> b -> a) -> Parser s e b -> Parser s e a -> Parser s e a
 pChainl2 op pc p = foldl (&) <$> p <*> many' (flip <$> op <*> pc)
 
