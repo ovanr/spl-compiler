@@ -249,8 +249,23 @@ test_parse_pexpr_list = do
 
 test_parse_pexpr_complex = do
     let tests =
+            [ 
+              -- tempDay ----getIndex()
+              [ IdentifierToken "tempDay", SymbolToken '-', SymbolToken '-', SymbolToken '-', SymbolToken '-',
+                IdentifierToken "getIndex", SymbolToken '(', SymbolToken ')'
+              ] -->
+              Op2Expr def 
+                (IdentifierExpr (ASTIdentifier def "tempDay")) 
+                Minus 
+                (OpExpr def UnMinus 
+                    (OpExpr def UnMinus 
+                        (OpExpr def UnMinus 
+                            (FunCallExpr (ASTFunCall def (ASTIdentifier def "getIndex") []))
+                        )
+                    )
+                ),
             -- list.hd || sum(list.tl)
-            [ [ IdentifierToken "list" , SymbolToken '.' , IdentifierToken "hd" ,
+            [ IdentifierToken "list" , SymbolToken '.' , IdentifierToken "hd" ,
                 SymbolToken '|' , SymbolToken '|' ,
                 IdentifierToken "sum" ,
                 SymbolToken '(' ,
@@ -360,13 +375,12 @@ test_parse_pexpr_complex = do
                                      ])
                           ]
                      )
-
--- (([] : -(1*[])-(2*[]-3*[])-4/[]/-5): (1*[])-(2+[]) 3*(4+[])) 
             ]
     executeMultipleTests pExpr tests
 
 test_parse_stmts = do
-    let tests = [
+    let tests = 
+            [
             -- foo();
             [IdentifierToken "foo",SymbolToken '(',SymbolToken ')',SymbolToken ';']
             --> FunCallStmt def (ASTFunCall def (ASTIdentifier def "foo") []),
@@ -385,7 +399,19 @@ test_parse_stmts = do
             ,SymbolToken '{',IdentifierToken "function",SymbolToken '(',SymbolToken ')',SymbolToken ';',SymbolToken '}'
             ,KeywordToken Else,SymbolToken '{',KeywordToken Return,SymbolToken ';',SymbolToken '}']
             --> IfElseStmt def (Op2Expr def (IntExpr def 3) Equal (IdentifierExpr (ASTIdentifier def "x")))
-                    [FunCallStmt def (ASTFunCall def (ASTIdentifier def "function") [])] [ReturnStmt def Nothing]
-                ]
-
+                    [FunCallStmt def (ASTFunCall def (ASTIdentifier def "function") [])] [ReturnStmt def Nothing],
+            -- if (isEmpty(a) && isEmpty(b)) { return True; }
+            [KeywordToken If, SymbolToken '(', IdentifierToken "isEmpty", SymbolToken '(',
+             IdentifierToken "a", SymbolToken ')', SymbolToken '&', SymbolToken '&',
+             IdentifierToken "isEmpty", SymbolToken '(', IdentifierToken "b", SymbolToken ')', SymbolToken ')',
+             SymbolToken '{', KeywordToken Return, BoolToken True, SymbolToken ';', SymbolToken '}']
+             --> IfElseStmt def 
+                    (Op2Expr def 
+                        (FunCallExpr (ASTFunCall def (ASTIdentifier def "isEmpty") [IdentifierExpr (ASTIdentifier def "a")]))
+                        LogAnd
+                        (FunCallExpr (ASTFunCall def (ASTIdentifier def "isEmpty") [IdentifierExpr (ASTIdentifier def "b")]))
+                    )
+                    [ ReturnStmt def $ Just (BoolExpr def True) ]
+                    []
+            ]
     executeMultipleTests pStmt tests

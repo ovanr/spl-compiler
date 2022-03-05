@@ -25,7 +25,10 @@ data ParserState s = ParserState {
 
 -- The Error data type holds the depth (how many tokens have been parsed)
 -- at which the error occured together with the actual error of type e
-data Error e = Error Int e
+data Error e = Error {
+    depth :: Int,
+    errMsg :: e
+}
 
 instance Eq (Error e) where
     (Error i e) == (Error i2 e2) = i == i2

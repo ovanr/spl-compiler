@@ -6,12 +6,10 @@ cabal-version: 1.12
 
 name:           spl-compiler
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/spl-compiler#readme>
-homepage:       https://github.com/githubuser/spl-compiler#readme
-bug-reports:    https://github.com/githubuser/spl-compiler/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2022 Author name here
+description:    Please see the README on GitHub at <https://gitlab.science.ru.nl/compilerconstruction/2122/group-14#readme>
+author:         Orpheas van Rooij, Joshua Steinmann
+maintainer:     orpheas.vanrooij@ru.nl
+copyright:      2022 Orpheas van Rooij, Joshua Steinmann
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -19,13 +17,10 @@ extra-source-files:
     README.md
     ChangeLog.md
 
-source-repository head
-  type: git
-  location: https://github.com/githubuser/spl-compiler
-
 library
   exposed-modules:
       SPL.Compiler.Lexer.AlexLexGen
+      SPL.Compiler.Main
       SPL.Compiler.Parser.AST
       SPL.Compiler.Parser.ASTEntityLocation
       SPL.Compiler.Parser.ASTParser
@@ -43,11 +38,13 @@ library
     , bytestring
     , containers
     , data-default
+    , extra
     , lens
+    , optparse-applicative
     , text
   default-language: Haskell2010
 
-executable spl-compiler-exe
+executable spl-compiler
   main-is: Main.hs
   other-modules:
       Paths_spl_compiler
@@ -61,7 +58,9 @@ executable spl-compiler-exe
     , bytestring
     , containers
     , data-default
+    , extra
     , lens
+    , optparse-applicative
     , spl-compiler
     , text
   default-language: Haskell2010
@@ -83,7 +82,9 @@ test-suite spl-compiler-test
     , bytestring
     , containers
     , data-default
+    , extra
     , lens
+    , optparse-applicative
     , spl-compiler
     , text
   default-language: Haskell2010

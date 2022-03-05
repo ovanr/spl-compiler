@@ -64,7 +64,7 @@ pFunDecl = (\i fargs t body -> ASTFunDecl (i |-| body) i fargs t body)
         pFunBody = (\start v s end -> ASTFunBody (start |-| end) v s)
                         <$> pIsSymbol '{'
                         <*> many' pVarDecl
-                        <*> many' pStmt
+                        <*> some' pStmt
                         <*> pIsSymbol '}'
 
 pFargs :: Parser Token Text [ASTIdentifier]
@@ -148,7 +148,7 @@ pFunType =
 pVarDecl :: Parser Token Text ASTVarDecl
 pVarDecl = (\t id expr end -> ASTVarDecl (t |-| end) t id expr)
              <$> (pIsVar <<|> pType)
-             <*> pIdentifier
+             <*> pIdentifier <* pIsSymbol '='
              <*> pExpr
              <*> pIsSymbol ';'
     where
@@ -168,10 +168,9 @@ pIfElseStmt :: Parser Token Text ASTStmt
 pIfElseStmt =
     (\kIf cond ifDo elseDo rParen-> IfElseStmt (kIf |-| rParen) cond ifDo elseDo)
         <$> pIf
-        <*> pExpr <* pIsSymbol '{'
-        <*> pBody <* pIsSymbol '}'
-        <*> (pElse *> pIsSymbol '{' *> pBody)
-        <*> pIsSymbol '}'
+        <*> (pExpr <* pIsSymbol '{')
+        <*> pBody
+        <*> ((pIsSymbol '}' *> pElse *> pIsSymbol '{' *> pBody) <<|> pure []) <*> pIsSymbol '}'
     where
         pIf = satisfy (\case
                          (MkToken _ (KeywordToken Lex.If)) -> True
@@ -179,7 +178,7 @@ pIfElseStmt =
         pElse = satisfy (\case
                            (MkToken _ (KeywordToken Lex.Else)) -> True
                            _ -> False)
-        pBody = many' pStmt
+        pBody = some' pStmt
 
 pWhileStmt :: Parser Token Text ASTStmt
 pWhileStmt =
