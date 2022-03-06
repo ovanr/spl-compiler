@@ -76,6 +76,7 @@ tokens :-
 
     -- character
     <0> \'.\'                            { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
+    <0> \'\\.\'                          { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
 {
 
 -- token :: (AlexInput -> Int64 -> token) -> AlexAction token

@@ -65,14 +65,14 @@ instance PrettyPrint ASTExpr where
 
 instance PrettyPrint ASTStmt where
     toCode n (IfElseStmt _ cond thenBody elseBody) =
-        mkIdent n <> "if " <> toCode n cond <> " {" <> 
+        mkIdent n <> "if (" <> toCode n cond <> ") {" <> 
             T.unlines ("": map (toCode (n+1)) thenBody) <> 
         mkIdent n <> "} " <>
         case elseBody of
             [] -> ""
             _ -> "else {" <> T.unlines ("": map (toCode (n+1)) elseBody) <> mkIdent n <> "}"
     toCode n (WhileStmt _ cond body) = 
-        mkIdent n <> "while " <> toCode n cond <> " {" <> 
+        mkIdent n <> "while (" <> toCode n cond <> ") {" <> 
             T.unlines ("": map (toCode (n+1)) body) <> 
         mkIdent n <> "}"
     toCode n (AssignStmt _ id expr) = mkIdent n <> toCode n id <> " = " <> toCode n expr <> ";"

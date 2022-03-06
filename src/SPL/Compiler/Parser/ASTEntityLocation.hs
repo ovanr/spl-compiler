@@ -15,6 +15,9 @@ class Locatable a where
     getEndLoc :: a -> Location
     getEndLoc a = getLoc a ^. locEnd
 
+instance Locatable EntityLoc where
+    getLoc = id
+
 instance Locatable ASTIdentifier where
     getLoc (ASTIdentifier l _) = l
 
@@ -83,3 +86,4 @@ locationRange (EntityLoc start _) (EntityLoc _ end) = EntityLoc start end
 infixr 5 |-|
 (|-|) :: (Locatable a, Locatable b) => a -> b -> EntityLoc
 start |-| end = EntityLoc (getStartLoc start) (getEndLoc end)
+

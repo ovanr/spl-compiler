@@ -29,7 +29,7 @@ compilerMain (Options path content lexDump parserDump v) = do
         Right . T.pack . show $ tokens
     else do
         ast <- case runParser pAST state of
-            [] -> Left "Interal parser error: Parser did not return any results"
+            [] -> Left "Internal parser error: Parser did not return any results"
             xs | null (rights xs) -> Left . errMsg . fromJust $ maximumOf (folded._Left) xs
                | otherwise -> Right . fst . head $ rights xs
 

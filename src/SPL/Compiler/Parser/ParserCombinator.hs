@@ -1,6 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module SPL.Compiler.Parser.ParserCombinator where
 
@@ -39,6 +40,8 @@ instance Ord (Error e) where
 instance Show e => Show (Error e) where
     show (Error _ e) = show e
 
+getLongestError xs = maybeToList $ Left <$> maximumOf (folded._Left) xs
+
 instance Functor (Parser s e) where
     fmap :: (a -> b) -> Parser s e a -> Parser s e b
     fmap ab p = Parser $ \s -> traversed._Right._1 %~ ab $ runParser p s
@@ -53,19 +56,12 @@ instance Applicative (Parser s e) where
     (<*>) :: Parser s e (a -> b) -> Parser s e a -> Parser s e b
     pab <*> pa =
         Parser $ \s ->
-            let abs = runParser pab s in
+            let  abs = runParser pab s in
                 if null (rights abs) then
                     -- useless map needed for typechecking
                     map (\(Left e) -> Left e) abs
                 else
-                    concat [ runParser (ab <$> pa) s' | (ab, s') <- rights abs ]
-
-instance Alternative (Parser s e) where
-    -- note the identity law:
-    -- empty <|> fa = fa and fa <|> empty = fa
-    empty = Parser $ const []
-    pa1 <|> pa2 =
-        Parser $ \s -> runParser pa1 s ++ runParser pa2 s
+                    getLongestError abs ++ concat [ runParser (ab <$> pa) s' | ( ab,  s') <- rights abs ]
 
 infixr 3 <:>
 (<:>) :: (Applicative f) => f a -> f [a] -> f [a]
@@ -80,13 +76,10 @@ infixr 1 <<|>
 x <<|> y =
     Parser $ \s ->
         case runParser x s of
-            xs | not $ null (rights xs) -> xs
-               | otherwise ->
+             xs | not $ null (rights xs) -> filter isRight xs ++ getLongestError xs 
+                | otherwise ->
                     case runParser y s of
-                        ys | not $ null (rights ys) -> ys
-                           | otherwise -> getLongestError (xs ++ ys)
-    where
-        getLongestError zs = maybeToList $ Left <$> maximumOf (folded._Left) zs
+                         ys -> filter isRight ys ++ getLongestError (xs ++ ys)
 
 -- Parser that returns the current token without consuming it
 peek :: Parser s e s

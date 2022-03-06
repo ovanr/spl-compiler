@@ -12,7 +12,7 @@ import Data.Text (Text)
 import Data.Default
 import Control.Monad (forM_)
 import Control.Applicative ((<|>))
-import Control.Lens ((^..), (^?), _Right, ix, _1)
+import Control.Lens ((^..), (^?), _Right, ix, _1, folded)
 
 import SPL.Compiler.Parser.Testable
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
@@ -29,7 +29,7 @@ executeMultipleTests parser tests =
         let actual = runParser parser (ParserState 0 tokens)
         case expected of
             Just value -> do
-                let a = toTestForm <$> actual ^? ix 0. _Right. _1
+                let a = toTestForm <$> actual ^? folded._Right._1
                 assertEqual (Just $ toTestForm value) a
             _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 tokens))
 

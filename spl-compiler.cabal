@@ -72,6 +72,7 @@ test-suite spl-compiler-test
       SPL.Compiler.Lexer.Test
       SPL.Compiler.Parser.Test
       SPL.Compiler.Parser.Testable
+      SPL.Compiler.Test
       Paths_spl_compiler
   hs-source-dirs:
       test

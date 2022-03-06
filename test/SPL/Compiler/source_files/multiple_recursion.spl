@@ -18,4 +18,5 @@ rec(a) {
 }
 
 main() {
+    print();
 }

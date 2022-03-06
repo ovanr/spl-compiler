@@ -1,5 +1,0 @@
-(2, 2)
-((p1.fst + p2.fst), (p1.snd + p2.snd))
-(p.fst * scalar, p.snd * scalar)
-((p1.fst + p2.fst), (p1.snd.fst + p2.snd.fst, p1.snd.snd + p2.snd.snd))
-(p.fst * scalar, (p.snd.fst * scalar, p.snd.snd * scalar))
