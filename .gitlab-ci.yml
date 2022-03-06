@@ -39,7 +39,7 @@ build-dependencies-job:   # This job runs in the test stage.
     - stack build alex
     - stack build --only-dependencies
   only:
-    changes: [package.json]
+    changes: [package.yaml]
   cache:
     <<: *dependency-cache
     policy: push
