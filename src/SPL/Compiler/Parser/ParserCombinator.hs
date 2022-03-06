@@ -21,7 +21,9 @@ newtype Parser s e a = Parser {
 
 data ParserState s = ParserState {
     tokensParsed :: Int,
-    remainingTokens :: [s]
+    remainingTokens :: [s],
+    sourcePath :: FilePath,
+    sourceCode :: [Text]
 } deriving (Eq, Show)
 
 -- The Error data type holds the depth (how many tokens have been parsed)
@@ -61,7 +63,7 @@ instance Applicative (Parser s e) where
                     -- useless map needed for typechecking
                     map (\(Left e) -> Left e) abs
                 else
-                    getLongestError abs ++ concat [ runParser (ab <$> pa) s' | ( ab,  s') <- rights abs ]
+                    concat [ runParser (ab <$> pa) s' | ( ab,  s') <- rights abs ] ++ getLongestError abs
 
 infixr 3 <:>
 (<:>) :: (Applicative f) => f a -> f [a] -> f [a]
@@ -79,13 +81,13 @@ x <<|> y =
              xs | not $ null (rights xs) -> filter isRight xs ++ getLongestError xs 
                 | otherwise ->
                     case runParser y s of
-                         ys -> filter isRight ys ++ getLongestError (xs ++ ys)
+                         ys -> filter isRight ys ++ getLongestError (ys ++ xs)
 
 -- Parser that returns the current token without consuming it
 peek :: Parser s e s
 peek =
     Parser $ \case
-                (ParserState cnt st@(a:_)) -> [Right (a, ParserState cnt st)]
+                (ParserState cnt st@(a:_) fp con) -> [Right (a, ParserState cnt st fp con)]
                 _ -> []
 
 -- Create a parser that returns the current
@@ -93,8 +95,8 @@ peek =
 satisfy :: (s -> Bool) -> Parser s e s
 satisfy f =
     Parser $ \case
-                (ParserState cnt (a:rest)) | f a -> 
-                    [Right (a, ParserState (cnt + 1) rest)]
+                (ParserState cnt (a:rest) fp con) | f a -> 
+                    [Right (a, ParserState (cnt + 1) rest fp con)]
                 _ -> []
 
 -- Create a parser that returns the result of applying `f` 
@@ -134,7 +136,7 @@ pList pElement pDelimiter =
 
 -- Parser that simply throws an error 
 pError :: (ParserState s -> e) -> Parser s e a
-pError err = Parser $ \s@(ParserState cnt _) -> [Left (Error cnt (err s))]
+pError err = Parser $ \s@(ParserState cnt _ fp con) -> [Left (Error cnt (err s))]
 
 -- Modify errors produced by the parser `p` using the function `err`
 pWrapErrors :: (ParserState s -> e -> e) -> Parser s e a -> Parser s e a

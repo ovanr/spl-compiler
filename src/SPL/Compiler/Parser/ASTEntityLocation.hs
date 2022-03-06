@@ -69,8 +69,8 @@ instance Locatable Token where
     getLoc (MkToken (AlexPn _ l c) t) = EntityLoc (l,c) (l, c + tokenLength t)
         where
             tokenLength (KeywordToken v) = length $ show v
-            tokenLength (TypeToken v) = length (show v) - 4
-            tokenLength (IntToken i) = length $ show i
+            tokenLength (TypeToken v) = length (show v)
+            tokenLength (IntToken i) = length (show i)
             tokenLength (IdentifierToken v) = T.length v
             tokenLength (BoolToken v) = length $ show v
             tokenLength (CharToken _) = 1

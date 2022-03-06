@@ -22,16 +22,16 @@ import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
 
 
-executeMultipleTests :: (Testable b, Eq b, Show b) => Parser Token Text b -> [([SPLToken], Maybe b)] -> IO ()
+executeMultipleTests :: (Testable b, Eq b, Show b) => Parser Token [Text] b -> [([SPLToken], Maybe b)] -> IO ()
 executeMultipleTests parser tests =
     forM_ tests $ \(input, expected) -> do
         let tokens = map mkToken input
-        let actual = runParser parser (ParserState 0 tokens)
+        let actual = runParser parser (ParserState 0 tokens mempty mempty)
         case expected of
             Just value -> do
                 let a = toTestForm <$> actual ^? folded._Right._1
                 assertEqual (Just $ toTestForm value) a
-            _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 tokens))
+            _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 tokens mempty mempty))
 
 -- Shorthand operator to create an (input, expected output) pair
 infixl 1 -->

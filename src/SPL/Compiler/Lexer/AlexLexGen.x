@@ -195,8 +195,8 @@ alexMonadScan' = do
                 gap = 1 + (length $ show lineno)
                 bottomHighlight = T.replicate (column) " " <> T.replicate (T.length token) "^"
             alexError . T.unpack . T.unlines $ 
-                [  
-                header <> "error: lexical parse failure on input '" <> token <> "'", 
+                ["Error occurred during lexing phase!", 
+                header <> "Unrecognised input '" <> token <> "'", 
                 T.replicate gap " " <> "|", 
                 T.pack (show lineno) <> " | " <> line, 
                 T.replicate gap " " <> "|" <> bottomHighlight
