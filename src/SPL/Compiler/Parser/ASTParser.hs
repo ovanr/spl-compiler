@@ -256,7 +256,7 @@ pExpr :: SPLParser ASTExpr
 pExpr = pWrapErrors (\_ -> (<>) ["Expression"]) _pExpr
 
 _pExpr :: SPLParser ASTExpr
-_pExpr = 
+_pExpr =
     foldr ($) baseExpr
         [
           pChainl (pBinOp "||")
@@ -314,24 +314,15 @@ pBinOp op = pReplaceError
 pTupExprOrParens :: SPLParser ASTExpr
 pTupExprOrParens =
     pWrapErrors (\_ -> (<>) ["Tuple constructor or Parens"]) $
-        toASTExpr 
+        toASTExpr
             <$> pIsSymbol '('
             <*> _pExpr
-            <*> (pMaybe (pIsSymbol ',' *> (pWrapErrors (\_ -> (<>) ["Tuple Constructor"]) _pExpr)))
-            <*> (pIsSymbol ')') 
+            <*> pMaybe (pIsSymbol ',' *> (pWrapErrors (\_ -> (<>) ["Tuple Constructor"]) _pExpr))
+            <*> pIsSymbol ')'
 
     where
         toASTExpr lParens expr1 (Just expr2) rParens = TupExpr (lParens |-| rParens) expr1 expr2
         toASTExpr _ expr Nothing _ = expr
-
--- pTupExpr :: SPLParser ASTExpr
--- pTupExpr =
---     pWrapErrors (\_ -> (<>) ["Tuple constructor"]) $
---         (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd)
---             <$> pIsSymbol '('
---             <*> _pExpr
---             <*> ((pIsSymbol ',' *> _pExpr) <<|> (pIsSymbol ')')
---             <*> pIsSymbol ')'
 
 pFieldSelectExpr :: SPLParser ASTExpr
 pFieldSelectExpr = FieldSelectExpr <$> pFieldSelect
