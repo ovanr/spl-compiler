@@ -40,6 +40,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
+    - -O2
     - -with-rtsopts=-N
     dependencies:
     - spl-compiler

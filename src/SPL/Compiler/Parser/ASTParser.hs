@@ -45,7 +45,7 @@ mkError err (ParserState _ (s@(MkToken _ t):_) fp con) =
         someLine = con ^? ix (lineNum - 1)
         startCol = snd $ getStartLoc s
         endCol = snd $ getEndLoc s
-        header = T.pack fp <> ":" <> T.pack (show lineNum) <> ":" <> 
+        header = T.pack fp <> ":" <> T.pack (show lineNum) <> ":" <>
                  T.pack (show startCol) <> ": " <> err
      in
         case someLine of
@@ -56,8 +56,8 @@ mkError err (ParserState _ (s@(MkToken _ t):_) fp con) =
                     emptyLeftMargin = T.replicate (T.length leftMargin) " " <> "|"
                 in [T.unlines
                      [ header,
-                      emptyLeftMargin, 
-                      leftMargin <> "| " <> line, 
+                      emptyLeftMargin,
+                      leftMargin <> "| " <> line,
                       emptyLeftMargin <> bottomHighlight
                      ]
                    ]
@@ -252,12 +252,11 @@ pFunCall fromExprCxt = (\id args rParen -> ASTFunCall (id |-| rParen) id args)
                 <*> (pIsSymbol '(' *> pList (if fromExprCxt then _pExpr else pExpr) (pIsSymbol ','))
                 <*> pIsSymbol ')'
 
-
 pExpr :: SPLParser ASTExpr
 pExpr = pWrapErrors (\_ -> (<>) ["Expression"]) _pExpr
 
 _pExpr :: SPLParser ASTExpr
-_pExpr =
+_pExpr = 
     foldr ($) baseExpr
         [
           pChainl (pBinOp "||")
@@ -267,17 +266,17 @@ _pExpr =
         , pChainr (pBinOp ":")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
+        , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
         , pChainr1 (pUnaryOp "!")
         , pChainr1 (pUnaryOp "-")
         ]
 
     where
-        baseExpr = pParens _pExpr
+        baseExpr = pTupExprOrParens
                    <<|> pIntExpr
                    <<|> pBoolExpr
                    <<|> pFunCallExpr
                    <<|> pEmptyListExpr
-                   <<|> pTupExpr
                    <<|> pCharExpr
                    <<|> pFieldSelectExpr
                    <<|> pError (mkError "Unknown expression encountered here")
@@ -290,7 +289,7 @@ pUnaryOp "-" = pReplaceError (mkError "Expected unary operator '-' here") (pIsSy
 pUnaryOp _ = error "Unary operator not defined"
 
 pBinOp :: String -> SPLParser (ASTExpr -> ASTExpr -> ASTExpr)
-pBinOp op = pReplaceError 
+pBinOp op = pReplaceError
                 (mkError $ "Expected binary operator " <> T.pack (show op) <> " here")
                 (foldl1 (*>) (map pIsSymbol op))
             $> (\e1 e2 -> Op2Expr (e1 |-| e2) e1 (getOperator op) e2)
@@ -312,14 +311,27 @@ pBinOp op = pReplaceError
         getOperator "||" = LogOr
         getOperator _ = error "Binary operator not defined"
 
-pTupExpr :: SPLParser ASTExpr
-pTupExpr =
-    pWrapErrors (\_ -> (<>) ["Tuple constructor"]) $
-        (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd)
+pTupExprOrParens :: SPLParser ASTExpr
+pTupExprOrParens =
+    pWrapErrors (\_ -> (<>) ["Tuple constructor or Parens"]) $
+        toASTExpr 
             <$> pIsSymbol '('
             <*> _pExpr
-            <*> (pIsSymbol ',' *> _pExpr)
-            <*> pIsSymbol ')'
+            <*> (pMaybe (pIsSymbol ',' *> (pWrapErrors (\_ -> (<>) ["Tuple Constructor"]) _pExpr)))
+            <*> (pIsSymbol ')') 
+
+    where
+        toASTExpr lParens expr1 (Just expr2) rParens = TupExpr (lParens |-| rParens) expr1 expr2
+        toASTExpr _ expr Nothing _ = expr
+
+-- pTupExpr :: SPLParser ASTExpr
+-- pTupExpr =
+--     pWrapErrors (\_ -> (<>) ["Tuple constructor"]) $
+--         (\lParen fst snd rParen -> TupExpr (lParen |-| rParen) fst snd)
+--             <$> pIsSymbol '('
+--             <*> _pExpr
+--             <*> ((pIsSymbol ',' *> _pExpr) <<|> (pIsSymbol ')')
+--             <*> pIsSymbol ')'
 
 pFieldSelectExpr :: SPLParser ASTExpr
 pFieldSelectExpr = FieldSelectExpr <$> pFieldSelect
@@ -343,10 +355,10 @@ pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$
                             _ -> False)
 
 pFunCallExpr :: SPLParser ASTExpr
-pFunCallExpr = FunCallExpr <$> (pFunCall True)
+pFunCallExpr = FunCallExpr <$> pFunCall True
 
 pFieldSelect :: SPLParser ASTFieldSelector
-pFieldSelect = 
+pFieldSelect =
     pWrapErrors (\_ -> (<>) ["Field selector"]) $
         liftA2 mkFieldSelector pIdentifier (many' (pIsSymbol '.' *> pField))
     where

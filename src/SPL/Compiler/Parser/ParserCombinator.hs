@@ -12,6 +12,7 @@ import Control.Lens ((%~), _1, _2, _Left, _Right, traversed, folded, maximumOf)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Function ((&))
+import Data.Foldable
 import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, isJust, fromJust)
 
@@ -78,7 +79,7 @@ infixr 1 <<|>
 x <<|> y =
     Parser $ \s ->
         case runParser x s of
-             xs | not $ null (rights xs) -> filter isRight xs ++ getLongestError xs 
+             xs | not $ null (rights xs) -> filter isRight xs ++ getLongestError xs
                 | otherwise ->
                     case runParser y s of
                          ys -> filter isRight ys ++ getLongestError (ys ++ xs)
@@ -95,7 +96,7 @@ peek =
 satisfy :: (s -> Bool) -> Parser s e s
 satisfy f =
     Parser $ \case
-                (ParserState cnt (a:rest) fp con) | f a -> 
+                (ParserState cnt (a:rest) fp con) | f a ->
                     [Right (a, ParserState (cnt + 1) rest fp con)]
                 _ -> []
 
@@ -131,7 +132,7 @@ pMaybe p = (Just <$> p) <<|> pure Nothing
 
 -- Parse 0 or more elements 
 pList :: Parser s e a -> Parser s e b -> Parser s e [a]
-pList pElement pDelimiter = 
+pList pElement pDelimiter =
     (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
 
 -- Parser that simply throws an error 
@@ -149,21 +150,27 @@ pWrapErrors err p =
 pReplaceError :: (ParserState s -> e) -> Parser s e a -> Parser s e a
 pReplaceError err = pWrapErrors (\st _ -> err st)
 
--- Parse sentences of the following format in a left associative way: 
--- p (`op` p)* => (p `op` (p `op` (p `op` p)))
-pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
-pChainl op p = foldl (&) <$> p <*> many' (flip <$> op <*> p)
+sepBy1 :: Parser s e a -> Parser s e b -> Parser s e [a]
+sepBy1 p sep = liftA2 (:) p (many' (sep *> p))
 
 -- Parse sentences of the following format in a left associative way: 
--- p (`op` pc)* => (p `op` (pc `op` (pc `op` pc)))
+-- p (`op` p)* => (((p `op` p) `op` p) `op` p)
+pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
+pChainl op p = foldl' (&) <$> p <*> many' (flip <$> op <*> p)
+
+pChainlAlt :: (a -> a -> a) -> Parser s e a -> Parser s e b -> Parser s e a
+pChainlAlt f p op = foldl1 f <$> sepBy1 p op
+
+-- Parse sentences of the following format in a left associative way: 
+-- p (`op` pc)* => (((p `op` pc) `op` pc) `op` p)
 pChainl2 :: Parser s e (a -> b -> a) -> Parser s e b -> Parser s e a -> Parser s e a
-pChainl2 op pc p = foldl (&) <$> p <*> many' (flip <$> op <*> pc)
+pChainl2 op pc p = foldl' (&) <$> p <*> many' (flip <$> op <*> pc)
 
 -- Parse sentences of the following format in a right associative way: 
--- p (`op` p)* => (((p `op` p) `op` p) `op` p)
+-- p (`op` p)* => (p `op` (p `op` (p `op` p)))
 pChainr :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
-pChainr op p = (&) <$> p <*> (flip <$> op <*> pChainr op p) <<|> p
-
+pChainr op p = (\a ma -> maybe a ($ a) ma) <$> p <*> pMaybe (flip <$> op <*> pChainr op p)
+            
 -- Parse sentences of the following format in a right associative way: 
 -- op* p => op (op (op p))
 pChainr1 :: Parser s e (a -> a) -> Parser s e a -> Parser s e a
