@@ -27,6 +27,8 @@ library
       SPL.Compiler.Parser.ASTPrettyPrint
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
+      SPL.Compiler.TypeChecker.AST
+      SPL.Compiler.TypeChecker.Type
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -73,6 +75,7 @@ test-suite spl-compiler-test
       SPL.Compiler.Parser.Test
       SPL.Compiler.Parser.Testable
       SPL.Compiler.Test
+      SPL.Compiler.TypeChecker.Test
       Paths_spl_compiler
   hs-source-dirs:
       test
