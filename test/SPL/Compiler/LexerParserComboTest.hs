@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant bracket" #-}
 
-module SPL.Compiler.Test (htf_SPL_Compiler_Test_thisModulesTests) where
+module SPL.Compiler.LexerParserComboTest (htf_thisModulesTests) where
 
 import Test.Framework 
 import Data.Either
@@ -48,6 +48,7 @@ sourceFiles = [
     -- "test/SPL/Compiler/source_files/unbalanced_parenthesis2.spl",
     "test/SPL/Compiler/source_files/complete.spl",
     "test/SPL/Compiler/source_files/many_parenthesis.spl",
+    "test/SPL/Compiler/source_files/many_parenthesis2.spl",
     "test/SPL/Compiler/source_files/recursion.spl",
     -- "test/SPL/Compiler/source_files/unbalanced_parenthesis.spl",
     "test/SPL/Compiler/source_files/constants_corner_cases.spl",

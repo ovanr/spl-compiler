@@ -10,8 +10,8 @@ extra-source-files:
 - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+# synopsis:            A compiler for SPL (Simple Programming Language)
+# category:            Compilers
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
@@ -25,6 +25,9 @@ dependencies:
 - containers
 - bytestring
 - text
+- mtl
+- random
+- MonadRandom
 - HTF
 - lens
 - data-default
@@ -40,7 +43,7 @@ executables:
     ghc-options:
     - -threaded
     - -rtsopts
-    - -O2
+    # - -O2
     - -with-rtsopts=-N
     dependencies:
     - spl-compiler

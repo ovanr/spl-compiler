@@ -34,4 +34,4 @@ Parse the source file and print the parsed result as actual code
 ## Running the tests
 
 We have an extensive test suite which can be run using:
-- `stack test`
+- `stack test --coverage`

@@ -6,9 +6,11 @@
 module SPL.Compiler.TypeChecker.Test (htf_thisModulesTests) where
 
 import Test.Framework
-import SPL.Compiler.TypeChecker.Type
 import Control.Monad
 import qualified Data.Map as M
+
+import SPL.Compiler.TypeChecker.Type
+import SPL.Compiler.TypeChecker.TypeProperty
 
 type UnifyTest = ((Type, Type), Maybe Subst)
 
@@ -27,6 +29,14 @@ executeUnifyTests tests =
         case expected of
             Just subst -> assertEqual (Right subst) actual 
             Nothing -> print actual >> void (assertLeft actual)
+
+executeSubstTests :: [UnifyTest] -> IO ()
+executeSubstTests tests =
+    forM_ tests $ \((t1,t2), expected) -> do
+        let actual = unify t1 t2
+        case expected of
+            Just subst -> assertEqual (substApply subst t1) (substApply subst t2) 
+            Nothing -> return ()
 
 test_unify = do
     let tests = [
@@ -66,3 +76,9 @@ test_unify = do
             failure (FunType (FunType (VarType "a") IntType) (VarType "a"), FunType (FunType BoolType IntType) IntType)
             ]
     executeUnifyTests tests
+    executeSubstTests tests
+
+
+prop_substitutionLaw = 
+    withQCArgs (\a -> a{maxSuccess = 1000}) 
+        (\s2 s1 t -> substApply (s2 <> s1) t == substApply s2 (substApply s1 t))
