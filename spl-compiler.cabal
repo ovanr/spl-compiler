@@ -31,6 +31,7 @@ library
       SPL.Compiler.TypeChecker.Checker
       SPL.Compiler.TypeChecker.TCT
       SPL.Compiler.TypeChecker.TCTEntityLocation
+      SPL.Compiler.TypeChecker.TreeTransformer
       SPL.Compiler.TypeChecker.Unify
   other-modules:
       Paths_spl_compiler
