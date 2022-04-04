@@ -100,14 +100,14 @@ data TCTType =
     deriving (Eq)
 
 instance Show TCTType where
-    show IntType = "Int"
-    show BoolType = "Bool"
-    show CharType = "Char"
-    show VoidType = "Void"
-    show (TCTVarType a) = T.unpack a
-    show (TCTListType a) = "[" <> show a <> "]"
-    show (TCTTupleType a b) = "(" <> show a <> "," <> show b <> ")"
-    show (TCTFunType a b) =
+    show (TCTIntType _) = "Int"
+    show (TCTBoolType _) = "Bool"
+    show (TCTCharType _) = "Char"
+    show (TCTVoidType _) = "Void"
+    show (TCTVarType _ a) = T.unpack a
+    show (TCTListType _ a) = "[" <> show a <> "]"
+    show (TCTTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
+    show (TCTFunType _ _ a b) =
         case a of
-            TCTFunType _ _ -> "(" <> show a <> ")" <> " -> " <> show b
+            TCTFunType {} -> "(" <> show a <> ")" <> " -> " <> show b
             _ -> show a <> " -> " <> show b

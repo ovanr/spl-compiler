@@ -9,9 +9,11 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import SPL.Compiler.TypeChecker.TCT
+
 type Error = Text
 
-newtype Subst = Subst (Map TypeVar Type) deriving (Eq, Show)
+newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 
 instance Semigroup Subst where
     -- `(subst2 <> subst1) t` means 
