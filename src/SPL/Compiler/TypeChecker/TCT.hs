@@ -1,7 +1,8 @@
 module SPL.Compiler.TypeChecker.TCT where
 
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
-import SPL.Compiler.Parser.AST (EntityLoc(..))
+import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
+import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Lens
@@ -23,7 +24,7 @@ data TCTFunDecl =
         TCTFunBody
     deriving (Eq, Show)
 
-data TCTVarDecl = EntityLoc TCTType TCTIdentifier TCTExpr
+data TCTVarDecl = TCTVarDecl EntityLoc TCTType TCTIdentifier TCTExpr
     deriving (Eq, Show)
 
 data TCTIdentifier = TCTIdentifier EntityLoc Text 
@@ -55,31 +56,10 @@ data TCTExpr =
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr TCTFunCall
     |   FieldSelectExpr TCTFieldSelector
-    |   OpExpr EntityLoc TCTOpUnary TCTExpr
-    |   Op2Expr EntityLoc TCTExpr TCTOpBin TCTExpr  
+    |   OpExpr EntityLoc OpUnary TCTExpr
+    |   Op2Expr EntityLoc TCTExpr OpBin TCTExpr  
     |   EmptyListExpr EntityLoc
     |   TupExpr EntityLoc TCTExpr TCTExpr
-    deriving (Eq, Show)
-
-data TCTOpUnary = UnNeg | UnMinus
-    deriving (Eq, Show)
-
-data TCTOpBin = 
-      Plus 
-    | Minus 
-    | Mul 
-    | Div 
-    | Mod 
-    | Pow
-    | Equal 
-    | Less 
-    | Greater 
-    | LessEq 
-    | GreaterEq 
-    | Nequal 
-    | LogAnd 
-    | LogOr 
-    | Cons 
     deriving (Eq, Show)
 
 data TypeConstraints =

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SPL.Compiler.TypeChecker.Type where
+module SPL.Compiler.TypeChecker.Unify where
 
 import Data.Text (Text)
 import Data.Map (Map)
@@ -10,6 +10,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.TypeChecker.TCTEntityLocation
+import SPL.Compiler.Common.EntityLocation
 
 type Error = Text
 
@@ -30,55 +32,55 @@ instance Monoid Subst where
     mappend = (<>)
 
 substApply :: Subst -> TCTType -> TCTType
-substApply _ (TCTIntType _) = TCTIntType
-substApply _ (TCTCharType _) = TCTCharType
-substApply _ (TCTBoolType _) = TCTBoolType
-substApply _ (TCTVoidType _) = TCTVoidType
-substApply (Subst s) v@(TCTVarType _ a) = M.findWithDefault v a s
-substApply s (TCTListType _ a) = TCTListType (substApply s a)
-substApply s (TCTTupleType _ a b) = TCTTupleType (substApply s a) (substApply s b)
-substApply s (TCTFunType _ _ a b) = TCTFunType (substApply s a) (substApply s b)
+substApply _ (TCTIntType e) = TCTIntType e
+substApply _ (TCTCharType e) = TCTCharType e
+substApply _ (TCTBoolType e) = TCTBoolType e
+substApply _ (TCTVoidType e) = TCTVoidType e
+substApply (Subst s) v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
+substApply s (TCTListType e a) = TCTListType e (substApply s a)
+substApply s (TCTTupleType e a b) = TCTTupleType e (substApply s a) (substApply s b)
+substApply s (TCTFunType d e a b) = TCTFunType d e (substApply s a) (substApply s b)
 
 typeVars :: TCTType -> Set TypeVar
 typeVars (TCTVarType _ a) = S.singleton a
-typeVars (TCTFunType _ a b) = typeVars a <> typeVars b
+typeVars (TCTFunType _ _ a b) = typeVars a <> typeVars b
 typeVars (TCTTupleType _ a b) = typeVars a <> typeVars b
 typeVars (TCTListType _ a) = typeVars a
 typeVars _ = S.empty
 
-occurs :: TypeVar -> Type -> Bool
+occurs :: TypeVar -> TCTType -> Bool
 occurs var t = S.member var (typeVars t)
-occursError :: TypeVar -> Type -> Error
+occursError :: TypeVar -> TCTType -> Error
 occursError var t =
     "Occurs check: cannot construct the infinite type: "
         <> var 
         <> " ~ " 
         <> T.pack (show t)
 
-unify :: Type -> Type -> Either Error Subst
-unify IntType IntType = Right mempty
-unify CharType CharType = Right mempty
-unify BoolType BoolType = Right mempty
-unify VoidType VoidType = Right mempty
-unify (VarType a) v2@(VarType b)
+unify :: TCTType -> TCTType -> Either Error Subst
+unify (TCTIntType _) (TCTIntType _) = Right mempty
+unify (TCTCharType _) (TCTCharType _) = Right mempty
+unify (TCTBoolType _) (TCTBoolType _) = Right mempty
+unify (TCTVoidType _) (TCTVoidType _) = Right mempty
+unify (TCTVarType _ a) v2@(TCTVarType _ b)
     | a == b = Right mempty
     | otherwise = Right . Subst $ M.singleton a v2
-unify (VarType a) t =
+unify (TCTVarType _ a) t =
     if not $ occurs a t then
         Right . Subst $ M.singleton a t
     else
         Left $ occursError a t
-unify t (VarType a) =
+unify t (TCTVarType _ a) =
     if not $ occurs a t then
         Right . Subst $ M.singleton a t
     else
         Left $ occursError a t
-unify (ListType a) (ListType b) = unify a b
-unify (TupleType a1 b1) (TupleType a2 b2) = do
+unify (TCTListType _ a) (TCTListType _ b) = unify a b
+unify (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
     subst1 <- unify a1 a2 
     subst2 <- unify (substApply subst1 b1) (substApply subst1 b2)
     return $ subst2 <> subst1
-unify (FunType a1 b1) (FunType a2 b2) = do
+unify (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
     subst1 <- unify a1 a2 
     subst2 <- unify (substApply subst1 b1) (substApply subst1 b2)
     return $ subst2 <> subst1

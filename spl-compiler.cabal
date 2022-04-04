@@ -19,6 +19,7 @@ extra-source-files:
 
 library
   exposed-modules:
+      SPL.Compiler.Common.EntityLocation
       SPL.Compiler.Lexer.AlexLexGen
       SPL.Compiler.Main
       SPL.Compiler.Parser.AST
@@ -29,7 +30,8 @@ library
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.TypeChecker.Checker
       SPL.Compiler.TypeChecker.TCT
-      SPL.Compiler.TypeChecker.Type
+      SPL.Compiler.TypeChecker.TCTEntityLocation
+      SPL.Compiler.TypeChecker.Unify
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -78,11 +80,13 @@ test-suite spl-compiler-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      SPL.Compiler.Common.Testable
       SPL.Compiler.Lexer.Test
       SPL.Compiler.LexerParserComboTest
       SPL.Compiler.Parser.Test
       SPL.Compiler.Parser.Testable
       SPL.Compiler.TypeChecker.Test
+      SPL.Compiler.TypeChecker.Testable
       SPL.Compiler.TypeChecker.TypeProperty
       Paths_spl_compiler
   hs-source-dirs:

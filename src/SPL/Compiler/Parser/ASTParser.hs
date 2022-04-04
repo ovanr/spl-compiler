@@ -3,11 +3,6 @@
 
 module SPL.Compiler.Parser.ASTParser where
 
-import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..))
-import qualified SPL.Compiler.Lexer.AlexLexGen as Lex (Keyword(..), Type(..))
-import SPL.Compiler.Parser.ParserCombinator
-import SPL.Compiler.Parser.AST
-import SPL.Compiler.Parser.ASTEntityLocation
 import Control.Applicative
 import Control.Lens ((%~), _1, _2, (^?), ix)
 import qualified Data.Text as T
@@ -16,6 +11,13 @@ import Data.Functor (($>), (<&>))
 import Data.Function ((&))
 import Data.Foldable
 import Data.Maybe (maybeToList)
+
+import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..))
+import qualified SPL.Compiler.Lexer.AlexLexGen as Lex (Keyword(..), Type(..))
+import SPL.Compiler.Parser.ParserCombinator
+import SPL.Compiler.Parser.AST
+import SPL.Compiler.Parser.ASTEntityLocation
+import SPL.Compiler.Common.EntityLocation
 
 type SPLParser a = Parser Token [Text] a
 

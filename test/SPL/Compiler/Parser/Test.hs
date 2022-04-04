@@ -14,13 +14,13 @@ import Control.Monad (forM_)
 import Control.Applicative ((<|>))
 import Control.Lens ((^..), (^?), _Right, ix, _1, folded)
 
+import SPL.Compiler.Common.Testable
 import SPL.Compiler.Parser.Testable
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..))
 import SPL.Compiler.Parser.ASTParser (pType, pFargs, pFunType, pExpr, pTupExprOrParens, pStmt, pVarDecl, pFunDecl)
 import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
-
 
 executeMultipleTests :: (Testable b, Eq b, Show b) => Parser Token [Text] b -> [([SPLToken], Maybe b)] -> IO ()
 executeMultipleTests parser tests =

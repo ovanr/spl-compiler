@@ -2,8 +2,8 @@
 module SPL.Compiler.Parser.ASTPrettyPrint where
 import SPL.Compiler.Parser.AST
     (ASTType(..),
-     ASTOpBin(..),
-     ASTOpUnary(..),
+     OpBin(..),
+     OpUnary(..),
      ASTExpr(..),
      ASTStmt(..),
      ASTFunCall(..),
@@ -83,11 +83,11 @@ instance PrettyPrint ASTStmt where
 instance PrettyPrint ASTFunCall where
     toCode n (ASTFunCall _ id args) = toCode n id <> "(" <> T.intercalate "," (map (toCode n) args) <> ")"
 
-instance PrettyPrint ASTOpUnary where
+instance PrettyPrint OpUnary where
     toCode _ UnNeg = " ! "
     toCode _ UnMinus = " -"
 
-instance PrettyPrint ASTOpBin where
+instance PrettyPrint OpBin where
     toCode _ Plus = " + "
     toCode _ Minus = " - "
     toCode _ Mul = " * "

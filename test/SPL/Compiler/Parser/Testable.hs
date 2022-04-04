@@ -3,20 +3,8 @@ module SPL.Compiler.Parser.Testable where
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..), Type(..), Keyword(..))
 import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
+import SPL.Compiler.Common.Testable
 import Data.Default
-
-instance Default EntityLoc where
-    def = EntityLoc (1,1) (1,1)
-
-instance Default AlexPosn where
-    def = AlexPn 0 1 1
-
--- used for test purposes
--- transform a data type to its test form
--- this means that certain fields may be replaced
--- with their default values for ease of comparisons, etc.
-class Testable a where
-    toTestForm :: a -> a
 
 instance Testable ASTIdentifier where
     toTestForm (ASTIdentifier _ i) = ASTIdentifier def i
@@ -65,16 +53,9 @@ instance Testable ASTFunDecl where
 instance Testable ASTFunBody where
     toTestForm (ASTFunBody _ v s) = ASTFunBody def (toTestForm v) (toTestForm s)
 
-instance Testable a => Testable [a] where
-    toTestForm = map toTestForm
-
 instance Testable ASTStmt where
     toTestForm (IfElseStmt _ val1 val2 val3) = IfElseStmt def (toTestForm val1) (toTestForm val2) (toTestForm val3)
     toTestForm (WhileStmt _ val1 val2) = WhileStmt def (toTestForm val1) (toTestForm val2)
     toTestForm (AssignStmt _ val1 val2) = AssignStmt def (toTestForm val1) (toTestForm val2)
     toTestForm (FunCallStmt _ val1) = FunCallStmt def (toTestForm val1)
     toTestForm (ReturnStmt _ val1) = ReturnStmt def (toTestForm val1)
-
-instance Testable a => Testable (Maybe a) where
-    toTestForm (Just val) = Just (toTestForm val)
-    toTestForm Nothing = Nothing

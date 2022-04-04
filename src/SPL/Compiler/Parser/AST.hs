@@ -1,22 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module SPL.Compiler.Parser.AST where
 
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
+import SPL.Compiler.Common.EntityLocation
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Lens
-
--- Location is (LineNum, ColumnNum)
-type Location = (Int, Int)
-
--- EntityLoc is StartLocation and EndLocation in source file
-data EntityLoc = EntityLoc {
-    _locStart :: Location,
-    _locEnd :: Location
-} deriving (Eq, Show)
-
-makeLenses ''EntityLoc
 
 newtype AST = AST [ASTLeaf]
 
@@ -65,16 +53,16 @@ data ASTExpr =
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall
     |   FieldSelectExpr ASTFieldSelector
-    |   OpExpr EntityLoc ASTOpUnary ASTExpr
-    |   Op2Expr EntityLoc ASTExpr ASTOpBin ASTExpr  
+    |   OpExpr EntityLoc OpUnary ASTExpr
+    |   Op2Expr EntityLoc ASTExpr OpBin ASTExpr  
     |   EmptyListExpr EntityLoc
     |   TupExpr EntityLoc ASTExpr ASTExpr
     deriving (Eq, Show)
 
-data ASTOpUnary = UnNeg | UnMinus
+data OpUnary = UnNeg | UnMinus
     deriving (Eq, Show)
 
-data ASTOpBin = 
+data OpBin = 
       Plus 
     | Minus 
     | Mul 

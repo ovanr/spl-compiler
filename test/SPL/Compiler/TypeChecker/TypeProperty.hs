@@ -3,11 +3,15 @@
 module SPL.Compiler.TypeChecker.TypeProperty where
 
 import Test.Framework
-import SPL.Compiler.TypeChecker.Type
+import Data.Default
 import Control.Applicative (liftA2)
 import Data.Text (Text)
 
-instance Arbitrary Type where
+import SPL.Compiler.TypeChecker.Testable
+import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.TypeChecker.Unify
+
+instance Arbitrary TCTType where
     arbitrary = frequency
         [
             (2, varGen),
@@ -20,13 +24,13 @@ instance Arbitrary Type where
         ]
 
        where
-            intGen = return IntType
-            boolGen = return BoolType
-            charGen = return CharType
-            varGen = oneof $ return . VarType <$> ["a", "b", "c", "d"]
-            tupleGen = liftA2 TupleType arbitrary arbitrary
-            funGen = liftA2 FunType arbitrary arbitrary
-            listGen = ListType <$> arbitrary
+            intGen = return (TCTIntType def)
+            boolGen = return (TCTBoolType def)
+            charGen = return (TCTCharType def)
+            varGen = oneof $ return . TCTVarType def <$> ["a", "b", "c", "d"]
+            tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
+            funGen = liftA2 (TCTFunType def []) arbitrary arbitrary
+            listGen = TCTListType def <$> arbitrary
 
 instance Arbitrary Text where
     arbitrary =  oneof $ return <$> ["a", "b", "c", "d"]
