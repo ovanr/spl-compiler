@@ -29,21 +29,21 @@ instance Monoid Subst where
     mempty = Subst mempty 
     mappend = (<>)
 
-substApply :: Subst -> Type -> Type
-substApply _ IntType = IntType
-substApply _ CharType = CharType
-substApply _ BoolType = BoolType
-substApply _ VoidType = VoidType
-substApply (Subst s) v@(VarType a) = M.findWithDefault v a s
-substApply s (ListType a) = ListType (substApply s a)
-substApply s (TupleType a b) = TupleType (substApply s a) (substApply s b)
-substApply s (FunType a b) = FunType (substApply s a) (substApply s b)
+substApply :: Subst -> TCTType -> TCTType
+substApply _ (TCTIntType _) = TCTIntType
+substApply _ (TCTCharType _) = TCTCharType
+substApply _ (TCTBoolType _) = TCTBoolType
+substApply _ (TCTVoidType _) = TCTVoidType
+substApply (Subst s) v@(TCTVarType _ a) = M.findWithDefault v a s
+substApply s (TCTListType _ a) = TCTListType (substApply s a)
+substApply s (TCTTupleType _ a b) = TCTTupleType (substApply s a) (substApply s b)
+substApply s (TCTFunType _ _ a b) = TCTFunType (substApply s a) (substApply s b)
 
-typeVars :: Type -> Set TypeVar
-typeVars (VarType a) = S.singleton a
-typeVars (FunType a b) = typeVars a <> typeVars b
-typeVars (TupleType a b) = typeVars a <> typeVars b
-typeVars (ListType a) = typeVars a
+typeVars :: TCTType -> Set TypeVar
+typeVars (TCTVarType _ a) = S.singleton a
+typeVars (TCTFunType _ a b) = typeVars a <> typeVars b
+typeVars (TCTTupleType _ a b) = typeVars a <> typeVars b
+typeVars (TCTListType _ a) = typeVars a
 typeVars _ = S.empty
 
 occurs :: TypeVar -> Type -> Bool

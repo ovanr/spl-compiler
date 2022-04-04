@@ -94,9 +94,9 @@ data TCTType =
     |   TCTCharType EntityLoc
     |   TCTVoidType EntityLoc
     |   TCTVarType EntityLoc TypeVar
-    |   TCTTupleType EntityLoc Type Type
-    |   TCTListType EntityLoc Type
-    |   TCTFunType EntityLoc [TypeConstraints] Type Type
+    |   TCTTupleType EntityLoc TCTType TCTType
+    |   TCTListType EntityLoc TCTType
+    |   TCTFunType EntityLoc [TypeConstraints] TCTType TCTType
     deriving (Eq)
 
 instance Show TCTType where
