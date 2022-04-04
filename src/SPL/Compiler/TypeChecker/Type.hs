@@ -10,31 +10,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 type Error = Text
-type TypeVar = Text
-
-data Type =
-        IntType
-    |   BoolType
-    |   CharType
-    |   VoidType
-    |   VarType TypeVar
-    |   TupleType Type Type
-    |   ListType Type
-    |   FunType Type Type
-    deriving (Eq)
-
-instance Show Type where
-    show IntType = "Int"
-    show BoolType = "Bool"
-    show CharType = "Char"
-    show VoidType = "Void"
-    show (VarType a) = T.unpack a
-    show (ListType a) = "[" <> show a <> "]"
-    show (TupleType a b) = "(" <> show a <> "," <> show b <> ")"
-    show (FunType a b) =
-        case a of
-            FunType _ _ -> "(" <> show a <> ")" <> " -> " <> show b
-            _ -> show a <> " -> " <> show b
 
 newtype Subst = Subst (Map TypeVar Type) deriving (Eq, Show)
 

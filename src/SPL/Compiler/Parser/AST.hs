@@ -65,7 +65,7 @@ data ASTExpr =
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall
     |   FieldSelectExpr ASTFieldSelector
-    |   OpExpr EntityLoc ASTOpUnary ASTExpr  
+    |   OpExpr EntityLoc ASTOpUnary ASTExpr
     |   Op2Expr EntityLoc ASTExpr ASTOpBin ASTExpr  
     |   EmptyListExpr EntityLoc
     |   TupExpr EntityLoc ASTExpr ASTExpr

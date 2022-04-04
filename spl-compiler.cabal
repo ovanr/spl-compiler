@@ -27,8 +27,8 @@ library
       SPL.Compiler.Parser.ASTPrettyPrint
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
-      SPL.Compiler.TypeChecker.AST
       SPL.Compiler.TypeChecker.Checker
+      SPL.Compiler.TypeChecker.TCT
       SPL.Compiler.TypeChecker.Type
   other-modules:
       Paths_spl_compiler
