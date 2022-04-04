@@ -23,7 +23,7 @@ data TCTFunDecl =
         TCTFunBody
     deriving (Eq, Show)
 
-data TCTVarDecl = EntityLoc TCTType TCTIdentifier TCTExpr
+data TCTVarDecl = TCTVarDecl EntityLoc TCTType TCTIdentifier TCTExpr
     deriving (Eq, Show)
 
 data TCTIdentifier = TCTIdentifier EntityLoc Text 
