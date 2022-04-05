@@ -23,9 +23,6 @@ type RandErr e a = RandT StdGen (Either e) a
 
 type Context = Map Text TCTType
 
-substGammaApply :: Subst -> Context -> Context
-substGammaApply s c = substApply s <$> c
-
 tcFail e = lift (Left e)
 
 freshVar :: MonadRandom m => EntityLoc -> m TCTType
@@ -83,10 +80,10 @@ typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
     alpha1 <- freshVar (getLoc e1)
     (_, e1Subst) <- typeCheckExpr gamma e1 alpha1
     alpha2 <- freshVar (getLoc e2)
-    (_, e2Subst) <- typeCheckExpr (substGammaApply e1Subst gamma) e2 alpha2
+    (_, e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 alpha2
     let eSubst = e2Subst <> e1Subst
-    let expectedType = substApply eSubst $ TCTTupleType loc alpha1 alpha2
-    subst <- lift . first (TCError . pure) $ unify (substApply eSubst tau) expectedType
+    let expectedType = eSubst $* TCTTupleType loc alpha1 alpha2
+    subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
     return (e, subst <> eSubst)
 typeCheckExpr gamma e@(OpExpr loc UnNeg e1) tau = do
     (_, e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType loc)
@@ -114,28 +111,28 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
     where
         handleIntOp = do
             (e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType $ getLoc e1)
-            (e2', e2Subst) <- typeCheckExpr (substGammaApply e1Subst gamma) e2 (TCTIntType $ getLoc e2)
+            (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTIntType $ getLoc e2)
             let eSubst = e2Subst <> e1Subst
             let expectedType = TCTIntType loc
-            subst <- lift . first (TCError . pure) $ unify (substApply eSubst tau) expectedType
+            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
             return (Op2Expr loc e1' op e2', subst <> eSubst)
 
         handleBoolOp = do
             (e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType $ getLoc e1)
-            (e2', e2Subst) <- typeCheckExpr (substGammaApply e1Subst gamma) e2 (TCTBoolType $ getLoc e2)
+            (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTBoolType $ getLoc e2)
             let eSubst = e2Subst <> e1Subst
             let expectedType = TCTBoolType loc
-            subst <- lift . first (TCError . pure) $ unify (substApply eSubst tau) expectedType
+            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
             return (Op2Expr loc e1' op e2', subst <> eSubst)
 
         handleConsOp = do
             alpha <- freshVar (getLoc e1)
             (e1', e1Subst) <- typeCheckExpr gamma e1 alpha
-            (e2', e2Subst) <- typeCheckExpr (substGammaApply e1Subst gamma) e2 
-                                            (TCTListType (getLoc e2) (substApply e1Subst alpha))
+            (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 
+                                            (TCTListType (getLoc e2) (e1Subst $* alpha))
             let eSubst = e2Subst <> e1Subst
-            let expectedType = substApply eSubst (TCTListType (getLoc e) alpha)
-            subst <- lift . first (TCError . pure) $ unify (substApply eSubst tau) expectedType
+            let expectedType = eSubst $* TCTListType (getLoc e) alpha
+            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
             return (Op2Expr loc e1' op e2', subst <> eSubst)
 
         -- | Equal 

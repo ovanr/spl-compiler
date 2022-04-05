@@ -89,6 +89,7 @@ test-suite spl-compiler-test
       SPL.Compiler.Parser.Testable
       SPL.Compiler.TypeChecker.Test
       SPL.Compiler.TypeChecker.Testable
+      SPL.Compiler.TypeChecker.TestUnify
       SPL.Compiler.TypeChecker.TypeProperty
       Paths_spl_compiler
   hs-source-dirs:
