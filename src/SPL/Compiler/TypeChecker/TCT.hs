@@ -4,6 +4,7 @@ import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Key
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
 import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 import Data.Text (Text)
+import Data.Set (Set)
 import qualified Data.Text as T
 import Control.Lens
 
@@ -74,6 +75,7 @@ data TCTType =
     |   TCTCharType EntityLoc
     |   TCTVoidType EntityLoc
     |   TCTVarType EntityLoc TypeVar
+    |   TCTUniversalType EntityLoc (Set TypeVar) TCTType
     |   TCTTupleType EntityLoc TCTType TCTType
     |   TCTListType EntityLoc TCTType
     |   TCTFunType EntityLoc [TypeConstraints] TCTType TCTType
@@ -85,6 +87,7 @@ instance Show TCTType where
     show (TCTCharType _) = "Char"
     show (TCTVoidType _) = "Void"
     show (TCTVarType _ a) = T.unpack a
+    show (TCTUniversalType _ _ a) = show a
     show (TCTListType _ a) = "[" <> show a <> "]"
     show (TCTTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
     show (TCTFunType _ _ a b) =

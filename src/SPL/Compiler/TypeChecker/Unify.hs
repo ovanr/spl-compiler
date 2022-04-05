@@ -5,6 +5,7 @@ module SPL.Compiler.TypeChecker.Unify where
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
+import Control.Monad
 import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -40,6 +41,7 @@ substApply (Subst s) v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
 substApply s (TCTListType e a) = TCTListType e (substApply s a)
 substApply s (TCTTupleType e a b) = TCTTupleType e (substApply s a) (substApply s b)
 substApply s (TCTFunType d e a b) = TCTFunType d e (substApply s a) (substApply s b)
+substApply s (TCTUniversalType _ _ t) = substApply s t
 
 typeVars :: TCTType -> Set TypeVar
 typeVars (TCTVarType _ a) = S.singleton a
@@ -58,34 +60,65 @@ occursError var t =
         <> T.pack (show t)
 
 unify :: TCTType -> TCTType -> Either Error Subst
-unify (TCTIntType _) (TCTIntType _) = Right mempty
-unify (TCTCharType _) (TCTCharType _) = Right mempty
-unify (TCTBoolType _) (TCTBoolType _) = Right mempty
-unify (TCTVoidType _) (TCTVoidType _) = Right mempty
-unify (TCTVarType _ a) v2@(TCTVarType _ b)
-    | a == b = Right mempty
-    | otherwise = Right . Subst $ M.singleton a v2
-unify (TCTVarType _ a) t =
-    if not $ occurs a t then
-        Right . Subst $ M.singleton a t
-    else
-        Left $ occursError a t
-unify t (TCTVarType _ a) =
-    if not $ occurs a t then
-        Right . Subst $ M.singleton a t
-    else
-        Left $ occursError a t
-unify (TCTListType _ a) (TCTListType _ b) = unify a b
-unify (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
-    subst1 <- unify a1 a2 
-    subst2 <- unify (substApply subst1 b1) (substApply subst1 b2)
-    return $ subst2 <> subst1
-unify (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
-    subst1 <- unify a1 a2 
-    subst2 <- unify (substApply subst1 b1) (substApply subst1 b2)
-    return $ subst2 <> subst1
-unify t1 t2 = Left $ 
-    "Couldn't match type '" <> T.pack (show t1) 
-                            <> "' with '" 
-                            <> T.pack (show t2)
-                            <> "'"
+unify t1 t2 = unifyHelper mempty t1 t2
+    where
+        typeMismatchError t1 t2 =
+            "Couldn't match type '" <> T.pack (show t1) 
+                                    <> "' with '" 
+                                    <> T.pack (show t2)
+                                    <> "'"
+        unifyHelper :: Set TypeVar -> TCTType -> TCTType -> Either Error Subst
+        unifyHelper boundVars (TCTUniversalType _ fv t1) t2 = do
+            unifyHelper (boundVars <> fv) t1 t2
+        unifyHelper boundVars t1 (TCTUniversalType _ fv t2) = do
+            unifyHelper (boundVars <> fv) t1 t2
+        unifyHelper _ (TCTIntType _) (TCTIntType _) = Right mempty
+        unifyHelper _ (TCTCharType _) (TCTCharType _) = Right mempty
+        unifyHelper _ (TCTBoolType _) (TCTBoolType _) = Right mempty
+        unifyHelper _ (TCTVoidType _) (TCTVoidType _) = Right mempty
+        unifyHelper boundVars v1@(TCTVarType _ a) v2@(TCTVarType _ b)
+            | a == b = Right mempty
+            | S.member a boundVars = Right . Subst $ M.singleton a v2
+            | S.member b boundVars = Right . Subst $ M.singleton b v2
+            | otherwise = Left $ typeMismatchError v1 v2
+        unifyHelper boundVars v@(TCTVarType _ a) t = do
+            unless (S.member a boundVars) $
+                Left $ typeMismatchError v t
+            if not $ occurs a t then
+                Right . Subst $ M.singleton a t
+            else
+                Left $ occursError a t
+        unifyHelper boundVars t v@(TCTVarType _ a) = do
+            unless (S.member a boundVars) $
+                Left $ typeMismatchError v t
+            if not $ occurs a t then
+                Right . Subst $ M.singleton a t
+            else
+                Left $ occursError a t
+        unifyHelper boundVars (TCTListType _ a) (TCTListType _ b) = unifyHelper boundVars a b
+        unifyHelper boundVars (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+            subst1 <- unifyHelper boundVars a1 a2 
+            subst2 <- unifyHelper boundVars (substApply subst1 b1) (substApply subst1 b2)
+            return $ subst2 <> subst1
+        unifyHelper boundVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
+            subst1 <- unifyHelper boundVars a1 a2 
+            subst2 <- unifyHelper boundVars (substApply subst1 b1) (substApply subst1 b2)
+            return $ subst2 <> subst1
+        unifyHelper _ t1 t2 = Left $ typeMismatchError t1 t2
+
+-- check if `t` a instance of `mgt` 
+-- --note that type variables of different names are not equivalent--
+-- and if so return their substitution
+getMGTInstance :: TCTType -> TCTType -> Either Text Subst
+getMGTInstance t mgt = do
+    Subst subst <- unify t mgt
+    let tvVars = typeVars t
+    forM_ tvVars $ \v ->
+        case M.lookup v subst of
+            Just t -> Left $
+                "unexpected type " <> 
+                T.pack (show v) <>
+                "expected type " <> 
+                T.pack (show t)
+            Nothing -> return ()
+    return (Subst subst)

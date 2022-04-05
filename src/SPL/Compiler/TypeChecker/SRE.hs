@@ -4,18 +4,19 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module SPL.Compiler.TypeChecker.Checker where
+module SPL.Compiler.TypeChecker.SRE where
 
 import System.Random
 import Control.Monad.Random.Class
 import Control.Monad.State.Class
 import Data.Function ((&))
 
-newtype Error e = Error { msg :: e }
-
 newtype SRE e s a = 
     SRE { runSRE :: s -> StdGen -> (Either e a, s, StdGen) }
     deriving (Functor)
+
+sreFail :: e -> SRE e s a 
+sreFail e = SRE $ \s g -> (Left e, s, g)
 
 instance Applicative (SRE e s) where
     pure a = SRE $ \s g -> (Right a, s, g)
