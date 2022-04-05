@@ -141,12 +141,12 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
         -- | Nequal 
 typeCheckExpr _ _ _ = undefined
 
-typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr (TCError [Text]) (TCTField, Subst)
+typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTField, Subst)
 typeCheckFieldSelector = undefined
 
 typeCheckStmt :: Context ->
                  TCTStmt ->
-                 RandErr (TCError [Text]) (TCTStmt, Subst)
+                 RandErr Error (TCTStmt, Subst)
 typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) = do
     (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
     (_, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts
@@ -165,7 +165,7 @@ typeCheckStmt gamma stmt@(AssignStmt loc field expr) = do
     alpha2 <- freshVar (getLoc expr)
     (_, exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
     let combSubst = exprSubst <> fieldSubst
-    subst <- lift . first (TCError . pure) $ unify (combSubst $* alpha1) (combSubst $* alpha2) 
+    subst <- lift $ unify (combSubst $* alpha1) (combSubst $* alpha2) 
     return (stmt, subst <> combSubst)
 
 typeCheckStmt _ _ = undefined
@@ -174,7 +174,7 @@ typeCheckStmt _ _ = undefined
 
 typeCheckStmtList :: Context ->
                      [TCTStmt] ->
-                     RandErr (TCError [Text]) ([TCTStmt], Subst)
+                     RandErr Error ([TCTStmt], Subst)
 typeCheckStmtList _ [] = return ([], mempty)
 typeCheckStmtList gamma (st:sts) = do
     (_, substSt)  <- typeCheckStmt gamma st
