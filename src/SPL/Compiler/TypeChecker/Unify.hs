@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module SPL.Compiler.TypeChecker.Unify where
 
@@ -18,6 +19,11 @@ type Error = Text
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 
+class SubstApply a where
+    ($*) :: Subst -> a -> a
+
+infixr 1 $*
+
 instance Semigroup Subst where
     -- `(subst2 <> subst1) t` means 
     -- first apply `subst1` to `t` and then apply `subst2` on result
@@ -26,23 +32,25 @@ instance Semigroup Subst where
     -- subst1 = [b |-> (a -> Int)]
     -- subst1(subst2(b -> b)) = (Int -> Int) -> (Int -> Int)
     -- subst1(subst1(b -> b)) = (a -> Int) -> (a -> Int)
-    subst2@(Subst a) <> (Subst b) = Subst (M.unionWith (\_ b -> b) a (substApply subst2 <$> b))
+    subst2@(Subst a) <> (Subst b) = Subst (M.unionWith (\_ b -> b) a (($*) subst2 <$> b))
 
 instance Monoid Subst where
     mempty = Subst mempty 
     mappend = (<>)
 
+instance SubstApply TCTType where 
+    _ $* (TCTIntType e) = TCTIntType e
+    _ $* (TCTCharType e) = TCTCharType e
+    _ $* (TCTBoolType e) = TCTBoolType e
+    _ $* (TCTVoidType e) = TCTVoidType e
+    (Subst s) $* v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
+    s $* (TCTListType e a) = TCTListType e (s $* a)
+    s $* (TCTTupleType e a b) = TCTTupleType e (s $* a) (s $* b)
+    s $* (TCTFunType d e a b) = TCTFunType d e (s $* a) (s $* b)
+    s $* (TCTUniversalType _ _ t) = s $* t
 
-substApply :: Subst -> TCTType -> TCTType
-substApply _ (TCTIntType e) = TCTIntType e
-substApply _ (TCTCharType e) = TCTCharType e
-substApply _ (TCTBoolType e) = TCTBoolType e
-substApply _ (TCTVoidType e) = TCTVoidType e
-substApply (Subst s) v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
-substApply s (TCTListType e a) = TCTListType e (substApply s a)
-substApply s (TCTTupleType e a b) = TCTTupleType e (substApply s a) (substApply s b)
-substApply s (TCTFunType d e a b) = TCTFunType d e (substApply s a) (substApply s b)
-substApply s (TCTUniversalType _ _ t) = substApply s t
+instance SubstApply (Map Text TCTType) where
+    s $* c = ($*) s <$> c
 
 typeVars :: TCTType -> Set TypeVar
 typeVars (TCTVarType _ a) = S.singleton a
@@ -99,11 +107,11 @@ unify t1 t2 = unifyHelper mempty t1 t2
         unifyHelper boundVars (TCTListType _ a) (TCTListType _ b) = unifyHelper boundVars a b
         unifyHelper boundVars (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
             subst1 <- unifyHelper boundVars a1 a2 
-            subst2 <- unifyHelper boundVars (substApply subst1 b1) (substApply subst1 b2)
+            subst2 <- unifyHelper boundVars (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1
         unifyHelper boundVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
             subst1 <- unifyHelper boundVars a1 a2 
-            subst2 <- unifyHelper boundVars (substApply subst1 b1) (substApply subst1 b2)
+            subst2 <- unifyHelper boundVars (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1
         unifyHelper _ t1 t2 = Left $ typeMismatchError t1 t2
 
