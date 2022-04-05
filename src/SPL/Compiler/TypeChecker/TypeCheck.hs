@@ -151,24 +151,26 @@ typeCheckStmt :: Context ->
                  RandErr (TCError [Text]) (TCTStmt, Subst)
 typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) = do
     (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
-    (_, thenSubst) <- typeCheckStmtList (substGammaApply condSubst gamma) thenStmts
+    (_, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts
     let combSubst = thenSubst <> condSubst
-    (_, elseSubst) <- typeCheckStmtList (substGammaApply combSubst gamma) thenStmts
+    (_, elseSubst) <- typeCheckStmtList (combSubst $* gamma) thenStmts
     return (stmt, combSubst <> elseSubst)
 
 typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) = do
     (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
-    (_, bodySubst) <- typeCheckStmtList (substGammaApply condSubst gamma) bodyStmts
+    (_, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts
     return (stmt, bodySubst <> condSubst)
 
 typeCheckStmt gamma stmt@(AssignStmt loc field expr) = do
     alpha1 <- freshVar (getLoc field)
     (_, fieldSubst) <- typeCheckFieldSelector gamma field alpha1
     alpha2 <- freshVar (getLoc expr)
-    (_, exprSubst) <- typeCheckExpr (substGammaApply fieldSubst gamma) expr alpha2
+    (_, exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
     let combSubst = exprSubst <> fieldSubst
-    subst <- lift . first (TCError . pure) $ unify (substApply combSubst alpha1) (substApply combSubst alpha2) 
+    subst <- lift . first (TCError . pure) $ unify (combSubst $* alpha1) (combSubst $* alpha2) 
     return (stmt, subst <> combSubst)
+
+typeCheckStmt _ _ = undefined
 
 
 
@@ -178,5 +180,5 @@ typeCheckStmtList :: Context ->
 typeCheckStmtList _ [] = return ([], mempty)
 typeCheckStmtList gamma (st:sts) = do
     (_, substSt)  <- typeCheckStmt gamma st
-    (_, substSts) <- typeCheckStmtList (substGammaApply substSt gamma) sts
+    (_, substSts) <- typeCheckStmtList (substSt $* gamma) sts
     return (st:sts, substSt <> substSts)
