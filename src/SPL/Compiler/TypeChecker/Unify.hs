@@ -15,7 +15,7 @@ import SPL.Compiler.TypeChecker.TCT
 import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.EntityLocation
 
-type Error = Text
+type Error = [Text]
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 
@@ -63,19 +63,19 @@ occurs :: TypeVar -> TCTType -> Bool
 occurs var t = S.member var (typeVars t)
 occursError :: TypeVar -> TCTType -> Error
 occursError var t =
-    "Occurs check: cannot construct the infinite type: "
+    ["Occurs check: cannot construct the infinite type: "
         <> var 
         <> " ~ " 
-        <> T.pack (show t)
+        <> T.pack (show t)]
 
 unify :: TCTType -> TCTType -> Either Error Subst
 unify t1 t2 = unifyHelper mempty t1 t2
     where
         typeMismatchError t1 t2 =
-            "Couldn't match type '" <> T.pack (show t1) 
-                                    <> "' with '" 
-                                    <> T.pack (show t2)
-                                    <> "'"
+            ["Couldn't match type '" <> T.pack (show t1) 
+                                     <> "' with '" 
+                                     <> T.pack (show t2)
+                                     <> "'"]
         unifyHelper :: Set TypeVar -> TCTType -> TCTType -> Either Error Subst
         unifyHelper boundVars (TCTUniversalType _ fv t1) t2 = do
             unifyHelper (boundVars <> fv) t1 t2
@@ -118,13 +118,13 @@ unify t1 t2 = unifyHelper mempty t1 t2
 -- check if `t` a instance of `mgt` 
 -- --note that type variables of different names are not equivalent--
 -- and if so return their substitution
-getMGTInstance :: TCTType -> TCTType -> Either Text Subst
+getMGTInstance :: TCTType -> TCTType -> Either Error Subst
 getMGTInstance t mgt = do
     Subst subst <- unify t mgt
     let tvVars = typeVars t
     forM_ tvVars $ \v ->
         case M.lookup v subst of
-            Just t -> Left $
+            Just t -> Left . pure $
                 "unexpected type " <> 
                 T.pack (show v) <>
                 "expected type " <> 

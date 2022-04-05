@@ -17,8 +17,6 @@ import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.TypeChecker.TCT
 import SPL.Compiler.TypeChecker.Unify
 
-newtype TCError e = TCError { msg :: e }
-
 type RandErr e a = RandT StdGen (Either e) a
 
 type Context = Map Text TCTType
@@ -59,42 +57,42 @@ freshVar loc = do
 typeCheckExpr :: Context ->
                  TCTExpr ->
                  TCTType ->
-                 RandErr (TCError [Text]) (TCTExpr, Subst)
+                 RandErr Error (TCTExpr, Subst)
 typeCheckExpr _ e@(IntExpr loc _) tau = do
     let expectedType = TCTIntType loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
+    subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr _ e@(CharExpr loc _) tau = do
     let expectedType = TCTCharType loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
+    subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr _ e@(BoolExpr loc _) tau = do
     let expectedType = TCTBoolType loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
+    subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr _ e@(EmptyListExpr loc) tau = do
     expectedType <- freshVar loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
+    subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
     alpha1 <- freshVar (getLoc e1)
-    (_, e1Subst) <- typeCheckExpr gamma e1 alpha1
+    (e1', e1Subst) <- typeCheckExpr gamma e1 alpha1
     alpha2 <- freshVar (getLoc e2)
-    (_, e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 alpha2
+    (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 alpha2
     let eSubst = e2Subst <> e1Subst
     let expectedType = eSubst $* TCTTupleType loc alpha1 alpha2
-    subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
-    return (e, subst <> eSubst)
+    tauSubst <- lift $ unify (eSubst $* tau) expectedType
+    return (TupExpr loc e1' e2', tauSubst <> eSubst)
 typeCheckExpr gamma e@(OpExpr loc UnNeg e1) tau = do
-    (_, e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType loc)
+    (e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType loc)
     let expectedType = TCTBoolType loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
-    return (e, subst <> e1Subst)
+    tauSubst <- lift $ unify tau expectedType
+    return (OpExpr loc UnNeg e1', tauSubst <> e1Subst)
 typeCheckExpr gamma e@(OpExpr loc UnMinus e1) tau = do
-    (_, e1Subst) <- typeCheckExpr gamma e1 (TCTIntType loc)
+    (e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType loc)
     let expectedType = TCTIntType loc
-    subst <- lift . first (TCError . pure) $ unify tau expectedType
-    return (e, subst <> e1Subst)
+    tauSubst <- lift $ unify tau expectedType
+    return (OpExpr loc UnMinus e1', tauSubst <> e1Subst)
 typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
     case op of
         Plus -> handleIntOp
@@ -114,16 +112,16 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
             (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTIntType $ getLoc e2)
             let eSubst = e2Subst <> e1Subst
             let expectedType = TCTIntType loc
-            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
-            return (Op2Expr loc e1' op e2', subst <> eSubst)
+            tauSubst <- lift $ unify (eSubst $* tau) expectedType
+            return (Op2Expr loc e1' op e2', tauSubst <> eSubst)
 
         handleBoolOp = do
             (e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType $ getLoc e1)
             (e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTBoolType $ getLoc e2)
             let eSubst = e2Subst <> e1Subst
             let expectedType = TCTBoolType loc
-            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
-            return (Op2Expr loc e1' op e2', subst <> eSubst)
+            tauSubst <- lift $ unify (eSubst $* tau) expectedType
+            return (Op2Expr loc e1' op e2', tauSubst <> eSubst)
 
         handleConsOp = do
             alpha <- freshVar (getLoc e1)
@@ -132,8 +130,8 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
                                             (TCTListType (getLoc e2) (e1Subst $* alpha))
             let eSubst = e2Subst <> e1Subst
             let expectedType = eSubst $* TCTListType (getLoc e) alpha
-            subst <- lift . first (TCError . pure) $ unify (eSubst $* tau) expectedType
-            return (Op2Expr loc e1' op e2', subst <> eSubst)
+            tauSubst <- lift $ unify (eSubst $* tau) expectedType
+            return (Op2Expr loc e1' op e2', tauSubst <> eSubst)
 
         -- | Equal 
         -- | Less 
