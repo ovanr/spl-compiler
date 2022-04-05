@@ -32,6 +32,7 @@ instance Monoid Subst where
     mempty = Subst mempty 
     mappend = (<>)
 
+
 substApply :: Subst -> TCTType -> TCTType
 substApply _ (TCTIntType e) = TCTIntType e
 substApply _ (TCTCharType e) = TCTCharType e

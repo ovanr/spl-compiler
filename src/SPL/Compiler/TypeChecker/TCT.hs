@@ -1,4 +1,23 @@
-module SPL.Compiler.TypeChecker.TCT where
+module SPL.Compiler.TypeChecker.TCT 
+    (TCT(..),
+     TypeVar,
+     TCTLeaf(..),
+     TCTFunDecl(..),
+     TCTVarDecl(..),
+     TCTIdentifier(..),
+     TCTFunBody(..),
+     TCTFunCall(..),
+     TCTFieldSelector(..),
+     TCTField(..),
+     TCTStmt(..),
+     TCTExpr(..),
+     TypeConstraints(..),
+     TCTType(..),
+     OpUnary(..),
+     OpBin(..),
+     EntityLoc
+    )
+    where
 
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))

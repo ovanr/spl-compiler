@@ -28,8 +28,10 @@ types ~* subst = (types, Just . Subst $ M.fromList subst)
 failure :: (TCTType, TCTType) -> UnifyTest
 failure types = (types, Nothing)
 
-forall :: [Text] ->  UnifyText -> UnifyTest
-forall vars ((t1,t2), r) = TCTUniversalType (S.fromList $ map (TCTVarType def) vars)
+forall :: [Text] -> UnifyTest -> UnifyTest
+forall vars ((t1,t2), r) = ((generalise t1, generalise t2), r)
+    where 
+        generalise = TCTUniversalType def (S.fromList vars)
 
 executeUnifyTests :: [UnifyTest] -> IO ()
 executeUnifyTests tests =
@@ -54,6 +56,11 @@ test_unify = do
             (TCTFunType def [] (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTVarType def "b")) (TCTIntType def)),
              TCTFunType def [] (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTIntType def)) (TCTIntType def)))
             ~* [("b", TCTIntType def)],
+
+            -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
+            forall ["a"] $ failure 
+            (TCTFunType def [] (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTVarType def "b")) (TCTIntType def)),
+             TCTFunType def [] (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTIntType def)) (TCTIntType def))),
 
             -- U( a -> [c], b -> a ) = [ a |-> [c], b |-> [c] ]
             forall ["a", "b", "c"] $
