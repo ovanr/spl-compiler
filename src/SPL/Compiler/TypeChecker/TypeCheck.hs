@@ -141,3 +141,42 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
         -- | Nequal 
 typeCheckExpr _ _ _ = undefined
 
+typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr (TCError [Text]) (TCTField, Subst)
+typeCheckFieldSelector = undefined
+
+typeCheckStmt :: Context ->
+                 TCTStmt ->
+                 RandErr (TCError [Text]) (TCTStmt, Subst)
+typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) = do
+    (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
+    (_, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts
+    let combSubst = thenSubst <> condSubst
+    (_, elseSubst) <- typeCheckStmtList (combSubst $* gamma) thenStmts
+    return (stmt, combSubst <> elseSubst)
+
+typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) = do
+    (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
+    (_, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts
+    return (stmt, bodySubst <> condSubst)
+
+typeCheckStmt gamma stmt@(AssignStmt loc field expr) = do
+    alpha1 <- freshVar (getLoc field)
+    (_, fieldSubst) <- typeCheckFieldSelector gamma field alpha1
+    alpha2 <- freshVar (getLoc expr)
+    (_, exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
+    let combSubst = exprSubst <> fieldSubst
+    subst <- lift . first (TCError . pure) $ unify (combSubst $* alpha1) (combSubst $* alpha2) 
+    return (stmt, subst <> combSubst)
+
+typeCheckStmt _ _ = undefined
+
+
+
+typeCheckStmtList :: Context ->
+                     [TCTStmt] ->
+                     RandErr (TCError [Text]) ([TCTStmt], Subst)
+typeCheckStmtList _ [] = return ([], mempty)
+typeCheckStmtList gamma (st:sts) = do
+    (_, substSt)  <- typeCheckStmt gamma st
+    (_, substSts) <- typeCheckStmtList (substSt $* gamma) sts
+    return (st:sts, substSt <> substSts)
