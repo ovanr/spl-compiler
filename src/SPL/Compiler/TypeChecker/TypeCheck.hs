@@ -23,8 +23,6 @@ type RandErr e a = RandT StdGen (Either e) a
 
 type Context = Map Text TCTType
 
-tcFail e = lift (Left e)
-
 freshVar :: MonadRandom m => EntityLoc -> m TCTType
 freshVar loc = do
     prefix <- T.singleton <$> getRandomR ('a', 'z')
@@ -32,27 +30,18 @@ freshVar loc = do
     let name = prefix <> suffix
     return $ TCTUniversalType loc (S.singleton name) (TCTVarType loc name) 
 
--- typeCheckVar :: Context ->
---                 TCTVarDecl ->
---                 RandErr (TCError [Text]) (TCTVarDecl, Subst)
--- typeCheckVar gamma (TCTVarDecl loc t (TCTIdentifier l i) e) = do
---     -- tau <- if 
---     (e', eSubst) <- typeCheckExpr gamma e tau
---     let tau' = substApply eSubst tau
---     tSubst <- lift (getMGTInstance t tau')
---     let subst = tSubst <> eSubst
---     return (TCTVarDecl loc t (TCTIdentifier l i) e', subst)
+typeMap :: (TCTType -> TCTType) -> TCTType -> TCTType
+typeMap f (TCTUniversalType l tv t) = TCTUniversalType l tv (f t)
+typeMap _ x = x
 
--- IntExpr EntityLoc Integer
--- CharExpr EntityLoc Char
--- BoolExpr EntityLoc Bool
--- EmptyListExpr EntityLoc
--- OpExpr EntityLoc OpUnary TCTExpr
--- TupExpr EntityLoc TCTExpr TCTExpr
--- FieldSelectExpr TCTFieldSelector
--- FunCallExpr TCTFunCall
--- Op2Expr EntityLoc TCTExpr OpBin TCTExpr  
-
+typeCheckVarDecl :: Context ->
+                    TCTVarDecl ->
+                    RandErr Error (TCTVarDecl, Subst)
+typeCheckVarDecl gamma (TCTVarDecl loc t (TCTIdentifier l i) e) = do
+    alpha <- freshVar loc
+    (e', eSubst) <- typeCheckExpr gamma e alpha
+    tSubst <- lift $ unify t (eSubst $* alpha)
+    return (TCTVarDecl loc t (TCTIdentifier l i) e', tSubst <> eSubst)
 
 typeCheckExpr :: Context ->
                  TCTExpr ->
@@ -71,7 +60,7 @@ typeCheckExpr _ e@(BoolExpr loc _) tau = do
     subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr _ e@(EmptyListExpr loc) tau = do   
-    expectedType <- TCTListType loc <$> freshVar loc
+    expectedType <- typeMap (TCTListType loc) <$> freshVar loc
     subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr gamma e@(FunCallExpr f) tau = do
@@ -162,8 +151,6 @@ typeCheckVar gamma id@(TCTIdentifier l idName) tau = do
 typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTField, Subst)
 typeCheckFieldSelector gamma = undefined
 
--- data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier [TCTExpr]
-
 typeCheckFunCall :: Context -> TCTFunCall -> TCTType -> RandErr Error (TCTFunCall, Subst)
 typeCheckFunCall gamma (TCTFunCall locF id@(TCTIdentifier locI _) args) tau = do
     (args', funType, argsSubst) <- foldrM typeCheckArgs ([], tau, mempty) args
@@ -222,9 +209,6 @@ typeCheckStmt gamma stmt@(ReturnStmt loc (Just expr)) t = do
 
 typeCheckStmt gamma stmt@(FunCallStmt loc funCall) t = undefined
     
-
-
-
 typeCheckStmtList :: Context ->
                      [TCTStmt] ->
                      TCTType ->
