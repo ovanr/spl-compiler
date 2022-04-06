@@ -159,8 +159,24 @@ typeCheckVar gamma id@(TCTIdentifier l idName) tau = do
 
 -- assume gamma contains = hd :: forall a. [a] -> a, tl :: forall a. [a] -> [a], fst :: forall a b. (a,b) -> a
 --                         snd :: forall a b. (a,b) -> b
-typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTField, Subst)
-typeCheckFieldSelector gamma = undefined
+typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTFieldSelector, Subst)
+typeCheckFieldSelector gamma fldslct@(TCTFieldSelector loc id []) t = do
+    (id', subst) <- typeCheckVar gamma id t
+    return (fldslct, subst)
+    
+typeCheckFieldSelector gamma fldslct@(TCTFieldSelector loc id fields) t = do
+    (_, subst) <- typeCheckVar gamma (toVar $ last fields) t
+    (_, subst') <- typeCheckFieldSelector (subst $* gamma) (TCTFieldSelector loc id (init fields)) (subst $* t)
+    return (fldslct, subst' <> subst)
+    
+    where
+        toVar :: TCTField -> TCTIdentifier
+        toVar (Hd loc) = TCTIdentifier loc "hd"
+        toVar (Tl loc) = TCTIdentifier loc "tl"
+        toVar (Fst loc) = TCTIdentifier loc "fst"
+        toVar (Snd loc) = TCTIdentifier loc "snd"
+
+
 
 -- data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier [TCTExpr]
 
