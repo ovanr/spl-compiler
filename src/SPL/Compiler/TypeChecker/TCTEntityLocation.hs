@@ -62,6 +62,7 @@ instance Locatable TCTStmt where
     getLoc (ReturnStmt l _) = l
     
 instance Locatable TCTType where
+    setLoc l (TCTUniversalType _ c t) = TCTUniversalType l c t
     setLoc l (TCTFunType _ c a b) = TCTFunType l c a b
     setLoc l (TCTTupleType _ a b) = TCTTupleType l a b
     setLoc l (TCTListType _ x) = TCTListType l x
@@ -70,6 +71,7 @@ instance Locatable TCTType where
     setLoc l (TCTBoolType _) = TCTBoolType l
     setLoc l (TCTCharType _) = TCTCharType l
     setLoc l (TCTVoidType _) = TCTVoidType l
+    getLoc (TCTUniversalType l _ _) = l
     getLoc (TCTFunType l _ _ _) = l
     getLoc (TCTTupleType l _ _) = l
     getLoc (TCTListType l _) = l

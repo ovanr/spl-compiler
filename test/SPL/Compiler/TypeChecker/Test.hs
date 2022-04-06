@@ -31,8 +31,8 @@ input ~= subst = (input, Just . Subst $ M.fromList subst)
 failure :: (Context, a, TCTType) -> TypeCheckTest a
 failure input = (input, Nothing)
 
--- freshVar :: Text -> TCTType
--- freshVar name = Universalk
+var :: Text -> TCTType
+var name = TCTUniversalType def (S.singleton name) (TCTVarType def name)
 
 executeTCTests :: [TypeCheckTest a] -> 
                   (Context -> a -> TCTType -> RandErr Error (a, Subst)) -> 
@@ -54,8 +54,11 @@ executeTCTests tests evaluator =
 
 test_type_check_expr = do
     let tests = [
-        (mempty, IntExpr def 5,  
-        ~=
-        []
-    ]
+            (mempty, IntExpr def 5, var "sigma") ~= [("sigma", TCTIntType def)],
+            (mempty, BoolExpr def True, TCTBoolType def) ~= [],
+            (mempty, EmptyListExpr def, var "sigma") ~= [("sigma", forall ["a"] $ TCTListType def (TCTVarType def "a"))],
+            
+            failure (mempty, CharExpr def 'c', TCTVarType def "a") 
+            ]
     executeTCTests tests typeCheckExpr
+

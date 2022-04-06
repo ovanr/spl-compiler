@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
@@ -28,10 +29,10 @@ types ~* subst = (types, Just . Subst $ M.fromList subst)
 failure :: (TCTType, TCTType) -> UnifyTest
 failure types = (types, Nothing)
 
-forall :: [Text] -> UnifyTest -> UnifyTest
-forall vars ((t1,t2), r) = ((generalise t1, generalise t2), r)
-    where 
-        generalise = TCTUniversalType def (S.fromList vars)
+instance Forall UnifyTest where
+    forall vars ((t1,t2), r) = ((generalise' t1, generalise' t2), r)
+        where 
+            generalise' = TCTUniversalType def (S.fromList vars)
 
 executeUnifyTests :: [UnifyTest] -> IO ()
 executeUnifyTests tests =
@@ -61,28 +62,28 @@ test_unify = do
             forall ["a", "b", "c"] $
             (TCTFunType def [] (TCTVarType def "a") (TCTListType def (TCTVarType def "c")),
              TCTFunType def [] (TCTVarType def "b") (TCTVarType def "a"))
-            ~* [("a", TCTListType def (TCTVarType def "c")), ("b", TCTListType def (TCTVarType def "c"))],
+            ~* [("a", forall ["c"] $ TCTListType def (TCTVarType def "c")), ("b", forall ["c"] $ TCTListType def (TCTVarType def "c"))],
 
             -- U( (Int, a) -> b, c -> (Int -> Bool) ) = [ c |-> (Int, a), b |-> (Int -> Bool)]
             forall ["a", "b", "c"] $
             (TCTFunType def [] (TCTTupleType def (TCTIntType def) (TCTVarType def "a")) (TCTVarType def "b"), 
              TCTFunType def [] (TCTVarType def "c") (TCTFunType def [] (TCTIntType def) (TCTBoolType def)))
-            ~* [("c", TCTTupleType def (TCTIntType def) (TCTVarType def "a")), 
+            ~* [("c", forall ["a"] $ TCTTupleType def (TCTIntType def) (TCTVarType def "a")), 
                 ("b", TCTFunType def [] (TCTIntType def) (TCTBoolType def))],
 
             -- U( a -> a, c -> d ) = [ a |-> d, c |-> d ]
             forall ["a", "c", "d"] $
             (TCTFunType def [] (TCTVarType def "a") (TCTVarType def "a"), 
              TCTFunType def [] (TCTVarType def "c") (TCTVarType def "d"))
-            ~* [("a", TCTVarType def "d"), ("c", TCTVarType def "d")],
+            ~* [("a", forall ["d"] $ TCTVarType def "d"), ("c", forall ["d"] $ TCTVarType def "d")],
 
             -- U( (b, b) -> c, d -> (d -> d) ) = [d |-> (b,b), c |-> ((b,b) -> (b,b))]
             forall ["b", "c", "d"] $
             (TCTFunType def [] (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")) (TCTVarType def "c"),
              TCTFunType def [] (TCTVarType def "d") (TCTFunType def [] (TCTVarType def "d") (TCTVarType def "d")))
-            ~* [("d", TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")), 
-                ("c", TCTFunType def [] (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")) 
-                                        (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")))],
+            ~* [("d", forall ["b"] $ TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")), 
+                ("c", forall ["b"] $ TCTFunType def [] (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")) 
+                                                       (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")))],
 
             -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
             forall ["a"] $ failure 

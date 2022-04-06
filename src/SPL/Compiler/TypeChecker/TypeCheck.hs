@@ -71,7 +71,7 @@ typeCheckExpr _ e@(BoolExpr loc _) tau = do
     subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr _ e@(EmptyListExpr loc) tau = do
-    expectedType <- freshVar loc
+    expectedType <- TCTListType loc <$> freshVar loc
     subst <- lift $ unify tau expectedType
     return (e, subst)
 typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
