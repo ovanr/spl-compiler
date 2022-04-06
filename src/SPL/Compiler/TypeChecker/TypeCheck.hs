@@ -144,22 +144,26 @@ typeCheckExpr _ _ _ = undefined
 typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTField, Subst)
 typeCheckFieldSelector = undefined
 
+typeCheckFunCall :: Context -> TCTFunCall -> TCTType -> RandErr Error (TCTFunCall, Subst)
+typeCheckFunCall = undefined
+
 typeCheckStmt :: Context ->
                  TCTStmt ->
+                 TCTType -> 
                  RandErr Error (TCTStmt, Subst)
-typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) = do
+typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) t = do
     (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
-    (_, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts
+    (_, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts (condSubst $* t)
     let combSubst = thenSubst <> condSubst
-    (_, elseSubst) <- typeCheckStmtList (combSubst $* gamma) thenStmts
+    (_, elseSubst) <- typeCheckStmtList (combSubst $* gamma) elseStmts (combSubst $* t)
     return (stmt, combSubst <> elseSubst)
 
-typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) = do
+typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) t = do
     (_, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
-    (_, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts
+    (_, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts (condSubst $* t)
     return (stmt, bodySubst <> condSubst)
 
-typeCheckStmt gamma stmt@(AssignStmt loc field expr) = do
+typeCheckStmt gamma stmt@(AssignStmt loc field expr) t = do
     alpha1 <- freshVar (getLoc field)
     (_, fieldSubst) <- typeCheckFieldSelector gamma field alpha1
     alpha2 <- freshVar (getLoc expr)
@@ -168,15 +172,27 @@ typeCheckStmt gamma stmt@(AssignStmt loc field expr) = do
     subst <- lift $ unify (combSubst $* alpha1) (combSubst $* alpha2) 
     return (stmt, subst <> combSubst)
 
-typeCheckStmt _ _ = undefined
+typeCheckStmt gamma stmt@(ReturnStmt loc Nothing) t = do
+    subst <- lift $ unify t (TCTVoidType loc)
+    return (stmt, mempty)
+
+typeCheckStmt gamma stmt@(ReturnStmt loc (Just expr)) t = do
+    alpha <- freshVar loc
+    (_, exprSubst) <- typeCheckExpr gamma expr alpha
+    subst <- lift $ unify (exprSubst $* alpha) (exprSubst $* t) 
+    return (stmt, subst <> exprSubst)
+
+typeCheckStmt gamma stmt@(FunCallStmt loc funCall) t = undefined
+    
 
 
 
 typeCheckStmtList :: Context ->
                      [TCTStmt] ->
+                     TCTType ->
                      RandErr Error ([TCTStmt], Subst)
-typeCheckStmtList _ [] = return ([], mempty)
-typeCheckStmtList gamma (st:sts) = do
-    (_, substSt)  <- typeCheckStmt gamma st
-    (_, substSts) <- typeCheckStmtList (substSt $* gamma) sts
+typeCheckStmtList _ [] _ = return ([], mempty)
+typeCheckStmtList gamma (st:sts) t = do
+    (_, substSt)  <- typeCheckStmt gamma st t
+    (_, substSts) <- typeCheckStmtList (substSt $* gamma) sts (substSt $* t)
     return (st:sts, substSt <> substSts)
