@@ -7,10 +7,12 @@ module SPL.Compiler.TypeChecker.TypeCheck where
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
+import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Bifunctor
+import Data.Foldable
 import Control.Monad.Random
 
 import SPL.Compiler.Common.EntityLocation
@@ -51,8 +53,6 @@ freshVar loc = do
 -- FunCallExpr TCTFunCall
 -- Op2Expr EntityLoc TCTExpr OpBin TCTExpr  
 
--- data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier [TCTExpr]
---     deriving (Eq, Show)
 
 typeCheckExpr :: Context ->
                  TCTExpr ->
@@ -70,10 +70,13 @@ typeCheckExpr _ e@(BoolExpr loc _) tau = do
     let expectedType = TCTBoolType loc
     subst <- lift $ unify tau expectedType
     return (e, subst)
-typeCheckExpr _ e@(EmptyListExpr loc) tau = do
+typeCheckExpr _ e@(EmptyListExpr loc) tau = do   
     expectedType <- TCTListType loc <$> freshVar loc
     subst <- lift $ unify tau expectedType
     return (e, subst)
+typeCheckExpr gamma e@(FunCallExpr f) tau = do
+    (f', fSubst) <- typeCheckFunCall gamma f tau
+    return (FunCallExpr f', fSubst)
 typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
     alpha1 <- freshVar (getLoc e1)
     (e1', e1Subst) <- typeCheckExpr gamma e1 alpha1
@@ -141,11 +144,46 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
         -- | Nequal 
 typeCheckExpr _ _ _ = undefined
 
+-- forall c. c ->> forall c. forall a. a -> Void ->> forall c a. a -> Void ->> forall a. a -> Void
+-- forall a. a -> Void
+-- [ c |-> forall a. a -> Void ] 
+
+typeCheckVar :: Context ->
+                TCTIdentifier ->
+                TCTType ->
+                RandErr Error (TCTIdentifier, Subst)
+typeCheckVar gamma id@(TCTIdentifier l idName) tau = do
+    idType <- lift . maybeToEither ["Variable not found " <> idName] $ M.lookup idName gamma
+    subst <- lift $ unify idType tau
+    return (id, subst)
+
+-- assume gamma contains = hd :: forall a. [a] -> a, tl :: forall a. [a] -> [a], fst :: forall a b. (a,b) -> a
+--                         snd :: forall a b. (a,b) -> b
 typeCheckFieldSelector :: Context -> TCTFieldSelector -> TCTType -> RandErr Error (TCTField, Subst)
-typeCheckFieldSelector = undefined
+typeCheckFieldSelector gamma = undefined
+
+-- data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier [TCTExpr]
 
 typeCheckFunCall :: Context -> TCTFunCall -> TCTType -> RandErr Error (TCTFunCall, Subst)
-typeCheckFunCall = undefined
+typeCheckFunCall gamma (TCTFunCall locF id@(TCTIdentifier locI _) args) tau = do
+    (args', funType, argsSubst) <- foldrM typeCheckArgs ([], tau, mempty) args
+    (id', idSubst) <- typeCheckVar gamma id funType
+
+    return (TCTFunCall locF id' args', idSubst <> argsSubst)
+
+    where
+        typeCheckArgs :: TCTExpr -> 
+                         ([TCTExpr], TCTType, Subst) -> 
+                         RandT StdGen (Either Error) ([TCTExpr], TCTType, Subst)
+        typeCheckArgs arg (exprs, funType, prevSubst) = do
+            -- generate freshVar for each arg
+            -- get a subst for each arg and compose them sequentially
+            alpha <- freshVar (getLoc arg)
+            (arg', argSubst) <- typeCheckExpr (prevSubst $* gamma) arg alpha
+            let subst = argSubst <> prevSubst
+            return (arg' : exprs, 
+                    TCTFunType (getLoc arg) [] (subst $* alpha) funType, 
+                    subst)
 
 typeCheckStmt :: Context ->
                  TCTStmt ->

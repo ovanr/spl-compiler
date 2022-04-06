@@ -42,18 +42,21 @@ instance Monoid Subst where
     mappend = (<>)
 
 instance SubstApply TCTType where
-    _ $* (TCTIntType e) = TCTIntType e
-    _ $* (TCTCharType e) = TCTCharType e
-    _ $* (TCTBoolType e) = TCTBoolType e
-    _ $* (TCTVoidType e) = TCTVoidType e
-    (Subst s) $* v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
-    s $* (TCTListType e a) = rank1Norm $ TCTListType e (s $* a)
-    s $* (TCTTupleType e a b) = rank1Norm $ TCTTupleType e (s $* a) (s $* b)
-    s $* (TCTFunType d e a b) = rank1Norm $ TCTFunType d e (s $* a) (s $* b)
-    s $* (TCTUniversalType l tv t) =
-        let t' = s $* t
-            boundVars = typeVars t' `S.intersection` tv
-        in rank1Norm $ generalise boundVars t'
+    s $* t =
+        rank1Norm $ s `substApply` t 
+        where
+            s `substApply` (TCTIntType e) = TCTIntType e
+            s `substApply` (TCTCharType e) = TCTCharType e
+            s `substApply` (TCTBoolType e) = TCTBoolType e
+            s `substApply` (TCTVoidType e) = TCTVoidType e
+            (Subst s) `substApply` v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
+            s `substApply` (TCTListType e a) = TCTListType e (s `substApply` a)
+            s `substApply` (TCTTupleType e a b) = TCTTupleType e (s `substApply` a) (s `substApply` b)
+            s `substApply` (TCTFunType d e a b) = TCTFunType d e (s `substApply` a) (s `substApply` b)
+            s `substApply` (TCTUniversalType l tv t) =
+                let t' = s `substApply` t
+                    boundVars = typeVars t' `S.intersection` tv
+                in generalise boundVars t'
 
 instance SubstApply (Map Text TCTType) where
     s $* c = ($*) s <$> c
@@ -141,6 +144,9 @@ occursError var t =
         <> " ~ "
         <> T.pack (show t)]
 
+-- Two assumptions
+-- i) Given two types, the type variables bound in quantifiers are always distinct 
+-- ii) Types can only be quantified on the outer level. if they are not then result is undefined
 unify :: TCTType -> TCTType -> Either Error Subst
 unify t1 t2 = do
     Subst subst <- unifyHelper mempty t1 t2
