@@ -18,125 +18,61 @@ import SPL.Compiler.TypeChecker.TCT
 import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.EntityLocation
 
-type Error = [Text]
-
-newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
-
-class SubstApply a where
+class Types a where
     ($*) :: Subst -> a -> a
+    freeVars :: a -> Set TypeVar
 
 infixr 1 $*
 
 instance Semigroup Subst where
-    -- `(subst2 <> subst1) t` means 
-    -- first apply `subst1` to `t` and then apply `subst2` on result
+    -- `(s1 <> s2) t` means 
+    -- first apply `s2` to `t` and then apply `s1` on result
     -- Note that order of application matters, e.g.:
-    -- subst2 = [a |-> Int] , 
-    -- subst1 = [b |-> (a -> Int)]
-    -- subst1(subst2(b -> b)) = (Int -> Int) -> (Int -> Int)
-    -- subst1(subst1(b -> b)) = (a -> Int) -> (a -> Int)
-    subst2@(Subst a) <> (Subst b) = Subst (M.unionWith (\_ b -> b) a (($*) subst2 <$> b))
+    -- s2 = [a |-> Int] , 
+    -- s1 = [b |-> (a -> Int)]
+    -- s1(s2(b -> b)) = (Int -> Int) -> (Int -> Int)
+    -- s2(s1(b -> b)) = (a -> Int) -> (a -> Int)
+    s1@(Subst s1') <> (Subst s2') = Subst ( (($*) s1 <$> s2') `M.union` s1')
 
 instance Monoid Subst where
     mempty = Subst mempty
     mappend = (<>)
 
-instance SubstApply TCTType where
-    s $* t =
-        rank1Norm $ s `substApply` t 
-        where
-            s `substApply` (TCTIntType e) = TCTIntType e
-            s `substApply` (TCTCharType e) = TCTCharType e
-            s `substApply` (TCTBoolType e) = TCTBoolType e
-            s `substApply` (TCTVoidType e) = TCTVoidType e
-            (Subst s) `substApply` v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
-            s `substApply` (TCTListType e a) = TCTListType e (s `substApply` a)
-            s `substApply` (TCTTupleType e a b) = TCTTupleType e (s `substApply` a) (s `substApply` b)
-            s `substApply` (TCTFunType d e a b) = TCTFunType d e (s `substApply` a) (s `substApply` b)
-            s `substApply` (TCTUniversalType l tv t) =
-                let t' = s `substApply` t
-                    boundVars = typeVars t' `S.intersection` tv
-                in generalise boundVars t'
+instance Types TCTType where
+    s $* (TCTIntType e) = TCTIntType e
+    s $* (TCTCharType e) = TCTCharType e
+    s $* (TCTBoolType e) = TCTBoolType e
+    s $* (TCTVoidType e) = TCTVoidType e
+    (Subst s) $* v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
+    s $* (TCTListType e a) = TCTListType e (s $* a)
+    s $* (TCTTupleType e a b) = TCTTupleType e (s $* a) (s $* b)
+    s $* (TCTFunType d e a b) = TCTFunType d e (s $* a) (s $* b)
+    freeVars v@(TCTVarType l a) = S.singleton a
+    freeVars (TCTListType _ a) = freeVars a
+    freeVars (TCTTupleType _ a b) = freeVars a <> freeVars b
+    freeVars (TCTFunType _ _ a b) = freeVars a <> freeVars b
+    freeVars _ = mempty
 
-instance SubstApply (Map Text TCTType) where
-    s $* c = ($*) s <$> c
+instance Types Scheme where
+    (Subst s) $* (Scheme tv t) = Scheme tv $ Subst (foldr M.delete s tv) $* t
+    freeVars (Scheme tv t) = freeVars t `S.difference` tv
 
-typeVars :: TCTType -> Set TypeVar
-typeVars (TCTVarType _ a) = S.singleton a
-typeVars (TCTFunType _ _ a b) = typeVars a <> typeVars b
-typeVars (TCTTupleType _ a b) = typeVars a <> typeVars b
-typeVars (TCTListType _ a) = typeVars a
-typeVars _ = S.empty
+instance Types TypeEnv where
+    s $* (TypeEnv env) = TypeEnv $ ($*) s <$> env
+    freeVars (TypeEnv env) = foldMap freeVars $ M.elems env
 
-boundTypeVars :: TCTType -> Set TypeVar
-boundTypeVars (TCTUniversalType _ tv a) = tv <> boundTypeVars a
-boundTypeVars (TCTFunType _ _ a b) = boundTypeVars a <> boundTypeVars b
-boundTypeVars (TCTTupleType _ a b) = boundTypeVars a <> boundTypeVars b
-boundTypeVars (TCTListType _ a) = boundTypeVars a
-boundTypeVars _ = S.empty
+generalise :: TypeEnv -> TCTType -> Scheme
+generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
 
-freeTypeVars :: TCTType -> Set TypeVar
-freeTypeVars t = typeVars t `S.difference` boundTypeVars t
 
-sanitize :: StdGen -> TCTType -> Subst -> Subst
-sanitize g t s =
-    case t of
-        (TCTFunType _ _ a b) -> 
-            let (g', g'') = split g 
-                s' = sanitize g' a s 
-            in sanitize g'' b s'
-        (TCTTupleType _ a b) -> 
-            let (g', g'') = split g 
-                s' = sanitize g' a s 
-            in sanitize g'' b s'
-        (TCTListType _ a) -> sanitize g a s
-        (TCTUniversalType _ tv a) -> evalRand (foldM foldRename s tv) g
-        _ -> s
-    where
-        foldRename :: Subst -> TypeVar -> Rand StdGen Subst
-        foldRename (Subst subst) v = do
-            suffix <- T.pack . show <$> getRandomR (10000 :: Int, 90000)
-            return . Subst $ rename v (v <> suffix) <$> subst
-
-        rename :: TypeVar -> TypeVar -> TCTType -> TCTType
-        rename from to v@(TCTVarType l a)
-            | from == a = TCTVarType l to
-            | otherwise = v
-        rename from to (TCTUniversalType l tv a) =
-            TCTUniversalType l
-                             (S.map (\v -> if v == from then to else v) tv)
-                             (rename from to a)
-        rename from to (TCTFunType l c a b) =
-            TCTFunType l c (rename from to a) (rename from to b)
-        rename from to (TCTTupleType l a b) =
-            TCTTupleType l (rename from to a) (rename from to b)
-        rename from to (TCTListType l a ) =
-            TCTListType l (rename from to a)
-        rename from to t = t
-
-rank1Norm :: TCTType -> TCTType
-rank1Norm t = generalise (boundTypeVars t) $ removeQuantifiers t
-    where
-        removeQuantifiers (TCTUniversalType _ _ a) = a
-        removeQuantifiers (TCTFunType c l a b) =
-            TCTFunType c l (removeQuantifiers a) (removeQuantifiers b)
-        removeQuantifiers (TCTTupleType l a b) =
-            TCTTupleType l (removeQuantifiers a) (removeQuantifiers b)
-        removeQuantifiers (TCTListType l a) = TCTListType l $ removeQuantifiers a
-        removeQuantifiers a = a
-
-generalise :: Set TypeVar -> TCTType -> TCTType
-generalise boundVars (TCTUniversalType l bs t) =
-    TCTUniversalType l (bs <> (typeVars t `S.intersection` boundVars)) t
-generalise boundVars t =
-    let boundVarsInT = typeVars t `S.intersection` boundVars
-     in if not (null boundVarsInT) then
-            TCTUniversalType (getLoc t) boundVarsInT t
-        else
-            t
+typeMismatchError t1 t2 =
+    ["Couldn't match type '" <> T.pack (show t1)
+                             <> "' with '"
+                             <> T.pack (show t2)
+                             <> "'"]
 
 occurs :: TypeVar -> TCTType -> Bool
-occurs var t = S.member var (typeVars t)
+occurs var t = S.member var (freeVars t)
 occursError :: TypeVar -> TCTType -> Error
 occursError var t =
     ["Occurs check: cannot construct the infinite type: "
@@ -144,65 +80,41 @@ occursError var t =
         <> " ~ "
         <> T.pack (show t)]
 
--- Two assumptions
--- i) Given two types, the type variables bound in quantifiers are always distinct 
--- ii) Types can only be quantified on the outer level. if they are not then result is undefined
 unify :: TCTType -> TCTType -> Either Error Subst
-unify t1 t2 = do
-    Subst subst <- unifyHelper mempty t1 t2
-    let boundVars = boundTypeVars t1 <> boundTypeVars t2
-    return . Subst $ rank1Norm . generalise boundVars <$> subst
-
+unify t1 t2 = unify' t1 t2
     where
-        typeMismatchError t1 t2 =
-            ["Couldn't match type '" <> T.pack (show t1)
-                                     <> "' with '"
-                                     <> T.pack (show t2)
-                                     <> "'"]
-        unifyHelper :: Set TypeVar -> TCTType -> TCTType -> Either Error Subst
-        unifyHelper boundVars (TCTUniversalType _ tv t1) t2 = do
-            unifyHelper (boundVars <> tv) t1 t2
-        unifyHelper boundVars t1 (TCTUniversalType _ tv t2) = do
-            unifyHelper (boundVars <> tv) t1 t2
+        unify' :: TCTType -> TCTType -> Either Error Subst
+        unify' (TCTIntType _) (TCTIntType _) = Right mempty
+        unify' (TCTCharType _) (TCTCharType _) = Right mempty
+        unify' (TCTBoolType _) (TCTBoolType _) = Right mempty
+        unify' (TCTVoidType _) (TCTVoidType _) = Right mempty
 
-        unifyHelper _ (TCTIntType _) (TCTIntType _) = Right mempty
-        unifyHelper _ (TCTCharType _) (TCTCharType _) = Right mempty
-        unifyHelper _ (TCTBoolType _) (TCTBoolType _) = Right mempty
-        unifyHelper _ (TCTVoidType _) (TCTVoidType _) = Right mempty
-
-        unifyHelper boundVars v1@(TCTVarType _ a) v2@(TCTVarType _ b)
+        unify' v1@(TCTVarType _ a) v2@(TCTVarType _ b)
             | a == b = Right mempty
-            | S.member a boundVars = Right . Subst $ M.singleton a v2
-            | S.member b boundVars = Right . Subst $ M.singleton b v2
-            | otherwise = Left $ typeMismatchError v1 v2
+            | otherwise = Right . Subst $ M.singleton a v2
 
-        unifyHelper boundVars v@(TCTVarType _ a) t = do
-            unless (S.member a boundVars) $
-                Left $ typeMismatchError v t
+        unify' v@(TCTVarType _ a) t = do
             if not $ occurs a t then
                 Right . Subst $ M.singleton a t
             else
                 Left $ occursError a t
 
-        unifyHelper boundVars t v@(TCTVarType _ a) = do
-            unless (S.member a boundVars) $
-                Left $ typeMismatchError v t
+        unify' t v@(TCTVarType _ a) = do
             if not $ occurs a t then
                 Right . Subst $ M.singleton a t
             else
                 Left $ occursError a t
 
-        unifyHelper boundVars (TCTListType _ a) (TCTListType _ b) =
-            unifyHelper boundVars a b
+        unify' (TCTListType _ a) (TCTListType _ b) = unify' a b
 
-        unifyHelper boundVars (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
-            subst1 <- unifyHelper boundVars a1 a2
-            subst2 <- unifyHelper boundVars (subst1 $* b1) (subst1 $* b2)
+        unify' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+            subst1 <- unify' a1 a2
+            subst2 <- unify' (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1
 
-        unifyHelper boundVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
-            subst1 <- unifyHelper boundVars a1 a2
-            subst2 <- unifyHelper boundVars (subst1 $* b1) (subst1 $* b2)
+        unify' (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
+            subst1 <- unify a1 a2
+            subst2 <- unify (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1
 
-        unifyHelper _ t1 t2 = Left $ typeMismatchError t1 t2
+        unify' t1 t2 = Left $ typeMismatchError t1 t2

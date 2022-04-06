@@ -2,6 +2,10 @@
 module SPL.Compiler.TypeChecker.TCT
     (TCT(..),
      TypeVar,
+     Error,
+     TypeEnv(..),
+     Scheme(..),
+     Subst(..),
      TCTLeaf(..),
      TCTFunDecl(..),
      TCTVarDecl(..),
@@ -22,15 +26,18 @@ module SPL.Compiler.TypeChecker.TCT
 
 import Data.Text (Text)
 import Data.Set (Set)
+import Data.Map (Map)
 import Control.Monad.State.Lazy
 import Data.Foldable
 import qualified Data.Text as T
+import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
 import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 
+type Error = [Text]
 type TypeVar = Text
 
 newtype TCT = TCT [TCTLeaf]
@@ -98,56 +105,49 @@ data TCTType =
     |   TCTCharType EntityLoc
     |   TCTVoidType EntityLoc
     |   TCTVarType EntityLoc TypeVar
-    |   TCTUniversalType EntityLoc (Set TypeVar) TCTType
     |   TCTTupleType EntityLoc TCTType TCTType
     |   TCTListType EntityLoc TCTType
     |   TCTFunType EntityLoc [TypeConstraints] TCTType TCTType
+
+newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
+data Scheme = Scheme (Set TypeVar) TCTType
+newtype TypeEnv = TypeEnv (Map Text Scheme)
+
+instance Show Scheme where
+    show (Scheme tv t) = 
+        "forall " <> show (T.intercalate " " $ S.elems tv) <> ". " <> show t
+
+instance Semigroup TypeEnv where
+    (TypeEnv e1) <> (TypeEnv e2) = TypeEnv $ M.union e2 e1
+
+instance Monoid TypeEnv where
+    mempty = TypeEnv mempty
+    mappend = (<>)
 
 instance Eq TCTType where
     (==) = alphaEq
 
 alphaEq :: TCTType -> TCTType -> Bool
-alphaEq t1 t2 = evalState (alphaEq' t1 t2) (mempty, mempty, [])
+alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
     where
         alphaEq' :: TCTType ->
                     TCTType ->
-                    State (Set TypeVar, Set TypeVar, [(TypeVar, TypeVar)]) Bool
+                    State [(TypeVar, TypeVar)] Bool
         alphaEq' (TCTIntType _) (TCTIntType _) = return True
         alphaEq' (TCTBoolType _) (TCTBoolType _) = return True
         alphaEq' (TCTCharType _) (TCTCharType _) = return True
         alphaEq' (TCTVoidType _) (TCTVoidType _) = return True
         alphaEq' (TCTVarType _ a) (TCTVarType _ b) = do
-            (tv1, tv2, pairs) <- get
-            if S.member a tv1 && S.member b tv2 then do
-                if (a,b) `elem` pairs then
-                    return True
-                else
-                    if not (a `elem` (fst <$> pairs) || b `elem` (snd <$> pairs)) then do
-                        put (tv1, tv2, pairs ++ [(a,b)]) 
-                        return True
-                    else
-                        return False
+            pairs <- get
+            if (a,b) `elem` pairs then
+                return True
             else
-                if not (S.member a tv1) && not (S.member b tv2) then
-                    return $ a == b
+                if not (a `elem` (fst <$> pairs) || b `elem` (snd <$> pairs)) then do
+                    put ((a,b) : pairs)
+                    return True
                 else
                     return False
 
-        alphaEq' (TCTUniversalType _ tv1 t1) (TCTUniversalType _ tv2 t2) =
-            if length tv1 /= length tv2 then
-                return False
-            else do
-                (tv1',tv2', pairs) <- get
-                put (tv1' <> tv1, tv2' <> tv2, pairs)
-                t1 `alphaEq'` t2
-        alphaEq' (TCTUniversalType _ tv t1) t2 = do
-            let r1 = null tv
-            r2 <- t1 `alphaEq'` t2
-            return $ r1 && r2
-        alphaEq' t1 (TCTUniversalType _ tv t2) = do
-            let r1 = null tv
-            r2 <- t1 `alphaEq'` t2
-            return $ r1 && r2
         alphaEq' (TCTListType _ a) (TCTListType _ b) = a `alphaEq'` b
         alphaEq' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
             r1 <- a1 `alphaEq'` a2
@@ -166,12 +166,6 @@ instance Show TCTType where
     show (TCTCharType _) = "Char"
     show (TCTVoidType _) = "Void"
     show (TCTVarType _ a) = T.unpack a
-    show (TCTUniversalType _ tv a) =
-        if null tv then
-            show a
-        else
-            "forall " <> T.unpack (T.intercalate " " $ S.toList tv) <> ". " <>
-            show a
     show (TCTListType _ a) = "[" <> show a <> "]"
     show (TCTTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
     show (TCTFunType _ _ a b) =
