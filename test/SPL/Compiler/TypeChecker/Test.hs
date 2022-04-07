@@ -42,13 +42,22 @@ forall vars = Scheme (S.fromList vars)
 var :: Text -> TCTType
 var = toType
 
+initGamma :: TypeEnv
+initGamma = TypeEnv . M.fromList $ 
+    [
+     ("hd", forall ["a"] $ TCTFunType def [] (toType [var "a"]) (var "a")),
+     ("tl", forall ["a"] $ TCTFunType def [] (toType [var "a"]) (toType [var "a"])),
+     ("fst", forall ["a","b"] $ TCTFunType def [] (toType (var "a", var "b")) (var "a")),
+     ("snd", forall ["a","b"] $ TCTFunType def [] (toType (var "a", var "b")) (var "b"))
+    ]
+
 executeTCTests :: [TypeCheckTest a] ->
                   (TypeEnv -> a -> TCTType -> TCMonad (a, Subst)) ->
                   IO ()
 executeTCTests tests evaluator =
     forM_ tests $ \((gamma, x, t), expected) -> do
         let st = TypeCheckState 0
-        let actual = snd.fst <$> runStateT (evaluator gamma x t) st
+        let actual = snd.fst <$> runStateT (evaluator (initGamma <> gamma) x t) st
         case expected of
             Just (Right subst) -> assertEqual (Right subst) (toTestForm actual)
             Just (Left typ) -> 
@@ -79,8 +88,26 @@ test_type_check_expr = do
             ~= TCTListType def (TCTCharType def),
 
             -- x.hd :: v? 
-            -- (, FieldSelectExpr (TCTFieldSelector def "v" ,var "sigma")
-            -- ~= var "v",
+            ([("x", forall [] $ toType ["v?" :: Text])], 
+             FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Hd def]), var "sigma")
+            ~= var "v?",
+
+            -- x :: [Int] |- x.hd : x :: [Int] = 
+            ([("x", forall [] (toType [TCTIntType def]))],
+             Op2Expr def
+             (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Hd def]))
+             Cons
+             (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [])), 
+             var "sigma")
+            ~= toType [TCTIntType def],
+
+            -- x :: [Int] |- x : x.tl :: ?v = Fail
+            failure ([("x", forall [] (toType [TCTIntType def]))],
+                     Op2Expr def
+                     (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") []))
+                     Cons
+                     (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Tl def])), 
+                     var "sigma"),
 
             -- !('c' : []) :: ?v = Fail
             failure (mempty, OpExpr def UnNeg (Op2Expr def (toExpr 'c') Cons (toExpr ([] :: [Char]))), var "sigma"),

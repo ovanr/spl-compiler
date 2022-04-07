@@ -33,7 +33,7 @@ newtype TypeCheckState =
 makeLenses 'TypeCheckState
 
 sanitize :: TCTType -> TCMonad TCTType
-sanitize = instantiate . generalise mempty
+sanitize = instantiate . liftToScheme
 
 instantiate :: Scheme -> TCMonad TCTType
 instantiate (Scheme tv t) = do
@@ -75,7 +75,7 @@ isInstanceOf t sch = do
 
         isInstanceOf' (TCTTupleType _ a1 b1) (Scheme tv (TCTTupleType _ a2 b2)) = do
             subst1 <- isInstanceOf' a1 (Scheme tv a2)
-            subst2 <- isInstanceOf' a2 (Scheme tv $ subst1 $* b2)
+            subst2 <- isInstanceOf' b1 (Scheme tv $ subst1 $* b2)
             Right $ subst2 <> subst1
 
         isInstanceOf' (TCTFunType _ _ a1 b1) (Scheme tv (TCTFunType _ _ a2 b2)) = do
@@ -176,7 +176,6 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
         -- | LessEq 
         -- | GreaterEq 
         -- | Nequal 
-typeCheckExpr _ _ _ = undefined
 
 -- forall c. c ->> forall c. forall a. a -> Void ->> forall c a. a -> Void ->> forall a. a -> Void
 -- forall a. a -> Void
@@ -204,10 +203,11 @@ typeCheckFieldSelector :: TypeEnv ->
 typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
     alpha <- freshVar (getLoc id) "fd"
     (id', idSubst) <- typeCheckVar gamma id alpha
-    (rType, fSubst) <- foldM typeCheckFields (alpha, mempty) fields
-
-    rSubst <- lift $ unify rType (fSubst $* tau)
-    return (TCTFieldSelector loc id' fields, rSubst <> fSubst)
+    (rType, fSubst) <- foldM typeCheckFields (idSubst $* alpha, mempty) fields
+    
+    let subst = fSubst <> idSubst
+    uSubst <- lift $ unify rType (subst $* tau)
+    return (TCTFieldSelector loc id' fields, uSubst <> subst)
 
     where
         toVar :: TCTField -> TCTIdentifier
@@ -295,14 +295,15 @@ typeCheckStmt gamma stmt@(FunCallStmt loc funCall) tau = do
 typeCheckVarDecl :: TypeEnv ->
                     TCTVarDecl ->
                     TCMonad (TCTVarDecl, Subst)
-typeCheckVarDecl gamma (TCTVarDecl loc t (TCTIdentifier l i) e) = do
+typeCheckVarDecl gamma (TCTVarDecl loc tau (TCTIdentifier l i) e) = do
     alpha <- freshVar loc "v"
     (e', eSubst) <- typeCheckExpr gamma e alpha
-    case t of
-        TCTVarType _ "" ->
-            return (TCTVarDecl loc (eSubst $* alpha) (TCTIdentifier l i) e', eSubst)
+    let mgt = eSubst $* alpha
+    case tau of
+        TCTVarType _ "" -> -- Use of Var
+            return (TCTVarDecl loc mgt (TCTIdentifier l i) e', eSubst)
         _ -> do
-            tSubst <- t `isInstanceOf` generalise gamma (eSubst $* alpha)
+            tSubst <- tau `isInstanceOf` generalise gamma mgt
             let subst = tSubst <> eSubst
             return (TCTVarDecl loc (subst $* alpha) (TCTIdentifier l i) e',
                     tSubst <> eSubst)
@@ -355,7 +356,7 @@ typeCheckFunBody gamma (TCTFunBody loc varDecl stmts) tau = do
                              TCMonad ([TCTVarDecl], TypeEnv, Subst)
         typeCheckVarDecls (prevVarDecl, prevGamma@(TypeEnv prevGamma'), prevSubst) varDecl = do
             (varDecl'@(TCTVarDecl loc t (TCTIdentifier idLoc id) _), subst) <- typeCheckVarDecl prevGamma varDecl
-            let newGamma = subst $* TypeEnv (M.insert id (generalise mempty t) prevGamma')
+            let newGamma = subst $* TypeEnv (M.insert id (liftToScheme t) prevGamma')
             return (prevVarDecl ++ [varDecl'], newGamma, subst)
 
 typeCheckTCT :: TCT -> TCMonad TCT
@@ -367,7 +368,7 @@ typeCheckTCT (TCT leafs) = do
         typeCheckLeaf :: ([TCTLeaf], TypeEnv) -> TCTLeaf -> TCMonad ([TCTLeaf], TypeEnv)
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma')) (TCTVar v)  = do
             (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst) <- typeCheckVarDecl prevGamma v 
-            let newGamma = subst $* TypeEnv (M.insert id (generalise mempty t) prevGamma')
+            let newGamma = subst $* TypeEnv (M.insert id (liftToScheme t) prevGamma')
             return (prevLeafs ++ [TCTVar v'], newGamma)
 
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma')) (TCTFun f)  = do

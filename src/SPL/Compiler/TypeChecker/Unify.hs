@@ -63,27 +63,30 @@ instance Types TypeEnv where
 
 instance Types TCT where
     s $* (TCT leaves) = TCT $ map (s $*) leaves
-    freeVars _ = undefined 
+    freeVars _ = undefined
 
 instance Types TCTLeaf where
     s $* (TCTVar varDecl) = TCTVar $ s $* varDecl
     s $* (TCTFun funDecl) = TCTFun $ s $* funDecl
-    freeVars _ = undefined 
+    freeVars _ = undefined
 
 instance Types TCTVarDecl where
     s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id expr
-    freeVars _ = undefined 
+    freeVars _ = undefined
 
 instance Types TCTFunDecl where
     s $* (TCTFunDecl loc id args t body) = TCTFunDecl loc id args (s $* t) (s $* body)
-    freeVars _ = undefined 
+    freeVars _ = undefined
 
 instance Types TCTFunBody where
     s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) stmts
-    freeVars _ = undefined 
+    freeVars _ = undefined
 
 generalise :: TypeEnv -> TCTType -> Scheme
 generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
+
+liftToScheme :: TCTType -> Scheme
+liftToScheme = Scheme mempty
 
 
 typeMismatchError t1 t2 =
