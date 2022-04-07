@@ -16,7 +16,6 @@ instance Testable TCTFunCall where
     toTestForm (TCTFunCall _ i e) = TCTFunCall def (toTestForm i) (toTestForm e)
 
 instance Testable TCTType where
-    toTestForm (TCTUniversalType _ v t) = TCTUniversalType def v (toTestForm t)
     toTestForm (TCTFunType _ d t1 t2) = TCTFunType def d (toTestForm t1) (toTestForm t2)
     toTestForm (TCTTupleType _ t1 t2) = TCTTupleType def (toTestForm t1) (toTestForm t2)
     toTestForm (TCTListType _ t) = TCTListType def (toTestForm t)
@@ -65,9 +64,3 @@ instance Testable TCTStmt where
 
 instance Testable Subst where
     toTestForm (Subst var) = Subst $ toTestForm <$> var
-
-class Forall a where
-    forall :: [Text] -> a -> a
-
-instance Forall TCTType where
-    forall vars = generalise (S.fromList vars)
