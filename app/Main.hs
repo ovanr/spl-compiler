@@ -24,6 +24,10 @@ optionsParser = Options
             long "parserDump" <>
             short 'p' <>
             help "Only parse file and pretty print the result")
+    <*> switch (
+            long "typeCheckerDump" <>
+            short 't' <>
+            help "parse file and typecheck ast, then pretty print the result")
     <*> option auto (
             long "verbosity" <>
             help "The level of verbosity" <>
