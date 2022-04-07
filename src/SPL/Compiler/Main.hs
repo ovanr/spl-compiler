@@ -8,6 +8,7 @@ import Control.Lens (maximumOf, _Left, folded)
 import Data.Text (Text)
 import Data.Foldable
 import Data.Either
+import Data.Bifunctor
 import Data.Maybe
 
 import SPL.Compiler.Lexer.AlexLexGen (tokenize)
@@ -55,9 +56,7 @@ compilerMain (Options path content lexDump parserDump typeCheckDump v) = do
         else
             do
             initTCT <- Right . ast2tct $ ast
-            checkedTCT <- case runStateT (typeCheckTCT initTCT) (TypeCheckState 0) of
-                Left errors  -> Left (T.intercalate "\n" errors)
-                Right tct -> Right tct
+            checkedTCT <- first (T.intercalate "\n") $ runStateT (typeCheckTCT initTCT) (TypeCheckState 0)
             if typeCheckDump then
                 Right . TCTPP.toCode 0 $ fst checkedTCT
             else

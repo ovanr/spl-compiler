@@ -7,9 +7,7 @@ module SPL.Compiler.TypeChecker.TypeCheck where
 
 import Data.Text (Text)
 import Data.Map (Map)
-import qualified Data.Map as M
 import Data.Set (Set)
-import qualified Data.Set as S
 import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -21,8 +19,8 @@ import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.TypeChecker.Env (initGamma)
 import SPL.Compiler.TypeChecker.Unify
-import qualified Control.Lens.Internal.Deque as Map
 
 type TCMonad a = StateT TypeCheckState (Either Error) a
 
@@ -381,11 +379,3 @@ typeCheckTCT (TCT leafs) = do
             let combSubst = subst' <> subst
             let newGamma = TypeEnv $ M.insert id (liftToScheme t) prevGamma'
             return (prevLeafs ++ [TCTFun f'], newGamma, combSubst)
-
-builtinLoc = EntityLoc (0,0) (0,0)
-
-printEnv :: (Text, Scheme)
-printEnv = ("print", Scheme (S.fromList ["a"]) (TCTFunType builtinLoc [] (TCTVarType builtinLoc "a") (TCTVoidType builtinLoc)))
-
-initGamma :: TypeEnv 
-initGamma = TypeEnv $ M.fromList [printEnv]

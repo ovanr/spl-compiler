@@ -28,7 +28,7 @@ library
       SPL.Compiler.Parser.ASTPrettyPrint
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
-      SPL.Compiler.TypeChecker.SRE
+      SPL.Compiler.TypeChecker.Env
       SPL.Compiler.TypeChecker.TCT
       SPL.Compiler.TypeChecker.TCTEntityLocation
       SPL.Compiler.TypeChecker.TCTPrettyPrint
