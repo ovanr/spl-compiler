@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SPL.Compiler.TypeChecker.TCTPrettyPrint where
+
 import SPL.Compiler.TypeChecker.TCT
     (TCTType(..),
      OpBin(..),
@@ -18,7 +19,6 @@ import SPL.Compiler.TypeChecker.TCT
 import Data.List (intercalate)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Test.Framework.Pretty (Pretty)
 
 mkIdent :: Int -> Text
 mkIdent n = foldl (<>) "" $ replicate n "   "
@@ -41,6 +41,10 @@ instance PrettyPrint TCTFunDecl where
     toCode n (TCTFunDecl _ id args t body) =
         toCode n id <> " (" <> T.intercalate "," (map (toCode n) args) <> ") ::"
                     <> toCodeFunType n t <> " " <> toCode (n + 1) body
+        where
+            toCodeFunType :: Int -> TCTType -> Text
+            toCodeFunType n t@TCTFunType{} = toCode n t 
+            toCodeFunType n t = "-> " <> toCode n t
 
 instance PrettyPrint TCTField where
     toCode _ (Hd _) = "hd"
@@ -118,11 +122,11 @@ instance PrettyPrint TCTType where
     toCode n (TCTBoolType _) = "Bool"
     toCode n (TCTCharType _) = "Char"
     toCode n (TCTVoidType _) = "Void"
-    toCode n (TCTFunType _ _ _ _) = error "Do not print TCTFunTypes using this function!"
+    toCode n (TCTFunType _ _ t1 t2) = toCode n t1 <> " " <>
+        case t2 of
+            TCTFunType{} -> toCode n t2
+            _ -> "-> " <> toCode n t2
 
-toCodeFunType :: Int -> TCTType -> Text
-toCodeFunType n (TCTFunType _ constraints t ts) = toCode n t <> " " <> toCodeFunType n ts
-toCodeFunType n t = "-> " <> toCode n t
 
 instance PrettyPrint TCTIdentifier where
     toCode n (TCTIdentifier _ id) = id

@@ -18,7 +18,6 @@ import SPL.Compiler.Parser.AST
 import Data.List (intercalate)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Test.Framework.Pretty (Pretty)
 
 mkIdent :: Int -> Text
 mkIdent n = foldl (<>) "" $ replicate n "   "
