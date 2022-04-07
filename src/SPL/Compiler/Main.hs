@@ -13,13 +13,20 @@ import Data.Maybe
 import SPL.Compiler.Lexer.AlexLexGen (tokenize)
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), Error(..))
 import SPL.Compiler.Parser.ASTParser
-import SPL.Compiler.Parser.ASTPrettyPrint (PrettyPrint(..))
+import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
+import SPL.Compiler.TypeChecker.TCT(TCT(..), Error)
+
+import Control.Monad.State (StateT(StateT, runStateT))
+import SPL.Compiler.TypeChecker.TypeCheck (typeCheckTCT, TypeCheckState (TypeCheckState))
+import SPL.Compiler.TypeChecker.TreeTransformer (ast2tct)
+import qualified SPL.Compiler.TypeChecker.TCTPrettyPrint as TCTPP (PrettyPrint(..))
 
 data Options = Options {
     filePath :: FilePath,
     fileContents :: B.ByteString,
     lexerDump :: Bool,
     parserDump :: Bool,
+    typeCheckDump :: Bool,
     verbosity :: Int
 }
 
@@ -32,7 +39,7 @@ printError xs =
       in T.init $ T.unlines [header, info, err]
 
 compilerMain :: Options -> Either Text Text
-compilerMain (Options path content lexDump parserDump v) = do
+compilerMain (Options path content lexDump parserDump typeCheckDump v) = do
     tokens <- tokenize path content
     let state = ParserState 0 tokens path (T.lines . decodeUtf8 . B.toStrict $ content)
     if lexDump then
@@ -44,6 +51,15 @@ compilerMain (Options path content lexDump parserDump v) = do
                | otherwise -> Right . fst . head $ rights xs
 
         if parserDump then
-            Right . toCode 0 $ ast
+            Right . ASTPP.toCode 0 $ ast
         else
-            Left "Not implemented"
+            do
+            initTCT <- Right . ast2tct $ ast
+            checkedTCT <- case runStateT (typeCheckTCT initTCT) (TypeCheckState 0) of
+                Left errors  -> Left (T.intercalate "\n" errors)
+                Right tct -> Right tct
+            if typeCheckDump then
+                Right . TCTPP.toCode 0 $ fst checkedTCT
+            else
+                Left "Not implemented"
+
