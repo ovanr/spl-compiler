@@ -21,7 +21,6 @@ instance Arbitrary TCTType where
             (3, funGen),
             (2, listGen),
             (2, tupleGen)
-            -- (2, universalGen)
         ]
 
        where
@@ -32,7 +31,6 @@ instance Arbitrary TCTType where
             tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
             funGen = liftA2 (TCTFunType def []) arbitrary arbitrary
             listGen = TCTListType def <$> arbitrary
-            -- universalGen = liftA2 (TCTUniversalType def) arbitrary arbitrary
 
 instance Arbitrary Text where
     arbitrary =  oneof $ return <$> ["a", "b", "c", "d"]
