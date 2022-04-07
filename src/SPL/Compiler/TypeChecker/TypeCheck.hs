@@ -108,6 +108,9 @@ typeCheckExpr _ e@(EmptyListExpr loc) tau = do
 typeCheckExpr gamma e@(FunCallExpr f) tau = do
     (f', fSubst) <- typeCheckFunCall gamma f tau
     return (FunCallExpr f', fSubst)
+typeCheckExpr gamma e@(FieldSelectExpr fs) tau = do
+    (fs', fSubst) <- typeCheckFieldSelector gamma fs tau
+    return (FieldSelectExpr fs', fSubst)
 typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
     alpha1 <- freshVar (getLoc e1) "tup1"
     (e1', e1Subst) <- typeCheckExpr gamma e1 alpha1
