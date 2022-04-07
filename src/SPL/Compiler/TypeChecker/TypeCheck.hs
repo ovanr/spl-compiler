@@ -7,7 +7,9 @@ module SPL.Compiler.TypeChecker.TypeCheck where
 
 import Data.Text (Text)
 import Data.Map (Map)
+import qualified Data.Map as M
 import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -20,6 +22,7 @@ import Control.Lens
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.TypeChecker.TCT
 import SPL.Compiler.TypeChecker.Unify
+import qualified Control.Lens.Internal.Deque as Map
 
 type TCMonad a = StateT TypeCheckState (Either Error) a
 
@@ -360,18 +363,28 @@ typeCheckFunBody gamma (TCTFunBody loc varDecl stmts) tau = do
 
 typeCheckTCT :: TCT -> TCMonad TCT
 typeCheckTCT (TCT leafs) = do
-    (leafs', _) <- foldlM typeCheckLeaf ([], mempty) leafs
-    return $ TCT leafs'
+    (leafs', _, subst) <- foldlM typeCheckLeaf ([], initGamma, mempty) leafs
+    return $ subst $* TCT leafs'
 
     where
-        typeCheckLeaf :: ([TCTLeaf], TypeEnv) -> TCTLeaf -> TCMonad ([TCTLeaf], TypeEnv)
-        typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma')) (TCTVar v)  = do
-            (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst) <- typeCheckVarDecl prevGamma v 
-            let newGamma = subst $* TypeEnv (M.insert id (generalise mempty t) prevGamma')
-            return (prevLeafs ++ [TCTVar v'], newGamma)
+        typeCheckLeaf :: ([TCTLeaf], TypeEnv, Subst) -> TCTLeaf -> TCMonad ([TCTLeaf], TypeEnv, Subst)
+        typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTVar v)  = do
+            (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst') <- typeCheckVarDecl prevGamma v 
+            let combSubst = subst' <> subst
+            let newGamma = subst' $* TypeEnv (M.insert id (generalise mempty t) prevGamma')
+            return (prevLeafs ++ [TCTVar v'], newGamma, combSubst)
 
-        typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma')) (TCTFun f)  = do
-            (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), subst) <- typeCheckFunDecl prevGamma f 
+        typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTFun f)  = do
+            (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), subst') <- typeCheckFunDecl prevGamma f 
             prevGamma@(TypeEnv prevGamma') <- return $ subst $* prevGamma
+            let combSubst = subst' <> subst
             let newGamma = TypeEnv $ M.insert id (generalise prevGamma t) prevGamma'
-            return (prevLeafs ++ [TCTFun f'], newGamma)
+            return (prevLeafs ++ [TCTFun f'], newGamma, combSubst)
+
+builtinLoc = EntityLoc (0,0) (0,0)
+
+printEnv :: (Text, Scheme)
+printEnv = ("print", Scheme (S.fromList ["a"]) (TCTFunType builtinLoc [] (TCTVarType builtinLoc "a") (TCTVoidType builtinLoc)))
+
+initGamma :: TypeEnv 
+initGamma = TypeEnv $ M.fromList [printEnv]
