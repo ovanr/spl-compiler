@@ -1,7 +1,20 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+
 module SPL.Compiler.TypeChecker.Testable where
 
 import Data.Default
 import Data.Text (Text)
+import qualified Data.Text as T
+import GHC.TypeLits
+import Data.Proxy
 import qualified Data.Set as S
 
 import SPL.Compiler.Common.Testable
@@ -48,7 +61,7 @@ instance Testable TCTExpr where
 instance Testable TCTVarDecl where
     toTestForm (TCTVarDecl _ t i e) = TCTVarDecl def (toTestForm t) (toTestForm i) (toTestForm e)
 
-instance Testable TCTFunDecl where 
+instance Testable TCTFunDecl where
     toTestForm (TCTFunDecl _ i is t b) =
         TCTFunDecl def (toTestForm i) (toTestForm is) (toTestForm t) (toTestForm b)
 
@@ -66,54 +79,89 @@ instance Testable Subst where
     toTestForm (Subst var) = Subst $ toTestForm <$> var
 
 class ToExpr a where
-    toExpr :: a -> TCTExpr
+    expr :: a -> TCTExpr
 
-data Unknown
+data Nop
 
-instance ToExpr Unknown where
-    toExpr = undefined
+instance ToExpr Nop where
+    expr = undefined
 
 instance ToExpr Int where
-    toExpr i = IntExpr def (fromIntegral i)
+    expr i = IntExpr def (fromIntegral i)
 
 instance ToExpr Bool where
-    toExpr b = BoolExpr def b
+    expr b = BoolExpr def b
 
 instance ToExpr Char where
-    toExpr c = CharExpr def c
+    expr c = CharExpr def c
 
 instance ToExpr TCTExpr where
-    toExpr e = e
+    expr e = e
 
 instance ToExpr a => ToExpr [a] where
-    toExpr [] = EmptyListExpr def
-    toExpr (x:xs) = Op2Expr def (toExpr x) Cons (toExpr xs)
+    expr [] = EmptyListExpr def
+    expr (x:xs) = Op2Expr def (expr x) Cons (expr xs)
 
 instance (ToExpr a, ToExpr b) => ToExpr (a,b) where
-    toExpr (a,b) = TupExpr def (toExpr a) (toExpr b)
+    expr (a,b) = TupExpr def (expr a) (expr b)
+
+instance ToExpr TCTFunCall where
+    expr f = FunCallExpr f
+
+instance ToExpr TCTFieldSelector where
+    expr f = FieldSelectExpr f
+
+fun1 :: ToExpr a => Text -> a -> TCTFunCall
+fun1 id e = TCTFunCall def (TCTIdentifier def id) [expr e]
+
+fun2 :: (ToExpr a, ToExpr b) => Text -> a -> b -> TCTFunCall
+fun2 id e1 e2 = TCTFunCall def (TCTIdentifier def id) [expr e1, expr e2]
+
+fun3 :: (ToExpr a, ToExpr b, ToExpr c) => Text -> a -> b -> c -> TCTFunCall
+fun3 id e1 e2 e3 = TCTFunCall def (TCTIdentifier def id) [expr e1, expr e2, expr e3]
+
+op1 :: (ToExpr a) => OpUnary -> a -> TCTExpr
+op1 op e = OpExpr def op (expr e)
+
+op2 :: (ToExpr a, ToExpr b) => a -> OpBin -> b -> TCTExpr
+op2 e1 op e2 = Op2Expr def (expr e1) op (expr e2)
+
+ident = TCTIdentifier def
+
+iexpr = expr @Int
+
+emptyList :: TCTExpr
+emptyList = EmptyListExpr def
+
+fd :: Text -> [TCTField] -> TCTFieldSelector
+fd name = TCTFieldSelector def (ident name)
 
 class ToType a where
-    toType :: a -> TCTType
+    toType :: Proxy a -> TCTType
 
 instance ToType Int where
-    toType i = TCTIntType def 
+    toType _ = TCTIntType def
 
 instance ToType Bool where
-    toType b = TCTBoolType def
+    toType _ = TCTBoolType def
 
 instance ToType Char where
-    toType c = TCTCharType def
+    toType _ = TCTCharType def
 
-instance ToType Text where
-    toType name = TCTVarType def name
-
-instance ToType TCTType where
-    toType t = t
+instance KnownSymbol a => ToType (Var (a :: Symbol)) where
+    toType p = TCTVarType def (T.pack . symbolVal $ Proxy @a)
 
 instance ToType a => ToType [a] where
-    toType [x] = TCTListType def (toType x)
-    toType _ = undefined
+    toType _ = TCTListType def (toType (Proxy @a))
 
 instance (ToType a, ToType b) => ToType (a,b) where
-    toType (a,b) = TCTTupleType def (toType a) (toType b)
+    toType _ = TCTTupleType def (toType (Proxy @a)) (toType (Proxy @b))
+
+instance (ToType a, ToType b) => ToType ((->) a b) where
+    toType _ = TCTFunType def [] (toType (Proxy @a)) (toType (Proxy @b))
+
+data Var a = Var
+
+typ :: forall a. ToType a => TCTType
+typ = toType (Proxy :: Proxy a)
 

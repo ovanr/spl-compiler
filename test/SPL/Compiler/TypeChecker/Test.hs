@@ -2,6 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 
 module SPL.Compiler.TypeChecker.Test (htf_SPL_Compiler_TypeChecker_Test_thisModulesTests) where
 
@@ -32,23 +35,19 @@ infixl 1 *=
 (*=) :: ([(Text, Scheme)], a, TCTType) -> [(Text,TCTType)] -> TypeCheckTest a
 (env, a, t) *= subst = ((TypeEnv . M.fromList $ env, a, t), Just . Right . Subst $ M.fromList subst)
 
-
 failure :: ([(Text, Scheme)], a, TCTType) -> TypeCheckTest a
 failure (env, a, t) = ((TypeEnv . M.fromList $ env, a, t), Nothing)
 
 forall :: [Text] -> TCTType -> Scheme
 forall vars = Scheme (S.fromList vars)
 
-var :: Text -> TCTType
-var = toType
-
 initGammaTest :: TypeEnv
 initGammaTest = TypeEnv . M.fromList $ 
     [
-     ("hd", forall ["a"] $ TCTFunType def [] (toType [var "a"]) (var "a")),
-     ("tl", forall ["a"] $ TCTFunType def [] (toType [var "a"]) (toType [var "a"])),
-     ("fst", forall ["a","b"] $ TCTFunType def [] (toType (var "a", var "b")) (var "a")),
-     ("snd", forall ["a","b"] $ TCTFunType def [] (toType (var "a", var "b")) (var "b"))
+     ("hd", forall ["a"] $ typ @([Var "a"] -> Var "a")),
+     ("tl", forall ["a"] $ typ @([Var "a"] -> [Var "a"])),
+     ("fst", forall ["a","b"] $ typ @((Var "a", Var "b") -> Var "a")),
+     ("snd", forall ["a","b"] $ typ @((Var "a", Var "b") -> Var "b"))
     ]
 
 executeTCTests :: [TypeCheckTest a] ->
@@ -68,58 +67,66 @@ executeTCTests tests evaluator =
 
 test_type_check_expr = do
     let tests = [
-            (mempty, toExpr (5 :: Int), var "sigma") *= [("sigma", TCTIntType def)],
-            (mempty, toExpr True, TCTBoolType def) *= [],
-            (mempty, toExpr 'c', var "sigma") *= [("sigma", toType 'c')],
-            (mempty, toExpr ([] :: [Unknown]), var "sigma") 
-            *= [("sigma", toType [var "a"])],
+            -- 5 :: σ = σ |-> Int
+            (mempty, iexpr 5, typ @(Var "sigma")) *= [("sigma", typ @Int)],
+
+            -- True :: σ = σ |-> Bool
+            (mempty, expr True, typ @Bool) *= [],
+
+            -- 'c' :: σ = σ |-> Char
+            (mempty, expr 'c', typ @(Var "sigma")) *= [("sigma", typ @Char)],
+
+            -- [] :: σ = σ |-> [?a]
+            (mempty, emptyList, typ @(Var "sigma")) 
+            *= [("sigma", typ @[Var "a"])],
             
-            -- ('c', []) :: (Char, [?v])
-            (mempty, toExpr ('c', [] :: [Unknown]), var "sigma") 
-            *= [("'tup10", TCTCharType def), ("'tup21", toType [var "'l2"]), 
-                ("sigma", toType ('c', [var "'l2"]))],
+            -- ('c', []) :: σ = σ |-> (Char, [?'l2]), ...
+            (mempty, expr ('c', emptyList) , typ @(Var "sigma")) 
+            *= [("'tup10", typ @Char), ("'tup21", typ @[Var "'l2"]), 
+                ("sigma", typ @(Char, [Var "'l2"]))],
 
             -- -(5 + 8) :: Int
-            (mempty, OpExpr def UnMinus (Op2Expr def (toExpr (5 :: Int)) Plus (toExpr (2 :: Int))), var "sigma")
-            ~= TCTIntType def,
+            (mempty, op1 UnMinus (op2 (iexpr 5) Plus (iexpr 2)), typ @(Var "sigma"))
+            ~= typ @Int,
 
             -- 'c' : [] :: [Char]
-            (mempty, Op2Expr def (toExpr 'c') Cons (toExpr ([] :: [Char])), var "sigma")
-            ~= TCTListType def (TCTCharType def),
+            (mempty, op2 'c' Cons emptyList, typ @(Var "sigma"))
+            ~= typ @[Char],
 
             -- x.hd :: v? 
-            ([("x", forall [] $ toType ["v?" :: Text])], 
-             FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Hd def]), var "sigma")
-            ~= var "v?",
+            ([("x", forall [] $ typ @[Var "v?"])], 
+             expr (fd "x" [Hd def]), typ @(Var "sigma"))
+            ~= typ @(Var "v?"),
 
             -- x :: [Int] |- x.hd : x :: [Int] = 
-            ([("x", forall [] (toType [TCTIntType def]))],
-             Op2Expr def
-             (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Hd def]))
-             Cons
-             (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [])), 
-             var "sigma")
-            ~= toType [TCTIntType def],
+            ([("x", forall [] (typ @[Int]))],
+             op2 (fd "x" [Hd def]) Cons (fd "x" []), 
+             typ @(Var "sigma"))
+            ~= typ @[Int],
 
-            -- x :: [Int] |- x : x.tl :: ?v = Fail
-            failure ([("x", forall [] (toType [TCTIntType def]))],
-                     Op2Expr def
-                     (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") []))
-                     Cons
-                     (FieldSelectExpr (TCTFieldSelector def (TCTIdentifier def "x") [Tl def])), 
-                     var "sigma"),
+            -- x :: [Int] |- x.hd : x :: [Int] = 
+            ([("x", forall ["a"] (typ @[Int]))],
+             op2 (fd "x" [Hd def]) Cons (fd "x" []),
+             typ @(Var "sigma"))
+            ~= typ @[Int],
+
+            -- id :: a -> a |- (id 'c') : [] :: [Char] 
+            ([("id", forall ["a"] $ typ @(Var "a" -> Var "a"))],
+             op2 (fun1 "id" 'c') Cons emptyList, 
+             typ @(Var "sigma"))
+            ~= typ @[Char],
 
             -- !('c' : []) :: ?v = Fail
-            failure (mempty, OpExpr def UnNeg (Op2Expr def (toExpr 'c') Cons (toExpr ([] :: [Char]))), var "sigma"),
+            failure (mempty, op1 UnNeg (op2 'c' Cons emptyList), typ @(Var "sigma")),
 
             -- 'c' : 'd' :: ?v = Fail
-            failure (mempty, Op2Expr def (toExpr 'c') Cons (toExpr 'd'), var "sigma"),
+            failure (mempty, op2 'c' Cons 'd', typ @(Var "sigma")),
 
             -- [] :: Int = Fail
-            failure (mempty, EmptyListExpr def, TCTIntType def),
+            failure (mempty, emptyList, typ @Int),
 
             -- 'c' + 'd' :: ?v = Fail
-            failure (mempty, Op2Expr def (toExpr 'c') Plus (toExpr 'd'), var "sigma")
+            failure (mempty, op2 'c' Plus 'd', typ @(Var "sigma"))
             ]
 
     executeTCTests tests typeCheckExpr
