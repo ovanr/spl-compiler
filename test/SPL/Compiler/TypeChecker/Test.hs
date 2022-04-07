@@ -35,7 +35,7 @@ forall :: [Text] -> TCTType -> Scheme
 forall vars = Scheme (S.fromList vars)
 
 var :: Text -> TCTType
-var = TCTVarType def
+var = toType
 
 executeTCTests :: [TypeCheckTest a] ->
                   (TypeEnv -> a -> TCTType -> TCMonad (a, Subst)) ->
@@ -51,17 +51,18 @@ executeTCTests tests evaluator =
 -- typeCheckExpr :: Context ->
 --                  TCTExpr ->
 --                  TCTType ->
---                  RandErr Error (TCTExpr, Subst)
-
--- type TypeCheckTest a = ((Context, a, TCTType), Maybe Subst)
-
+--                  TCMonad (TCTExpr, Subst)
 test_type_check_expr = do
     let tests = [
-            (mempty, IntExpr def 5, var "sigma") ~= [("sigma", TCTIntType def)],
-            (mempty, BoolExpr def True, TCTBoolType def) ~= [],
-            (mempty, CharExpr def 'c', var "sigma") ~= [("sigma", TCTCharType def)],
-            (mempty, EmptyListExpr def, var "sigma") 
-            ~= [("sigma", TCTListType def (TCTVarType def "a"))]
+            (mempty, toExpr (5 :: Int), var "sigma") ~= [("sigma", TCTIntType def)],
+            (mempty, toExpr True, TCTBoolType def) ~= [],
+            (mempty, toExpr 'c', var "sigma") ~= [("sigma", toType 'c')],
+            (mempty, toExpr ([] :: [Unknown]), var "sigma") 
+            ~= [("sigma", toType [var "a"])],
+            (mempty, toExpr ('c', [] :: [Unknown]), var "sigma") 
+            ~= [("t1", TCTCharType def), ("t2", toType [var "v"]), 
+                ("sigma", toType ('c', [var "v"]))],
+            failure (mempty, EmptyListExpr def, TCTIntType def)
             ]
     executeTCTests tests typeCheckExpr
 

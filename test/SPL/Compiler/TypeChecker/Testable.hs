@@ -64,3 +64,56 @@ instance Testable TCTStmt where
 
 instance Testable Subst where
     toTestForm (Subst var) = Subst $ toTestForm <$> var
+
+class ToExpr a where
+    toExpr :: a -> TCTExpr
+
+data Unknown
+
+instance ToExpr Unknown where
+    toExpr = undefined
+
+instance ToExpr Int where
+    toExpr i = IntExpr def (fromIntegral i)
+
+instance ToExpr Bool where
+    toExpr b = BoolExpr def b
+
+instance ToExpr Char where
+    toExpr c = CharExpr def c
+
+instance ToExpr TCTExpr where
+    toExpr e = e
+
+instance ToExpr a => ToExpr [a] where
+    toExpr [] = EmptyListExpr def
+    toExpr (x:xs) = Op2Expr def (toExpr x) Cons (toExpr xs)
+
+instance (ToExpr a, ToExpr b) => ToExpr (a,b) where
+    toExpr (a,b) = TupExpr def (toExpr a) (toExpr b)
+
+class ToType a where
+    toType :: a -> TCTType
+
+instance ToType Int where
+    toType i = TCTIntType def 
+
+instance ToType Bool where
+    toType b = TCTBoolType def
+
+instance ToType Char where
+    toType c = TCTCharType def
+
+instance ToType Text where
+    toType name = TCTVarType def name
+
+instance ToType TCTType where
+    toType t = t
+
+instance ToType a => ToType [a] where
+    toType [x] = TCTListType def (toType x)
+    toType _ = undefined
+
+instance (ToType a, ToType b) => ToType (a,b) where
+    toType (a,b) = TCTTupleType def (toType a) (toType b)
+
