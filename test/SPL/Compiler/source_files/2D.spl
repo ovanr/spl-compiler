@@ -1,4 +1,4 @@
-foo (n) :: a2 -> (a1, Int)
+foo (n) :: a1 -> (a1, Int)
 {
 	return (n, 2);
 }

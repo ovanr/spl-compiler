@@ -35,7 +35,7 @@ newtype TypeCheckState =
 makeLenses 'TypeCheckState
 
 sanitize :: TCTType -> TCMonad TCTType
-sanitize = instantiate . liftToScheme
+sanitize = instantiate . generalise mempty
 
 instantiate :: Scheme -> TCMonad TCTType
 instantiate (Scheme tv t) = do
@@ -49,7 +49,6 @@ freshVar loc prefix = do
     tvCounter += 1
     return $ TCTVarType loc ("'" <> prefix <> suffix)
 
-
 isInstanceOf :: TCTType -> Scheme -> TCMonad Subst
 isInstanceOf t sch = do
     sanitizedT <- sanitize t
@@ -61,17 +60,14 @@ isInstanceOf t sch = do
         isInstanceOf' (TCTIntType _)  (Scheme _ (TCTIntType _)) = Right mempty
         isInstanceOf' (TCTCharType _) (Scheme _ (TCTCharType _)) = Right mempty
         isInstanceOf' (TCTBoolType _) (Scheme _ (TCTBoolType _)) = Right mempty
-        isInstanceOf' (TCTVarType _ t) (Scheme tv (TCTVarType l a)) =
-            if not $ S.member a tv && a == t then
-                return mempty
-            else
-                Left $ typeMismatchError t a
+        isInstanceOf' v@(TCTVarType _ t) (Scheme tv (TCTVarType l a))
+            | S.member a tv = Right . Subst $ M.singleton a (setLoc l v)
+            | not (S.member a tv) && a == t = return mempty
+            | otherwise = Left $ typeMismatchError v a
 
-        isInstanceOf' t (Scheme tv v@(TCTVarType l a)) =
-            if S.member a tv then
-                Right . Subst $ M.singleton a (setLoc l t)
-            else
-                Left $ typeMismatchError t v
+        isInstanceOf' t (Scheme tv v@(TCTVarType l a))
+            | S.member a tv = Right . Subst $ M.singleton a (setLoc l t)
+            | otherwise = Left $ typeMismatchError t v
 
         isInstanceOf' (TCTListType _ t1) (Scheme tv (TCTListType _ t2)) =
            isInstanceOf' t1 (Scheme tv t2)
@@ -208,7 +204,7 @@ typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
     (id', idSubst) <- typeCheckVar gamma id alpha
 
     (rType, fSubst) <- foldM typeCheckFields (idSubst $* alpha, mempty) fields
-    
+
     let subst = fSubst <> idSubst
     uSubst <- lift $ unify rType (subst $* tau)
     return (TCTFieldSelector loc id' fields, uSubst <> subst)
@@ -372,13 +368,13 @@ typeCheckTCT (TCT leafs) = do
     where
         typeCheckLeaf :: ([TCTLeaf], TypeEnv, Subst) -> TCTLeaf -> TCMonad ([TCTLeaf], TypeEnv, Subst)
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTVar v)  = do
-            (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst') <- typeCheckVarDecl prevGamma v 
+            (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst') <- typeCheckVarDecl prevGamma v
             let combSubst = subst' <> subst
             let newGamma = subst' $* TypeEnv (M.insert id (liftToScheme t) prevGamma')
             return (prevLeafs ++ [TCTVar v'], newGamma, combSubst)
 
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTFun f)  = do
-            (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), subst') <- typeCheckFunDecl prevGamma f 
+            (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), subst') <- typeCheckFunDecl prevGamma f
             prevGamma@(TypeEnv prevGamma') <- return $ subst $* prevGamma
             let combSubst = subst' <> subst
             let newGamma = TypeEnv $ M.insert id (liftToScheme t) prevGamma'
