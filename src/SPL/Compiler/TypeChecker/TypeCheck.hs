@@ -176,10 +176,6 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
         -- | GreaterEq 
         -- | Nequal 
 
--- forall c. c ->> forall c. forall a. a -> Void ->> forall c a. a -> Void ->> forall a. a -> Void
--- forall a. a -> Void
--- [ c |-> forall a. a -> Void ] 
-
 typeCheckVar :: TypeEnv ->
                 TCTIdentifier ->
                 TCTType ->
@@ -193,8 +189,6 @@ typeCheckVar (TypeEnv gamma) id@(TCTIdentifier l idName) tau = do
         Nothing -> do
             tcError $ "Variable not found " <> idName
 
--- assume gamma contains = hd :: forall a. [a] -> a, tl :: forall a. [a] -> [a], fst :: forall a b. (a,b) -> a
---                         snd :: forall a b. (a,b) -> b
 typeCheckFieldSelector :: TypeEnv ->
                           TCTFieldSelector ->
                           TCTType ->
@@ -290,8 +284,7 @@ typeCheckStmt gamma stmt@(ReturnStmt loc (Just expr)) tau = do
 typeCheckStmt gamma stmt@(FunCallStmt loc funCall) tau = do
     alpha <- freshVar loc "fcall"
     (funCall', funCallSubst) <- typeCheckFunCall gamma funCall alpha
-    subst <- lift $ unify (funCallSubst $* alpha) (funCallSubst $* tau)
-    return (FunCallStmt loc funCall', subst <> funCallSubst)
+    return (FunCallStmt loc funCall', funCallSubst)
 
 typeCheckVarDecl :: TypeEnv ->
                     TCTVarDecl ->
@@ -322,20 +315,20 @@ typeCheckStmtList gamma (st:sts) tau = do
 typeCheckFunDecl ::  TypeEnv ->
                      TCTFunDecl ->
                      TCMonad (TCTFunDecl, Subst)
-typeCheckFunDecl (TypeEnv gamma) (TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau funBody) = do
+typeCheckFunDecl gamma@(TypeEnv gamma') (TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau funBody) = do
     retType <- freshVar idLoc "fun"
     alphaArgs <- mapM (\(TCTIdentifier l i) -> freshVar l "arg") args
     let expectedType = foldr (TCTFunType loc []) retType alphaArgs
 
-    newGamma <- return $ M.insert idName expectedType
-    newGamma <- return $ foldr insertToGamma gamma (zip args alphaArgs)
-    (funBody', bSubst) <- typeCheckFunBody (TypeEnv newGamma) funBody retType
+    let newGamma = M.insert idName (liftToScheme expectedType) gamma'
+    let newGamma' = foldr insertToGamma newGamma (zip args alphaArgs)
+    (funBody', bSubst) <- typeCheckFunBody (TypeEnv newGamma') funBody retType
 
     case tau of
         TCTVarType _ "" ->
             return (TCTFunDecl loc id args (bSubst $* expectedType) funBody', bSubst)
         _ -> do
-            tSubst <- tau `isInstanceOf` generalise (TypeEnv gamma) (bSubst $* expectedType)
+            tSubst <- tau `isInstanceOf` generalise gamma (bSubst $* expectedType)
             let subst = tSubst <> bSubst
             return (TCTFunDecl loc id args (subst $* tau) funBody', subst)
 
@@ -369,13 +362,11 @@ typeCheckTCT (TCT leafs) = do
         typeCheckLeaf :: ([TCTLeaf], TypeEnv, Subst) -> TCTLeaf -> TCMonad ([TCTLeaf], TypeEnv, Subst)
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTVar v)  = do
             (v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), subst') <- typeCheckVarDecl prevGamma v
-            let combSubst = subst' <> subst
             let newGamma = subst' $* TypeEnv (M.insert id (liftToScheme t) prevGamma')
-            return (prevLeafs ++ [TCTVar v'], newGamma, combSubst)
+            return (prevLeafs ++ [TCTVar v'], newGamma, subst' <> subst)
 
         typeCheckLeaf (prevLeafs, prevGamma@(TypeEnv prevGamma'), subst) (TCTFun f)  = do
             (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), subst') <- typeCheckFunDecl prevGamma f
-            prevGamma@(TypeEnv prevGamma') <- return $ subst $* prevGamma
-            let combSubst = subst' <> subst
-            let newGamma = TypeEnv $ M.insert id (liftToScheme t) prevGamma'
-            return (prevLeafs ++ [TCTFun f'], newGamma, combSubst)
+            let interGamma@(TypeEnv interGamma') = subst' $* prevGamma
+            let newGamma = TypeEnv $ M.insert id (generalise interGamma t) interGamma'
+            return (prevLeafs ++ [TCTFun f'], newGamma, subst' <> subst)

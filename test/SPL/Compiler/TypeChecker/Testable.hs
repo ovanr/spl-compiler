@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -163,3 +164,43 @@ data Var a = Var
 typ :: forall a. ToType a => TCTType
 typ = toType (Proxy :: Proxy a)
 
+
+class ToStmt a where
+    stmt :: a -> TCTStmt
+
+instance ToStmt TCTStmt where
+    stmt = id
+
+instance ToStmt TCTFunCall where
+    stmt = FunCallStmt def
+
+ite :: ToExpr a => a -> [TCTStmt] -> [TCTStmt] -> TCTStmt
+ite c = IfElseStmt def (expr c)
+
+while :: ToExpr a => a -> [TCTStmt] -> TCTStmt
+while c = WhileStmt def (expr c)
+
+infixl 2 =:
+
+(=:) :: ToExpr a => TCTFieldSelector -> a -> TCTStmt
+(=:) fd x = AssignStmt def fd (expr x)
+
+ret :: ToExpr a => a -> TCTStmt
+ret a = ReturnStmt def (Just . expr $ a)
+
+retVoid :: TCTStmt
+retVoid = ReturnStmt def Nothing
+
+defineI :: Text -> TCTExpr -> TCTVarDecl
+defineI id  = TCTVarDecl def (TCTVarType def "") (TCTIdentifier def id)
+
+define :: Text -> TCTType -> TCTExpr -> TCTVarDecl
+define id t = TCTVarDecl def t (TCTIdentifier def id)
+
+declare :: Text -> [Text] -> TCTType -> [TCTVarDecl] -> [TCTStmt] -> TCTFunDecl
+declare id args tau vs stmt =
+    TCTFunDecl def
+               (TCTIdentifier def id)
+               (map (TCTIdentifier def) args)
+               tau
+               (TCTFunBody def vs stmt)

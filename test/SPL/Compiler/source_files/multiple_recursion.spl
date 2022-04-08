@@ -2,7 +2,7 @@
 
 flip(n, l)
 {
-  if( n <= 0 )
+  if( True )
     return l;
   else
     return flop(n-1, 0:l);

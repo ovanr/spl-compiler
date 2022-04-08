@@ -1,0 +1,13 @@
+
+
+
+foo (n) :: Int -> Bool {
+    if () {
+        return True;
+    } else {
+        return 4;
+    }
+
+    return 3;
+}
+
