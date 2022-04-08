@@ -1,8 +1,15 @@
 (Int,Bool) a = (1,True);
+
 [Char] b = ('x' : ('c' : []));
+
 Int c = (2 + 3);
+
 Int d = (c + 1);
+
 Bool e = (True && False);
+
 Bool f = (True || False);
+
 [Char] g = ('y' : b);
-[a] x = [];
+
+['l16] x = [];

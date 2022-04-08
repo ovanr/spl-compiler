@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://gitlab.science.
 
 dependencies:
 - base >= 4.7 && < 5
+- directory
 - extra
 - array
 - containers
