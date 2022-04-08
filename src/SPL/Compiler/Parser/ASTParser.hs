@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Data.Functor (($>), (<&>))
 import Data.Function ((&))
 import Data.Foldable
+import Control.Monad.State
 import Data.Maybe (maybeToList)
 
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), AlexPosn(..))
@@ -18,6 +19,7 @@ import SPL.Compiler.Parser.ParserCombinator
 import SPL.Compiler.Parser.AST
 import SPL.Compiler.Parser.ASTEntityLocation
 import SPL.Compiler.Common.EntityLocation
+import SPL.Compiler.Common.Error
 
 type SPLParser a = Parser Token [Text] a
 
@@ -42,28 +44,8 @@ pIdentifier =
     ) <<|> pError (mkError "Expected identifier here")
 
 mkError :: Text -> ParserState Token -> [Text]
-mkError err (ParserState _ (s@(MkToken _ t):_) fp con) =
-    let lineNum = fst $ getStartLoc s
-        someLine = con ^? ix (lineNum - 1)
-        startCol = snd $ getStartLoc s
-        endCol = snd $ getEndLoc s
-        header = T.pack fp <> ":" <> T.pack (show lineNum) <> ":" <>
-                 T.pack (show startCol) <> ": " <> err
-     in
-        case someLine of
-           Nothing -> [header, T.pack (show t)]
-           Just line ->
-                let bottomHighlight = T.replicate startCol " " <> T.replicate (endCol - startCol) "^"
-                    leftMargin = T.pack (show lineNum) <> " "
-                    emptyLeftMargin = T.replicate (T.length leftMargin) " " <> "|"
-                in [T.unlines
-                     [ header,
-                      emptyLeftMargin,
-                      leftMargin <> "| " <> line,
-                      emptyLeftMargin <> bottomHighlight
-                     ]
-                   ]
-
+mkError err state@(ParserState _ (s@(MkToken _ t):_) _ _) =
+        evalState (definition err s) state
 mkError err ParserState{} = [err]
 
 pAST :: SPLParser AST

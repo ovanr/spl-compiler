@@ -20,6 +20,7 @@ extra-source-files:
 library
   exposed-modules:
       SPL.Compiler.Common.EntityLocation
+      SPL.Compiler.Common.Error
       SPL.Compiler.Lexer.AlexLexGen
       SPL.Compiler.Main
       SPL.Compiler.Parser.AST

@@ -72,7 +72,7 @@ executeTCTests :: [TypeCheckTestEnv a] ->
                   IO ()
 executeTCTests tests evaluator =
     forM_ tests $ \((gamma, x, t), expected) -> do
-        let st = TypeCheckState 0
+        let st = TypeCheckState 0 mempty mempty
         let actual = snd.fst <$> runStateT (evaluator (initGamma <> gamma) x t) st
         case expected of
             Just (Right subst) -> assertEqual (Right subst) (toTestForm actual)

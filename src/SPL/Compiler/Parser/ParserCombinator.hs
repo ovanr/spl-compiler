@@ -1,12 +1,12 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
 
 module SPL.Compiler.Parser.ParserCombinator where
 
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..), AlexPosn(..))
 import SPL.Compiler.Parser.AST
+import SPL.Compiler.Common.Error
 import Control.Applicative
 import Control.Lens ((%~), _1, _2, _Left, _Right, traversed, folded, maximumOf)
 import Data.Text (Text)
@@ -26,6 +26,10 @@ data ParserState s = ParserState {
     sourcePath :: FilePath,
     sourceCode :: [Text]
 } deriving (Eq, Show)
+
+instance ContainsSource (ParserState s) where
+    getFilePath = sourcePath 
+    getSource = sourceCode
 
 -- The Error data type holds the depth (how many tokens have been parsed)
 -- at which the error occured together with the actual error of type e

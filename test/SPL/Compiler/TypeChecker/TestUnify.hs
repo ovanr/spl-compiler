@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
+{-# HLINT ignore "Redundant bracket" #-}
 
 module SPL.Compiler.TypeChecker.TestUnify (htf_thisModulesTests) where
 
@@ -10,6 +11,7 @@ import Test.Framework
 import Control.Monad
 import Data.Default
 import Data.Text (Text)
+import Control.Monad.State
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -32,7 +34,8 @@ failure types = (types, Nothing)
 executeUnifyTests :: [UnifyTest] -> IO ()
 executeUnifyTests tests =
     forM_ tests $ \((t1,t2), expected) -> do
-        let actual = unify t1 t2
+        let st = TypeCheckState 0 mempty mempty
+        let actual = fst <$> runStateT (unify t1 t2) st
         case expected of
             Just subst -> assertEqual (Right subst) (toTestForm actual) 
             Nothing -> print actual >> void (assertLeft actual)

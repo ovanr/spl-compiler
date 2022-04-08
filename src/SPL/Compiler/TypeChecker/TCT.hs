@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module SPL.Compiler.TypeChecker.TCT
     (TCT(..),
      TypeVar,
@@ -6,6 +8,12 @@ module SPL.Compiler.TypeChecker.TCT
      TypeEnv(..),
      Scheme(..),
      Subst(..),
+     TCMonad,
+     tcError,
+     TypeCheckState(..),
+     tvCounter,
+     sourcePath,
+     sourceCode,
      TCTLeaf(..),
      TCTFunDecl(..),
      TCTVarDecl(..),
@@ -29,16 +37,36 @@ import Data.Set (Set)
 import Data.Map (Map)
 import Control.Monad.State.Lazy
 import Data.Foldable
+import Control.Monad.Trans
 import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
+import SPL.Compiler.Common.Error
 import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 
 type Error = [Text]
 type TypeVar = Text
+
+data TypeCheckState =
+    TypeCheckState {
+        _tvCounter :: Integer,
+        _sourcePath :: FilePath,
+        _sourceCode :: [Text]
+    }
+
+instance ContainsSource TypeCheckState where
+    getFilePath = _sourcePath
+    getSource = _sourceCode
+
+type TCMonad a = StateT TypeCheckState (Either Error) a
+
+tcError :: Error -> TCMonad a
+tcError = lift . Left 
+
+makeLenses 'TypeCheckState
 
 newtype TCT = TCT [TCTLeaf] deriving (Eq)
 

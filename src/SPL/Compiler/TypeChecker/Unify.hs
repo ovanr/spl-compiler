@@ -8,7 +8,8 @@ import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
 import Control.Monad
-import Control.Monad.Random
+import Control.Lens ((^?), ix)
+import Control.Monad.State
 import System.Random
 import qualified Data.Text as T
 import qualified Data.Map as M
@@ -17,6 +18,7 @@ import qualified Data.Set as S
 import SPL.Compiler.TypeChecker.TCT
 import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.EntityLocation
+import SPL.Compiler.Common.Error
 
 class Types a where
     ($*) :: Subst -> a -> a
@@ -89,45 +91,70 @@ liftToScheme :: TCTType -> Scheme
 liftToScheme = Scheme mempty
 
 
-typeMismatchError t1 t2 =
-    ["Couldn't match type '" <> T.pack (show t1)
-                             <> "' with '"
-                             <> T.pack (show t2)
-                             <> "'"]
+ -- • Couldn't match expected type ‘Bool’ with actual type ‘a’
+ --      ‘a’ is a rigid type variable bound by
+ --        the type signature for:
+ --          foo :: forall a. a -> a
+ --        at <interactive>:1:1-13
+ --    • In the first argument of ‘(&&)’, namely ‘x’
+ --      In the expression: x && x
+ --      In an equation for ‘foo’: foo x = x && x
+ --    • Relevant bindings include
+ --        x :: a (bound at <interactive>:1:20)
+ --        foo :: a -> a (bound at <interactive>:1:16)
+typeMismatchError :: TCTType -> TCTType -> TCMonad a
+typeMismatchError expT actT = do
+    let header = [ T.pack $
+            "Couldn't match expected type '" <> show expT <> 
+            "' with actual type '" <> show actT <> "'"
+            ]
+    typeLocTrace <- definition (T.pack $ "'" <> 
+                                         show expT <> 
+                                         "' has been inferred as the type of: ") 
+                                actT
+    tcError $ header <> typeLocTrace
+
 
 occurs :: TypeVar -> TCTType -> Bool
 occurs var t = S.member var (freeVars t)
-occursError :: TypeVar -> TCTType -> Error
-occursError var t =
-    ["Occurs check: cannot construct the infinite type: "
+
+occursError :: TypeVar -> TCTType -> TCMonad a
+occursError var t = do
+    typeLocTrace <- definition (T.pack $ "'" <> 
+                                         show t <> 
+                                         "' has been inferred as the type of: "
+                               ) t
+    tcError $ [
+        "Occurs check: cannot construct the infinite type: "
         <> var
         <> " ~ "
-        <> T.pack (show t)]
+        <> T.pack (show t)
+        ] <> typeLocTrace
 
-unify :: TCTType -> TCTType -> Either Error Subst
+unify :: TCTType -> TCTType -> TCMonad Subst
 unify t1 t2 = unify' t1 t2
     where
-        unify' :: TCTType -> TCTType -> Either Error Subst
-        unify' (TCTIntType _) (TCTIntType _) = Right mempty
-        unify' (TCTCharType _) (TCTCharType _) = Right mempty
-        unify' (TCTBoolType _) (TCTBoolType _) = Right mempty
-        unify' (TCTVoidType _) (TCTVoidType _) = Right mempty
+        unify' :: TCTType -> TCTType -> TCMonad Subst
+        unify' (TCTIntType _) (TCTIntType _) = return mempty
+        unify' (TCTCharType _) (TCTCharType _) = return mempty
+        unify' (TCTBoolType _) (TCTBoolType _) = return mempty
+        unify' (TCTVoidType _) (TCTVoidType _) = return mempty
 
         unify' v1@(TCTVarType _ a) v2@(TCTVarType _ b)
-            | a == b = Right mempty
-            | otherwise = Right . Subst $ M.singleton a v2
+            | a == b = return mempty
+            | otherwise = return . Subst $ M.singleton a v2
 
         unify' v@(TCTVarType _ a) t = do
             if not $ occurs a t then
-                Right . Subst $ M.singleton a t
+                return . Subst $ M.singleton a t
             else
-                Left $ occursError a t
+                occursError a t
 
         unify' t v@(TCTVarType _ a) = do
             if not $ occurs a t then
-                Right . Subst $ M.singleton a t
+                return . Subst $ M.singleton a t
             else
-                Left $ occursError a t
+                occursError a t
 
         unify' (TCTListType _ a) (TCTListType _ b) = unify' a b
 
@@ -141,4 +168,4 @@ unify t1 t2 = unify' t1 t2
             subst2 <- unify (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1
 
-        unify' t1 t2 = Left $ typeMismatchError t1 t2
+        unify' t1 t2 = typeMismatchError t1 t2
