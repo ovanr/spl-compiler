@@ -47,7 +47,7 @@ freshVar :: EntityLoc -> Text -> TCMonad TCTType
 freshVar loc prefix = do
     suffix <- T.pack . show <$> use tvCounter
     tvCounter += 1
-    return $ TCTVarType loc ("'" <> prefix <> suffix)
+    return $ TCTVarType loc (prefix <> suffix)
 
 isInstanceOf :: TCTType -> Scheme -> TCMonad Subst
 isInstanceOf t sch = do

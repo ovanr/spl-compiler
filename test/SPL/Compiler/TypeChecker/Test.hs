@@ -99,8 +99,8 @@ test_type_check_expr = do
             
             -- ('c', []) :: σ = σ |-> (Char, [?'l2]), ...
             [] |= (expr ('c', emptyList) , typ @(Var "sigma")) 
-            *= [("'tup10", typ @Char), ("'tup21", typ @[Var "'l2"]), 
-                ("sigma", typ @(Char, [Var "'l2"]))],
+            *= [("tup10", typ @Char), ("tup21", typ @[Var "l2"]), 
+                ("sigma", typ @(Char, [Var "l2"]))],
 
             -- -(5 + 8) :: Int
             [] |= (op1 UnMinus (op2 (iexpr 5) Plus (iexpr 2)), typ @(Var "sigma"))

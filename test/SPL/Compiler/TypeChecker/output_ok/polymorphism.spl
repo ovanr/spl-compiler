@@ -1,0 +1,7 @@
+id (x) :: fun0 -> fun0 {
+   return x;
+}
+
+foo (x,y) :: Int Bool -> (Int,Bool) {
+   return (id(x),id(y));
+}

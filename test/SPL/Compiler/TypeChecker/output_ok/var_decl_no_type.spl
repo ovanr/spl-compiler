@@ -12,4 +12,4 @@ Bool f = (True || False);
 
 [Char] g = ('y' : b);
 
-['l16] x = [];
+[l16] x = [];
