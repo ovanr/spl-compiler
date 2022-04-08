@@ -16,6 +16,7 @@ import Data.Bifunctor
 import Data.Foldable
 import Control.Monad.State
 import Control.Lens
+import Debug.Trace
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.TypeChecker.TCT
@@ -47,6 +48,7 @@ freshVar loc prefix = do
     suffix <- T.pack . show <$> use tvCounter
     tvCounter += 1
     return $ TCTVarType loc ("'" <> prefix <> suffix)
+
 
 isInstanceOf :: TCTType -> Scheme -> TCMonad Subst
 isInstanceOf t sch = do
@@ -81,7 +83,7 @@ isInstanceOf t sch = do
 
         isInstanceOf' (TCTFunType _ _ a1 b1) (Scheme tv (TCTFunType _ _ a2 b2)) = do
             subst1 <- isInstanceOf' a1 (Scheme tv a2)
-            subst2 <- isInstanceOf' a2 (Scheme tv $ subst1 $* b2)
+            subst2 <- isInstanceOf' b1 (Scheme tv $ subst1 $* b2)
             Right $ subst2 <> subst1
 
         isInstanceOf' t1 t2 = Left $ typeMismatchError t1 t2
@@ -204,6 +206,7 @@ typeCheckFieldSelector :: TypeEnv ->
 typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
     alpha <- freshVar (getLoc id) "fd"
     (id', idSubst) <- typeCheckVar gamma id alpha
+
     (rType, fSubst) <- foldM typeCheckFields (idSubst $* alpha, mempty) fields
     
     let subst = fSubst <> idSubst
@@ -245,7 +248,7 @@ typeCheckFunCall gamma (TCTFunCall locF id@(TCTIdentifier locI _) args) tau = do
         typeCheckArgs arg (exprs, funType, prevSubst) = do
             -- generate freshVar for each arg
             -- get a subst for each arg and compose them sequentially
-            alpha <- freshVar (getLoc arg) "arg"
+            alpha <- freshVar (getLoc arg) "argCall"
             (arg', argSubst) <- typeCheckExpr (prevSubst $* gamma) arg alpha
             let subst = argSubst <> prevSubst
             return (arg' : exprs,
@@ -283,9 +286,10 @@ typeCheckStmt gamma stmt@(ReturnStmt loc Nothing) tau = do
 
 typeCheckStmt gamma stmt@(ReturnStmt loc (Just expr)) tau = do
     alpha <- freshVar loc "ret"
-    (_, exprSubst) <- typeCheckExpr gamma expr alpha
+    (expr', exprSubst) <- typeCheckExpr gamma expr alpha
     subst <- lift $ unify (exprSubst $* alpha) (exprSubst $* tau)
-    return (stmt, subst <> exprSubst)
+
+    return (ReturnStmt loc (Just expr'), subst <> exprSubst)
 
 typeCheckStmt gamma stmt@(FunCallStmt loc funCall) tau = do
     alpha <- freshVar loc "fcall"
@@ -315,9 +319,9 @@ typeCheckStmtList :: TypeEnv ->
                      TCMonad ([TCTStmt], Subst)
 typeCheckStmtList _ [] _ = return ([], mempty)
 typeCheckStmtList gamma (st:sts) tau = do
-    (_, substSt)  <- typeCheckStmt gamma st tau
-    (_, substSts) <- typeCheckStmtList (substSt $* gamma) sts (substSt $* tau)
-    return (st:sts, substSt <> substSts)
+    (st', substSt)  <- typeCheckStmt gamma st tau
+    (sts', substSts) <- typeCheckStmtList (substSt $* gamma) sts (substSt $* tau)
+    return (st':sts', substSts <> substSt)
 
 typeCheckFunDecl ::  TypeEnv ->
                      TCTFunDecl ->
@@ -333,15 +337,15 @@ typeCheckFunDecl (TypeEnv gamma) (TCTFunDecl loc id@(TCTIdentifier idLoc idName)
 
     case tau of
         TCTVarType _ "" ->
-            return (TCTFunDecl loc id args (bSubst $* tau) funBody', bSubst)
+            return (TCTFunDecl loc id args (bSubst $* expectedType) funBody', bSubst)
         _ -> do
-            tSubst <- tau `isInstanceOf` generalise (TypeEnv newGamma) (bSubst $* expectedType)
+            tSubst <- tau `isInstanceOf` generalise (TypeEnv gamma) (bSubst $* expectedType)
             let subst = tSubst <> bSubst
             return (TCTFunDecl loc id args (subst $* tau) funBody', subst)
 
     where
         insertToGamma (TCTIdentifier l arg, t) g =
-            M.insert arg (generalise (TypeEnv g) t) g
+            M.insert arg (liftToScheme t) g
 
 typeCheckFunBody :: TypeEnv -> TCTFunBody -> TCTType -> TCMonad (TCTFunBody, Subst)
 typeCheckFunBody gamma (TCTFunBody loc varDecl stmts) tau = do

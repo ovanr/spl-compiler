@@ -27,23 +27,23 @@ class PrettyPrint a where
     toCode :: Int -> a -> Text
 
 instance PrettyPrint TCT where
-    toCode _ (TCT leaves) = T.unlines $ map (toCode 0) leaves
+    toCode _ (TCT leaves) = T.unlines $ concatMap ((\i -> [i, mempty]) . toCode 0) leaves
 
 instance PrettyPrint TCTLeaf where
     toCode _ (TCTVar vd) = toCode 0 vd
     toCode _ (TCTFun fd) = toCode 0 fd
 
 instance PrettyPrint TCTVarDecl where
-    toCode n (TCTVarDecl _ t id expr) = 
+    toCode n (TCTVarDecl _ t id expr) =
         mkIdent n <> toCode n t <> " " <> toCode n id <> " = " <> toCode n expr <> ";"
 
 instance PrettyPrint TCTFunDecl where
     toCode n (TCTFunDecl _ id args t body) =
-        toCode n id <> " (" <> T.intercalate "," (map (toCode n) args) <> ") ::"
+        toCode n id <> " (" <> T.intercalate "," (map (toCode n) args) <> ") :: "
                     <> toCodeFunType n t <> " " <> toCode (n + 1) body
         where
             toCodeFunType :: Int -> TCTType -> Text
-            toCodeFunType n t@TCTFunType{} = toCode n t 
+            toCodeFunType n t@TCTFunType{} = toCode n t
             toCodeFunType n t = "-> " <> toCode n t
 
 instance PrettyPrint TCTField where
@@ -68,15 +68,15 @@ instance PrettyPrint TCTExpr where
 
 instance PrettyPrint TCTStmt where
     toCode n (IfElseStmt _ cond thenBody elseBody) =
-        mkIdent n <> "if (" <> toCode n cond <> ") {" <> 
-            T.unlines ("": map (toCode (n+1)) thenBody) <> 
+        mkIdent n <> "if (" <> toCode n cond <> ") {" <>
+            T.unlines ("": map (toCode (n+1)) thenBody) <>
         mkIdent n <> "} " <>
         case elseBody of
             [] -> ""
             _ -> "else {" <> T.unlines ("": map (toCode (n+1)) elseBody) <> mkIdent n <> "}"
-    toCode n (WhileStmt _ cond body) = 
-        mkIdent n <> "while (" <> toCode n cond <> ") {" <> 
-            T.unlines ("": map (toCode (n+1)) body) <> 
+    toCode n (WhileStmt _ cond body) =
+        mkIdent n <> "while (" <> toCode n cond <> ") {" <>
+            T.unlines ("": map (toCode (n+1)) body) <>
         mkIdent n <> "}"
     toCode n (AssignStmt _ id expr) = mkIdent n <> toCode n id <> " = " <> toCode n expr <> ";"
     toCode n (FunCallStmt _ fCall) = mkIdent n <> toCode n fCall <> ";"
@@ -108,10 +108,10 @@ instance PrettyPrint OpBin where
     toCode _ Cons = " : "
 
 instance PrettyPrint TCTFunBody where
-    toCode n (TCTFunBody _ vars stmts) = 
-        "{" <> 
-            T.unlines ("": map (toCode n) vars) <> 
-            T.unlines (map (toCode n) stmts) <> 
+    toCode n (TCTFunBody _ vars stmts) =
+        "{" <>
+            T.unlines ("": map (toCode n) vars) <>
+            T.unlines (map (toCode n) stmts) <>
         "}"
 
 instance PrettyPrint TCTType where

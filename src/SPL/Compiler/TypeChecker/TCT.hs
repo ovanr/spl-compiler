@@ -40,11 +40,12 @@ import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 type Error = [Text]
 type TypeVar = Text
 
-newtype TCT = TCT [TCTLeaf]
+newtype TCT = TCT [TCTLeaf] deriving (Eq)
 
 data TCTLeaf =
         TCTVar TCTVarDecl
     |   TCTFun TCTFunDecl
+    deriving (Eq)
 
 data TCTFunDecl =
     TCTFunDecl
@@ -111,7 +112,7 @@ data TCTType =
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 data Scheme = Scheme (Set TypeVar) TCTType
-newtype TypeEnv = TypeEnv (Map Text Scheme)
+newtype TypeEnv = TypeEnv (Map Text Scheme) deriving (Show)
 
 instance Show Scheme where
     show (Scheme tv t) = 
