@@ -47,6 +47,7 @@ library
     , bytestring
     , containers
     , data-default
+    , directory
     , extra
     , lens
     , mtl
@@ -70,6 +71,7 @@ executable spl-compiler
     , bytestring
     , containers
     , data-default
+    , directory
     , extra
     , lens
     , mtl
@@ -88,6 +90,8 @@ test-suite spl-compiler-test
       SPL.Compiler.LexerParserComboTest
       SPL.Compiler.Parser.Test
       SPL.Compiler.Parser.Testable
+      SPL.Compiler.Start2TypeCheckComboTest
+      SPL.Compiler.TypeChecker.DirBasedTest
       SPL.Compiler.TypeChecker.Test
       SPL.Compiler.TypeChecker.Testable
       SPL.Compiler.TypeChecker.TestUnify
@@ -104,6 +108,7 @@ test-suite spl-compiler-test
     , bytestring
     , containers
     , data-default
+    , directory
     , extra
     , lens
     , mtl

@@ -27,7 +27,7 @@ class PrettyPrint a where
     toCode :: Int -> a -> Text
 
 instance PrettyPrint TCT where
-    toCode _ (TCT leaves) = T.unlines $ concatMap ((\i -> [i, mempty]) . toCode 0) leaves
+    toCode _ (TCT leaves) = T.unlines $ init $ concatMap ((\i -> [i, mempty]) . toCode 0) leaves
 
 instance PrettyPrint TCTLeaf where
     toCode _ (TCTVar vd) = toCode 0 vd
