@@ -1,7 +1,8 @@
 module SPL.Compiler.TypeChecker.TreeTransformer where
 
-import qualified SPL.Compiler.Parser.AST as AST
+import SPL.Compiler.TypeChecker.TCon
 import SPL.Compiler.TypeChecker.TCT
+import qualified SPL.Compiler.Parser.AST as AST
 import qualified SPL.Compiler.Lexer.AlexLexGen as AST
 import SPL.Compiler.Common.EntityLocation
 
@@ -74,7 +75,7 @@ ast2tctType (AST.ASTFunType loc ts) = typeFold loc $ map ast2tctType ts
         typeFold :: EntityLoc -> [TCTType] -> TCTType
         typeFold loc [] = error "internal failure: transformation from AST tree type to TCT tree type failed"
         typeFold loc [t] = t
-        typeFold loc (t:ts) = TCTFunType loc [] t (typeFold loc ts)
+        typeFold loc (t:ts) = TCTFunType loc mempty t (typeFold loc ts)
 ast2tctType (AST.ASTTupleType loc tl tr) = TCTTupleType loc (ast2tctType tl) (ast2tctType tr)
 ast2tctType (AST.ASTListType loc t) = TCTListType loc (ast2tctType t)
 ast2tctType (AST.ASTVarType loc t) = TCTVarType loc t

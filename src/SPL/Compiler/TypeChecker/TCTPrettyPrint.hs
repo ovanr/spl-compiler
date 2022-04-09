@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 module SPL.Compiler.TypeChecker.TCTPrettyPrint where
 
 import SPL.Compiler.TypeChecker.TCT
@@ -9,6 +10,7 @@ import SPL.Compiler.TypeChecker.TCT
      TCTStmt(..),
      TCTFunCall(..),
      TCTFieldSelector(..),
+     TCon(..),
      TCTField(..),
      TCTFunBody(..),
      TCTIdentifier(..),
@@ -16,8 +18,11 @@ import SPL.Compiler.TypeChecker.TCT
      TCTFunDecl(..),
      TCTLeaf(..),
      TCT(..))
+import SPL.Compiler.TypeChecker.TCon
 import Data.List (intercalate)
 import Data.Text (Text)
+import Data.Set (Set)
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 mkIdent :: Int -> Text
@@ -43,9 +48,14 @@ instance PrettyPrint TCTFunDecl where
                     <> toCodeFunType n t <> " " <> toCode (n + 1) body
         where
             toCodeFunType :: Int -> TCTType -> Text
-            toCodeFunType n t@TCTFunType{} = toCode n t
+            toCodeFunType n t@(TCTFunType _ tcon _ _) = toCode n tcon <> toCode n t
             toCodeFunType n t = "-> " <> toCode n t
 
+instance PrettyPrint (Set TCon) where
+    toCode n = toCodeCon . S.toList
+        where
+            toCodeCon = foldMap (\x -> "( " <> T.pack (show x) <> " ), ") 
+        
 instance PrettyPrint TCTField where
     toCode _ (Hd _) = "hd"
     toCode _ (Tl _) = "tl"

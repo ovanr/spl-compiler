@@ -29,7 +29,7 @@ instance Arbitrary TCTType where
             charGen = return (TCTCharType def)
             varGen = oneof $ return . TCTVarType def <$> ["a", "b", "c", "d"]
             tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
-            funGen = liftA2 (TCTFunType def []) arbitrary arbitrary
+            funGen = liftA2 (TCTFunType def mempty) arbitrary arbitrary
             listGen = TCTListType def <$> arbitrary
 
 instance Arbitrary Text where

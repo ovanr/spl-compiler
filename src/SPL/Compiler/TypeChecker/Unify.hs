@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.TypeChecker.TCon
 import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
@@ -48,12 +49,28 @@ instance Types TCTType where
     (Subst s) $* v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
     s $* (TCTListType e a) = TCTListType e (s $* a)
     s $* (TCTTupleType e a b) = TCTTupleType e (s $* a) (s $* b)
-    s $* (TCTFunType d e a b) = TCTFunType d e (s $* a) (s $* b)
+    s $* (TCTFunType d e a b) = TCTFunType d (s $* e) (s $* a) (s $* b)
     freeVars v@(TCTVarType l a) = S.singleton a
     freeVars (TCTListType _ a) = freeVars a
     freeVars (TCTTupleType _ a b) = freeVars a <> freeVars b
     freeVars (TCTFunType _ _ a b) = freeVars a <> freeVars b
     freeVars _ = mempty
+
+instance Types TCon where
+    s $* (TEq t) = TEq (s $* t)
+    s $* (TOrd t) = TOrd (s $* t)
+    s $* (TPrint t) = TPrint (s $* t)
+    freeVars (TEq t) = freeVars t
+    freeVars (TOrd t) = freeVars t
+    freeVars (TPrint t) = freeVars t
+
+instance Types a => Types [a] where
+    s $* xs = map (s $*) xs
+    freeVars xs = foldMap freeVars xs
+
+instance (Types a, Ord a) => Types (Set a) where
+    s $* xs = S.map (s $*) xs
+    freeVars xs = foldMap freeVars xs
 
 instance Types Scheme where
     (Subst s) $* (Scheme tv t) = Scheme tv $ Subst (foldr M.delete s tv) $* t
@@ -61,28 +78,28 @@ instance Types Scheme where
 
 instance Types TypeEnv where
     s $* (TypeEnv env) = TypeEnv $ ($*) s <$> env
-    freeVars (TypeEnv env) = foldMap freeVars $ M.elems env
+    freeVars (TypeEnv env) = freeVars $ M.elems env
 
 instance Types TCT where
     s $* (TCT leaves) = TCT $ map (s $*) leaves
-    freeVars _ = undefined
+    freeVars _ = mempty
 
 instance Types TCTLeaf where
     s $* (TCTVar varDecl) = TCTVar $ s $* varDecl
     s $* (TCTFun funDecl) = TCTFun $ s $* funDecl
-    freeVars _ = undefined
+    freeVars _ = mempty
 
 instance Types TCTVarDecl where
     s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id expr
-    freeVars _ = undefined
+    freeVars _ = mempty
 
 instance Types TCTFunDecl where
     s $* (TCTFunDecl loc id args t body) = TCTFunDecl loc id args (s $* t) (s $* body)
-    freeVars _ = undefined
+    freeVars _ = mempty
 
 instance Types TCTFunBody where
     s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) stmts
-    freeVars _ = undefined
+    freeVars _ = mempty
 
 generalise :: TypeEnv -> TCTType -> Scheme
 generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
@@ -90,18 +107,6 @@ generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
 liftToScheme :: TCTType -> Scheme
 liftToScheme = Scheme mempty
 
-
- -- • Couldn't match expected type ‘Bool’ with actual type ‘a’
- --      ‘a’ is a rigid type variable bound by
- --        the type signature for:
- --          foo :: forall a. a -> a
- --        at <interactive>:1:1-13
- --    • In the first argument of ‘(&&)’, namely ‘x’
- --      In the expression: x && x
- --      In an equation for ‘foo’: foo x = x && x
- --    • Relevant bindings include
- --        x :: a (bound at <interactive>:1:20)
- --        foo :: a -> a (bound at <interactive>:1:16)
 typeMismatchError :: TCTType -> TCTType -> TCMonad a
 typeMismatchError expT actT = do
     let header = [ T.pack $

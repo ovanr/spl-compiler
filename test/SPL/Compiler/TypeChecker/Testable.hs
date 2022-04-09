@@ -157,7 +157,7 @@ instance (ToType a, ToType b) => ToType (a,b) where
     toType _ = TCTTupleType def (toType (Proxy @a)) (toType (Proxy @b))
 
 instance (ToType a, ToType b) => ToType ((->) a b) where
-    toType _ = TCTFunType def [] (toType (Proxy @a)) (toType (Proxy @b))
+    toType _ = TCTFunType def mempty (toType (Proxy @a)) (toType (Proxy @b))
 
 data Var a = Var
 

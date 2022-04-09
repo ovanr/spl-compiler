@@ -7,9 +7,18 @@ var f = True || False;
 var g = 'y' : b;
 var x = [];
 
-Int x = 3;
-
-foo (y) :: Int -> Bool {
-    var z = x && x;
-    return True;
+idPrint (y) :: a -> a {
+    var z = y <= y;
+    var e = f == f;
+    return y;
 }
+
+foo (z) :: Int -> Bool {
+    var zz = idPrint (z);
+    var zz = idPrint ('c');
+    if (5 >= 5) {
+        return True;
+    }
+}
+
+

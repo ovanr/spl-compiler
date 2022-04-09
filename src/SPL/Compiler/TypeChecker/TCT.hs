@@ -24,7 +24,7 @@ module SPL.Compiler.TypeChecker.TCT
      TCTField(..),
      TCTStmt(..),
      TCTExpr(..),
-     TypeConstraints(..),
+     TCon(..),
      TCTType(..),
      OpUnary(..),
      OpBin(..),
@@ -64,7 +64,7 @@ instance ContainsSource TypeCheckState where
 type TCMonad a = StateT TypeCheckState (Either Error) a
 
 tcError :: Error -> TCMonad a
-tcError = lift . Left 
+tcError = lift . Left
 
 makeLenses 'TypeCheckState
 
@@ -122,11 +122,10 @@ data TCTExpr =
     |   TupExpr EntityLoc TCTExpr TCTExpr
     deriving (Eq, Show)
 
-data TypeConstraints =
-        Eq T.Text
-    |   Ord T.Text
-    |   Print T.Text
-    deriving (Eq, Show)
+data TCon =
+        TEq TCTType
+    |   TOrd TCTType
+    |   TPrint TCTType
 
 data TCTType =
         TCTIntType EntityLoc
@@ -136,14 +135,14 @@ data TCTType =
     |   TCTVarType EntityLoc TypeVar
     |   TCTTupleType EntityLoc TCTType TCTType
     |   TCTListType EntityLoc TCTType
-    |   TCTFunType EntityLoc [TypeConstraints] TCTType TCTType
+    |   TCTFunType EntityLoc (Set TCon) TCTType TCTType
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 data Scheme = Scheme (Set TypeVar) TCTType
 newtype TypeEnv = TypeEnv (Map Text Scheme) deriving (Show)
 
 instance Show Scheme where
-    show (Scheme tv t) = 
+    show (Scheme tv t) =
         "forall " <> show (T.intercalate " " $ S.elems tv) <> ". " <> show t
 
 instance Semigroup TypeEnv where
@@ -183,10 +182,9 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
         alphaEq' (TCTFunType _ c1 a1 b1) (TCTFunType _ c2 a2 b2) = do
-            let r1 = c1 == c2
-            r2 <- a1 `alphaEq'` a2
-            r3 <- b1 `alphaEq'` b2
-            return $ r1 && r2 && r3
+            r1 <- a1 `alphaEq'` a2
+            r2 <- b1 `alphaEq'` b2
+            return $ r1 && r2
         alphaEq' _ _ = return False
 
 instance Show TCTType where

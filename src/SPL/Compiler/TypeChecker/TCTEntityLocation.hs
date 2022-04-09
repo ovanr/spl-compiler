@@ -79,6 +79,14 @@ instance Locatable TCTType where
     getLoc (TCTCharType l) = l
     getLoc (TCTVoidType l) = l
 
+instance Locatable TCon where
+    setLoc l (TEq t) = TEq $ setLoc l t
+    setLoc l (TOrd t) = TOrd $ setLoc l t
+    setLoc l (TPrint t) = TPrint $ setLoc l t
+    getLoc (TEq t) = getLoc t
+    getLoc (TOrd t) = getLoc t
+    getLoc (TPrint t) = getLoc t
+
 instance Locatable TCTFunBody where
     setLoc l (TCTFunBody _ d b) = TCTFunBody l d b
     getLoc (TCTFunBody l _ _) = l

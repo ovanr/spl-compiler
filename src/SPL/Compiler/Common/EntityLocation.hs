@@ -13,7 +13,7 @@ type Location = (Int, Int)
 data EntityLoc = EntityLoc {
     _locStart :: Location,
     _locEnd :: Location
-} deriving (Eq, Show)
+} deriving (Eq, Ord, Show)
 
 makeLenses ''EntityLoc
 
