@@ -33,9 +33,14 @@ instantiate :: Scheme -> TCMonad (TCTType, Subst)
 instantiate (Scheme tv t) = do
     newNames <- mapM (\v -> (v,) <$> freshVar (fromMaybe (getLoc t) (findLoc v t)) v) $ S.toList tv
     let subst = Subst . M.fromList $ newNames
-    return (subst $* t, subst)
+    return (subst $* t, reverseSubst subst)
 
     where
+        reverseSubst :: Subst -> Subst
+        reverseSubst (Subst s) = Subst . 
+                                 M.fromList . 
+                                 map (\(k, TCTVarType l a) -> (a, TCTVarType l k)) . 
+                                 M.toList $ s
         findLoc :: TypeVar -> TCTType -> Maybe EntityLoc
         findLoc v1 (TCTVarType l v2)
             | v1 == v2 = Just l
@@ -54,34 +59,39 @@ freshVar loc prefix = do
     return $ TCTVarType loc (prefix <> suffix)
 
 
-isInstanceOf :: TCTType -> Scheme -> TCMonad Subst
-isInstanceOf (TCTVoidType _) (Scheme _ (TCTVoidType _)) = return mempty
-isInstanceOf (TCTIntType _)  (Scheme _ (TCTIntType _)) = return mempty
-isInstanceOf (TCTCharType _) (Scheme _ (TCTCharType _)) = return mempty
-isInstanceOf (TCTBoolType _) (Scheme _ (TCTBoolType _)) = return mempty
-isInstanceOf v@(TCTVarType _ t) (Scheme tv v2@(TCTVarType l a))
-    | S.member a tv = return . Subst $ M.singleton a (setLoc l v)
-    | not (S.member a tv) && a == t = return mempty
-    | otherwise = typeMismatchError v2 v
+(<=*) :: TCTType -> Scheme -> TCMonad Subst
+(<=*) typ scheme = do
+    (typSanit, renameSubst) <- sanitize typ
+    isInstanceOf renameSubst typSanit scheme
 
-isInstanceOf t (Scheme tv v@(TCTVarType l a))
-    | S.member a tv = return . Subst $ M.singleton a (setLoc l t)
-    | otherwise = typeMismatchError v t
+    where
+        isInstanceOf _ TCTVoidType{} (Scheme _ TCTVoidType{}) = return mempty
+        isInstanceOf _ TCTIntType{}  (Scheme _ TCTIntType{}) = return mempty
+        isInstanceOf _ TCTCharType{} (Scheme _ TCTCharType{}) = return mempty
+        isInstanceOf _ TCTBoolType{} (Scheme _ TCTBoolType{}) = return mempty
+        isInstanceOf re v@(TCTVarType _ t) (Scheme tv v2@(TCTVarType l a))
+            | S.member a tv = return . Subst $ M.singleton a (setLoc l v)
+            | not (S.member a tv) && a == t = return mempty
+            | otherwise = typeMismatchError (re $* v2) (re $* v)
 
-isInstanceOf (TCTListType _ t1) (Scheme tv (TCTListType _ t2)) =
-   isInstanceOf t1 (Scheme tv t2)
+        isInstanceOf re t (Scheme tv v@(TCTVarType l a))
+            | S.member a tv = return . Subst $ M.singleton a (setLoc l t)
+            | otherwise = typeMismatchError (re $* v) (re $* t)
 
-isInstanceOf (TCTTupleType _ a1 b1) (Scheme tv (TCTTupleType _ a2 b2)) = do
-    subst1 <- isInstanceOf a1 (Scheme tv a2)
-    subst2 <- isInstanceOf b1 (Scheme tv $ subst1 $* b2)
-    return $ subst2 <> subst1
+        isInstanceOf re (TCTListType _ t1) (Scheme tv (TCTListType _ t2)) =
+           isInstanceOf re t1 (Scheme tv t2)
 
-isInstanceOf (TCTFunType _ _ a1 b1) (Scheme tv (TCTFunType _ _ a2 b2)) = do
-    subst1 <- isInstanceOf a1 (Scheme tv a2)
-    subst2 <- isInstanceOf b1 (Scheme tv $ subst1 $* b2)
-    return $ subst2 <> subst1
+        isInstanceOf re (TCTTupleType _ a1 b1) (Scheme tv (TCTTupleType _ a2 b2)) = do
+            subst1 <- isInstanceOf re a1 (Scheme tv a2)
+            subst2 <- isInstanceOf re b1 (Scheme tv $ subst1 $* b2)
+            return $ subst2 <> subst1
 
-isInstanceOf t1 (Scheme _ t2) = typeMismatchError t2 t1
+        isInstanceOf re (TCTFunType _ _ a1 b1) (Scheme tv (TCTFunType _ _ a2 b2)) = do
+            subst1 <- isInstanceOf re a1 (Scheme tv a2)
+            subst2 <- isInstanceOf re b1 (Scheme tv $ subst1 $* b2)
+            return $ subst2 <> subst1
+
+        isInstanceOf re t1 (Scheme _ t2) = typeMismatchError (re $* t2) (re $* t1)
 
 typeCheckExpr :: TypeEnv ->
                  TCTExpr ->
@@ -328,8 +338,7 @@ typeCheckVarDecl gamma (TCTVarDecl loc tau (TCTIdentifier l i) e) = do
         TCTVarType _ "" -> -- Use of Var
             return (tcon, TCTVarDecl loc mgt (TCTIdentifier l i) e', eSubst)
         _ -> do
-            (tauSanit, _) <- sanitize tau
-            tauSubst <- tauSanit `isInstanceOf` generalise gamma mgt
+            tauSubst <- tau <=* generalise gamma mgt
             let subst = tauSubst <> eSubst
             return (tauSubst $* tcon,
                     TCTVarDecl loc (subst $* alpha) (TCTIdentifier l i) e',
@@ -365,8 +374,7 @@ typeCheckFunDecl gamma@(TypeEnv gamma') (TCTFunDecl loc id@(TCTIdentifier idLoc 
             validateTCon tcon
             return (TCTFunDecl loc id args expectedType' funBody', bSubst)
         _ -> do
-            (tauSanit, _) <- sanitize tau
-            tSubst <- tauSanit `isInstanceOf` generalise gamma expectedType'
+            tSubst <- tau <=* generalise gamma expectedType'
             validateTCon (tSubst $* tcon)
             return (TCTFunDecl loc id args (tSubst $* expectedType') funBody', tSubst <> bSubst)
 

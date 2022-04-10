@@ -7,6 +7,9 @@ var f = True || False;
 var g = 'y' : b;
 var x = [];
 
+[a] df8 = [];
+a x = df8;
+
 idPrint (y) :: a -> a {
     var z = y <= y;
     var e = f == f;
@@ -21,4 +24,7 @@ foo (z) :: Int -> Bool {
     }
 }
 
+const (x, y) :: a b -> b {
+    return x;
+}
 

@@ -82,24 +82,25 @@ instance Types TypeEnv where
 
 instance Types TCT where
     s $* (TCT leaves) = TCT $ map (s $*) leaves
-    freeVars _ = mempty
+    freeVars (TCT leaves) = freeVars leaves
 
 instance Types TCTLeaf where
     s $* (TCTVar varDecl) = TCTVar $ s $* varDecl
     s $* (TCTFun funDecl) = TCTFun $ s $* funDecl
-    freeVars _ = mempty
+    freeVars (TCTVar varDecl) = freeVars varDecl
+    freeVars (TCTFun funDecl) = freeVars funDecl
 
 instance Types TCTVarDecl where
     s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id expr
-    freeVars _ = mempty
+    freeVars (TCTVarDecl _ t _ _) = freeVars t
 
 instance Types TCTFunDecl where
     s $* (TCTFunDecl loc id args t body) = TCTFunDecl loc id args (s $* t) (s $* body)
-    freeVars _ = mempty
+    freeVars (TCTFunDecl loc id args t body) = freeVars t
 
 instance Types TCTFunBody where
     s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) stmts
-    freeVars _ = mempty
+    freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl
 
 generalise :: TypeEnv -> TCTType -> Scheme
 generalise env t = Scheme (freeVars t `S.difference` freeVars env) t

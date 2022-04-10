@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 {-# HLINT ignore "Redundant bracket" #-}
@@ -48,55 +50,71 @@ executeSubstTests tests =
             Just subst -> assertEqual (subst $* t1) (subst $* t2) 
             Nothing -> return ()
 
-test_unify = do
-    let tests = [
-            -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
-            (TCTFunType def mempty (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTVarType def "b")) (TCTIntType def)),
-             TCTFunType def mempty (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTIntType def)) (TCTIntType def)))
-            ~* [("b", TCTIntType def)],
 
+test_unify_1 = do
+            -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
+            let test = (typ @(Var "a" -> ([Var "b"], Int)), typ @(Var "a" -> ([Int], Int))) ~* [("b", typ @Int)]
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_2 = do
             -- U( a -> [c], b -> a ) = [ a |-> [c], b |-> [c] ]
-            (TCTFunType def mempty (TCTVarType def "a") (TCTListType def (TCTVarType def "c")),
-             TCTFunType def mempty (TCTVarType def "b") (TCTVarType def "a"))
-            ~* [("a", TCTListType def (TCTVarType def "c")), ("b", TCTListType def (TCTVarType def "c"))],
+            let test = (typ @(Var "a" -> [Var "c"]), typ @(Var "b" -> Var "a"))
+                        ~* [("a", typ @[Var "c"]), ("b", typ @[Var "c"])]
+            executeUnifyTests [test]
+            executeSubstTests [test]
 
+test_unify_3 = do
             -- U( (Int, a) -> b, c -> (Int -> Bool) ) = [ c |-> (Int, a), b |-> (Int -> Bool)]
-            (TCTFunType def mempty (TCTTupleType def (TCTIntType def) (TCTVarType def "a")) (TCTVarType def "b"), 
-             TCTFunType def mempty (TCTVarType def "c") (TCTFunType def mempty (TCTIntType def) (TCTBoolType def)))
-            ~* [("c", TCTTupleType def (TCTIntType def) (TCTVarType def "a")), 
-                ("b", TCTFunType def mempty (TCTIntType def) (TCTBoolType def))],
+            let test = (typ @((Int, Var "a") -> Var "b"), typ @(Var "c" -> Int -> Bool))
+                        ~* [("c", typ @(Int, Var "a")), ("b", typ @(Int -> Bool))]
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_4 = do
             -- U( a -> a, c -> d ) = [ a |-> d, c |-> d ]
-            (TCTFunType def mempty (TCTVarType def "a") (TCTVarType def "a"), 
-             TCTFunType def mempty (TCTVarType def "c") (TCTVarType def "d"))
-            ~* [("a", TCTVarType def "d"), ("c", TCTVarType def "d")],
+            let test = (typ @(Var "a" -> Var "a"), typ @(Var "c" -> Var "d"))
+                        ~* [("a", typ @(Var "d")), ("c", typ @(Var "d"))]
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_5 = do
             -- U( (b, b) -> c, d -> (d -> d) ) = [d |-> (b,b), c |-> ((b,b) -> (b,b))]
-            (TCTFunType def mempty (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")) (TCTVarType def "c"),
-             TCTFunType def mempty (TCTVarType def "d") (TCTFunType def mempty (TCTVarType def "d") (TCTVarType def "d")))
-            ~* [("d", TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")), 
-                ("c", TCTFunType def mempty (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")) 
-                                        (TCTTupleType def (TCTVarType def "b") (TCTVarType def "b")))],
+            let test = (typ @((Var "b", Var "b") -> Var "c"), typ @(Var "d" -> Var "d" -> Var "d"))
+                    ~* [("d", typ @(Var "b", Var "b")), ("c", typ @((Var "b", Var "b") -> (Var "b", Var "b")))]
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_6 = do
             -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
-            (TCTFunType def mempty (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTVarType def "b")) (TCTIntType def)),
-             TCTFunType def mempty (TCTVarType def "a") (TCTTupleType def (TCTListType def (TCTIntType def)) (TCTIntType def)))
-            ~* [("b", TCTIntType def)], 
+            let test = (typ @(Var "a" -> ([Var "b"], Int)), typ @(Var "a" -> ([Int], Int))) ~* [("b", typ @Int)]
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_7 = do
             -- U( a, (b, a) ) = fail
-            failure (TCTVarType def "a", TCTTupleType def (TCTVarType def "b") (TCTVarType def "a")),
+            let test = failure (typ @(Var "a"), typ @(Var "b", Var "a"))
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_8 = do
             -- U( a -> b -> b -> c, a -> d -> d) = fail
-            failure (TCTFunType def mempty (TCTVarType def "a") (TCTFunType def mempty (TCTVarType def "b") 
-                                       (TCTFunType def mempty (TCTVarType def "b") (TCTVarType def "c"))),
-                     TCTFunType def mempty (TCTVarType def "a") (TCTFunType def mempty (TCTVarType def "d") (TCTVarType def "d"))),
+            let test = failure (typ @(Var "a" -> Var "b" -> Var "b" -> Var "c"), typ @(Var "a" -> Var "d" -> Var "d")) 
 
+            executeUnifyTests [test]
+            executeSubstTests [test]
+
+test_unify_9 = do
             -- U( (a -> Int) -> a, (Bool -> Int) -> Int ) = fail
-            failure (TCTFunType def mempty (TCTFunType def mempty (TCTVarType def "a") (TCTIntType def)) (TCTVarType def "a"), 
-                     TCTFunType def mempty (TCTFunType def mempty (TCTBoolType def) (TCTIntType def)) (TCTIntType def))
-            ]
-    executeUnifyTests tests
-    executeSubstTests tests
+            let test = failure (typ @((Var "a" -> Int) -> Var "a"), typ @((Bool -> Int) -> Int))
+
+            executeUnifyTests [test]
+            executeSubstTests [test]
 
 
 prop_substitutionLaw = 
