@@ -1,3 +1,5 @@
+module SPL.Compiler.TypeChecker.ReturnPathCheck where
+
 import SPL.Compiler.TypeChecker.TCT
 import qualified Data.Text as T
 import SPL.Compiler.Common.Error (definition)
