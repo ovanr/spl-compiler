@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant bracket" #-}
 
-module SPL.Compiler.Start2TypeCheckComboTest (htf_thisModulesTests) where
+module SPL.Compiler.SemanticAnalysis.TypeCheckPropertyTest (htf_thisModulesTests) where
 
 import Test.Framework 
 import Data.Either
@@ -70,14 +70,14 @@ sourceFiles = [
 -- property check of the form: 
 -- parsing a file two times is semantically equivalent to parsing one time
 --  compilerMain { compilerMain { TEST_FILE, parserDump }, parserDump } == compilerMain { TEST_FILE, parserDump }
--- test_type_check_property_check = do
---     forM_ sourceFiles $ \fp -> do
---         contents <- B.readFile fp
---         let options = Options fp contents False False True 0
---         print fp
---         let pass1 = compilerMain options
---         when (isLeft pass1) $ print $ "---> " <> fp
---         when (isRight pass1) $ do
---             let contentNew = fromStrict . encodeUtf8 . fromRight mempty $ pass1
---             let pass2 = compilerMain options{ fileContents = contentNew }
---             assertEqual pass1 pass2
+test_type_check_property_check = do
+    forM_ sourceFiles $ \fp -> do
+        contents <- B.readFile fp
+        let options = Options fp contents False False True 0
+        print fp
+        let pass1 = compilerMain options
+        when (isLeft pass1) $ print $ "---> " <> fp
+        when (isRight pass1) $ do
+            let contentNew = fromStrict . encodeUtf8 . fromRight mempty $ pass1
+            let pass2 = compilerMain options{ fileContents = contentNew }
+            assertEqual pass1 pass2

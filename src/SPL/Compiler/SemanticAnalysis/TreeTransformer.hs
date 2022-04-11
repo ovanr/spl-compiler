@@ -1,10 +1,10 @@
-module SPL.Compiler.TypeChecker.TreeTransformer where
+module SPL.Compiler.SemanticAnalysis.TreeTransformer where
 
-import SPL.Compiler.TypeChecker.TCon
-import SPL.Compiler.TypeChecker.TCT
 import qualified SPL.Compiler.Parser.AST as AST
 import qualified SPL.Compiler.Lexer.AlexLexGen as AST
 import SPL.Compiler.Common.EntityLocation
+import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+import SPL.Compiler.SemanticAnalysis.TCT
 
 ast2tct :: AST.AST -> TCT
 ast2tct (AST.AST leaves) = TCT $ map ast2tctLeaf leaves

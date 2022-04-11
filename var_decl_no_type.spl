@@ -8,7 +8,7 @@ var g = 'y' : b;
 var x = [];
 
 [a] df8 = [];
-a x = df8;
+/* a x = df8; */
 
 idPrint (y) :: a -> a {
     var z = y <= y;
@@ -18,7 +18,7 @@ idPrint (y) :: a -> a {
 
 foo (z) :: Int -> Bool {
     var zz = idPrint (z);
-    var zz = idPrint ('c');
+    var zy = idPrint ('c');
     if (5 >= 5) {
         return True;
     }

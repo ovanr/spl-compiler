@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-module SPL.Compiler.TypeChecker.TCTPrettyPrint where
+module SPL.Compiler.SemanticAnalysis.TCTPrettyPrint where
 
-import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.SemanticAnalysis.TCT
     (TCTType(..),
      OpBin(..),
      OpUnary(..),
@@ -18,7 +18,7 @@ import SPL.Compiler.TypeChecker.TCT
      TCTFunDecl(..),
      TCTLeaf(..),
      TCT(..))
-import SPL.Compiler.TypeChecker.TCon
+import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import Data.List (intercalate)
 import Data.Text (Text)
 import Data.Set (Set)

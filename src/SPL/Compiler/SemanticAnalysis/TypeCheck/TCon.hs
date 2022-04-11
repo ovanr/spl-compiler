@@ -1,12 +1,13 @@
 
-module SPL.Compiler.TypeChecker.TCon where
+module SPL.Compiler.SemanticAnalysis.TypeCheck.TCon where
 
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.Error
 import Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Text as T
+
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
 instance Show TCon where
     show (TEq t) = "Equality " <> show t  

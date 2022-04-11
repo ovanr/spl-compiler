@@ -4,7 +4,7 @@
 {-# HLINT ignore "Redundant bracket" #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module SPL.Compiler.TypeChecker.DirBasedTest (htf_thisModulesTests) where
+module SPL.Compiler.SemanticAnalysis.DirBasedTest (htf_thisModulesTests) where
 
 import Test.Framework 
 import Data.Either
@@ -17,9 +17,9 @@ import System.Directory
 import SPL.Compiler.Main (compilerMain, Options(..))
 
 
-inputDir = "test/SPL/Compiler/TypeChecker/input_ok/"
-outputDir = "test/SPL/Compiler/TypeChecker/output_ok/"
-failingDir = "test/SPL/Compiler/TypeChecker/input_failing/"
+inputDir = "test/SPL/Compiler/SemanticAnalysis/input_ok/"
+outputDir = "test/SPL/Compiler/SemanticAnalysis/output_ok/"
+failingDir = "test/SPL/Compiler/SemanticAnalysis/input_failing/"
 
 testTuples :: IO [(FilePath, FilePath)]
 testTuples = do

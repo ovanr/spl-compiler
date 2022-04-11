@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module SPL.Compiler.TypeChecker.TypeProperty where
+module SPL.Compiler.SemanticAnalysis.TypeProperty where
 
 import Test.Framework
 import Data.Default
 import Control.Applicative (liftA2)
 import Data.Text (Text)
 
-import SPL.Compiler.TypeChecker.Testable
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.Unify
+import SPL.Compiler.SemanticAnalysis.Testable
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
 
 instance Arbitrary TCTType where
     arbitrary = frequency

@@ -5,6 +5,7 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Control.Lens (maximumOf, _Left, folded)
+import Control.Monad.State (StateT(StateT, runStateT))
 import Data.Text (Text)
 import Data.Foldable
 import Data.Either
@@ -15,12 +16,11 @@ import SPL.Compiler.Lexer.AlexLexGen (tokenize)
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), Error(..))
 import SPL.Compiler.Parser.ASTParser
 import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
-import SPL.Compiler.TypeChecker.TCT(TCT(..), Error, TypeCheckState(..))
 
-import Control.Monad.State (StateT(StateT, runStateT))
-import SPL.Compiler.TypeChecker.TypeCheck (typeCheckTCT)
-import SPL.Compiler.TypeChecker.TreeTransformer (ast2tct)
-import qualified SPL.Compiler.TypeChecker.TCTPrettyPrint as TCTPP (PrettyPrint(..))
+import SPL.Compiler.SemanticAnalysis.TCT(TCT(..), Error, TypeCheckState(..))
+import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckTCT)
+import SPL.Compiler.SemanticAnalysis.TreeTransformer (ast2tct)
+import qualified SPL.Compiler.SemanticAnalysis.TCTPrettyPrint as TCTPP (PrettyPrint(..))
 
 data Options = Options {
     filePath :: FilePath,

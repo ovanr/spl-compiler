@@ -29,14 +29,15 @@ library
       SPL.Compiler.Parser.ASTPrettyPrint
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
-      SPL.Compiler.TypeChecker.Env
-      SPL.Compiler.TypeChecker.TCon
-      SPL.Compiler.TypeChecker.TCT
-      SPL.Compiler.TypeChecker.TCTEntityLocation
-      SPL.Compiler.TypeChecker.TCTPrettyPrint
-      SPL.Compiler.TypeChecker.TreeTransformer
-      SPL.Compiler.TypeChecker.TypeCheck
-      SPL.Compiler.TypeChecker.Unify
+      SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis
+      SPL.Compiler.SemanticAnalysis.TCT
+      SPL.Compiler.SemanticAnalysis.TCTEntityLocation
+      SPL.Compiler.SemanticAnalysis.TCTPrettyPrint
+      SPL.Compiler.SemanticAnalysis.TreeTransformer
+      SPL.Compiler.SemanticAnalysis.TypeCheck
+      SPL.Compiler.SemanticAnalysis.TypeCheck.Env
+      SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+      SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -92,12 +93,12 @@ test-suite spl-compiler-test
       SPL.Compiler.LexerParserComboTest
       SPL.Compiler.Parser.Test
       SPL.Compiler.Parser.Testable
-      SPL.Compiler.Start2TypeCheckComboTest
-      SPL.Compiler.TypeChecker.DirBasedTest
-      SPL.Compiler.TypeChecker.Test
-      SPL.Compiler.TypeChecker.Testable
-      SPL.Compiler.TypeChecker.TestUnify
-      SPL.Compiler.TypeChecker.TypeProperty
+      SPL.Compiler.SemanticAnalysis.DirBasedTest
+      SPL.Compiler.SemanticAnalysis.Testable
+      SPL.Compiler.SemanticAnalysis.TestTypeCheck
+      SPL.Compiler.SemanticAnalysis.TestTypeUnify
+      SPL.Compiler.SemanticAnalysis.TypeCheckPropertyTest
+      SPL.Compiler.SemanticAnalysis.TypeProperty
       Paths_spl_compiler
   hs-source-dirs:
       test

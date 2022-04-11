@@ -2,11 +2,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SPL.Compiler.TypeChecker.Unify where
+module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify where
 
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
+import Data.Bifunctor (second)
 import Control.Monad
 import Control.Lens ((^?), ix)
 import Control.Monad.State
@@ -15,11 +16,11 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.TCon
-import SPL.Compiler.TypeChecker.TCTEntityLocation
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
 class Types a where
     ($*) :: Subst -> a -> a
@@ -77,8 +78,8 @@ instance Types Scheme where
     freeVars (Scheme tv t) = freeVars t `S.difference` tv
 
 instance Types TypeEnv where
-    s $* (TypeEnv env) = TypeEnv $ ($*) s <$> env
-    freeVars (TypeEnv env) = freeVars $ M.elems env
+    s $* (TypeEnv env) = TypeEnv $ second (s $*) <$> env
+    freeVars (TypeEnv env) = freeVars . map snd $ M.elems env
 
 instance Types TCT where
     s $* (TCT leaves) = TCT $ map (s $*) leaves
@@ -111,12 +112,12 @@ liftToScheme = Scheme mempty
 typeMismatchError :: TCTType -> TCTType -> TCMonad a
 typeMismatchError expT actT = do
     let header = [ T.pack $
-            "Couldn't match expected type '" <> show expT <> 
-            "' with actual type '" <> show actT <> "'"
+            "Couldn't match expected type '" <> show expT <>
+            "' with actual type '" <> show actT <> "'."
             ]
-    typeLocTrace <- definition (T.pack $ "'" <> 
-                                         show expT <> 
-                                         "' has been inferred as the type of: ") 
+    typeLocTrace <- definition (T.pack $ "'" <>
+                                         show expT <>
+                                         "' has been inferred as the type of: ")
                                 actT
     tcError $ header <> typeLocTrace
 
@@ -126,8 +127,8 @@ occurs var t = S.member var (freeVars t)
 
 occursError :: TypeVar -> TCTType -> TCMonad a
 occursError var t = do
-    typeLocTrace <- definition (T.pack $ "'" <> 
-                                         show t <> 
+    typeLocTrace <- definition (T.pack $ "'" <>
+                                         show t <>
                                          "' has been inferred as the type of: "
                                ) t
     tcError $ [

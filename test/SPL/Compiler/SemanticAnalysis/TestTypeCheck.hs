@@ -4,15 +4,17 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Redundant bracket" #-}
 
-module SPL.Compiler.TypeChecker.Test (htf_SPL_Compiler_TypeChecker_Test_thisModulesTests) where
+module SPL.Compiler.SemanticAnalysis.TestTypeCheck (htf_thisModulesTests) where
 
 import Test.Framework
 import Control.Monad
 import Data.Default
 import Data.Tuple
+import Data.Bifunctor
 import Data.Text (Text)
 import Data.Set (Set)
 import Control.Monad.State
@@ -20,13 +22,13 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import SPL.Compiler.Common.Testable
-import SPL.Compiler.TypeChecker.Testable
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.TCon
-import SPL.Compiler.TypeChecker.Env (initGamma)
-import SPL.Compiler.TypeChecker.TypeCheck
-import SPL.Compiler.TypeChecker.Unify
-import SPL.Compiler.TypeChecker.TypeProperty
+import SPL.Compiler.SemanticAnalysis.Testable
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+import SPL.Compiler.SemanticAnalysis.TypeCheck.Env (initGamma)
+import SPL.Compiler.SemanticAnalysis.TypeCheck
+import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+import SPL.Compiler.SemanticAnalysis.TypeProperty
 
 type TypeCheckTest a = ((a, TCTType), Maybe (TCTType, [TCon])) 
 type TypeCheckTestEnv a = ((TypeEnv, a, TCTType), Maybe (TCTType, [TCon]))
@@ -63,7 +65,7 @@ infixl 2 =\:
 
 infixl 1 |= 
 (|=) :: [(Text, Scheme)] -> TypeCheckTest a -> TypeCheckTestEnv a
-(|=) env ((a, t), r) = ((TypeEnv . M.fromList $ env, a, t), r)
+(|=) env ((a, t), r) = ((TypeEnv . M.fromList . map (second (Global,)) $ env, a, t), r)
 
 thd3 :: (a,b,c) -> c
 thd3 (_,_,x) = x

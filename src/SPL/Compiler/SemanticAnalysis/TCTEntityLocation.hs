@@ -1,7 +1,7 @@
-module SPL.Compiler.TypeChecker.TCTEntityLocation where
+module SPL.Compiler.SemanticAnalysis.TCTEntityLocation where
 
 import SPL.Compiler.Common.EntityLocation
-import SPL.Compiler.TypeChecker.TCT
+import SPL.Compiler.SemanticAnalysis.TCT
 
 instance Locatable TCTIdentifier where
     setLoc l (TCTIdentifier _ v) = TCTIdentifier l v

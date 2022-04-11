@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module SPL.Compiler.TypeChecker.TCT
+module SPL.Compiler.SemanticAnalysis.TCT
     (TCT(..),
      TypeVar,
      Error,
@@ -14,6 +14,7 @@ module SPL.Compiler.TypeChecker.TCT
      tvCounter,
      sourcePath,
      sourceCode,
+     Scope(..),
      TCTLeaf(..),
      TCTFunDecl(..),
      TCTVarDecl(..),
@@ -49,6 +50,8 @@ import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 
 type Error = [Text]
 type TypeVar = Text
+
+data Scope = Local Text | Arg | Global deriving (Show, Eq, Ord)
 
 data TypeCheckState =
     TypeCheckState {
@@ -100,7 +103,14 @@ data TCTFieldSelector = TCTFieldSelector EntityLoc TCTIdentifier [TCTField]
     deriving (Eq, Show)
 
 data TCTField = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc
-    deriving (Eq, Show)
+    deriving (Show)
+
+instance Eq TCTField where
+    (Hd _) == (Hd _) = True
+    (Tl _) == (Tl _) = True
+    (Fst _) == (Fst _) = True
+    (Snd _) == (Snd _) = True
+    _ == _ = False
 
 data TCTStmt =
         IfElseStmt EntityLoc TCTExpr [TCTStmt] [TCTStmt]
@@ -139,7 +149,7 @@ data TCTType =
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 data Scheme = Scheme (Set TypeVar) TCTType
-newtype TypeEnv = TypeEnv (Map Text Scheme) deriving (Show)
+newtype TypeEnv = TypeEnv (Map Text (Scope, Scheme)) deriving (Show)
 
 instance Show Scheme where
     show (Scheme tv t) =

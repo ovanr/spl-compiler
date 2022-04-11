@@ -7,7 +7,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 
-module SPL.Compiler.TypeChecker.Testable where
+module SPL.Compiler.SemanticAnalysis.Testable where
 
 import Data.Default
 import Data.Text (Text)
@@ -17,9 +17,9 @@ import Data.Proxy
 import qualified Data.Set as S
 
 import SPL.Compiler.Common.Testable
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.Unify
-import SPL.Compiler.TypeChecker.TCTEntityLocation
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
 instance Testable TCTIdentifier where
     toTestForm (TCTIdentifier _ i) = TCTIdentifier def i

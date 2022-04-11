@@ -7,7 +7,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# HLINT ignore "Redundant bracket" #-}
 
-module SPL.Compiler.TypeChecker.TestUnify (htf_thisModulesTests) where
+module SPL.Compiler.SemanticAnalysis.TestTypeUnify (htf_thisModulesTests) where
 
 import Test.Framework
 import Control.Monad
@@ -18,10 +18,10 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import SPL.Compiler.Common.Testable
-import SPL.Compiler.TypeChecker.Testable
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.Unify
-import SPL.Compiler.TypeChecker.TypeProperty
+import SPL.Compiler.SemanticAnalysis.Testable
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+import SPL.Compiler.SemanticAnalysis.TypeProperty
 
 type UnifyTest = ((TCTType, TCTType), Maybe Subst)
 

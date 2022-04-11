@@ -1,17 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
-module SPL.Compiler.TypeChecker.Env where
+module SPL.Compiler.SemanticAnalysis.TypeCheck.Env where
 
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
+import Data.Bifunctor
 import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import SPL.Compiler.Common.EntityLocation
-import SPL.Compiler.TypeChecker.TCT
-import SPL.Compiler.TypeChecker.TCon
+import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 
 defLoc = EntityLoc (0,0) (0,0)
 
@@ -46,4 +48,4 @@ sndEnv = ("snd", Scheme (S.fromList ["a", "b"])
                             (TCTVarType defLoc "b"))) 
 
 initGamma :: TypeEnv 
-initGamma = TypeEnv $ M.fromList [printEnv, hdEnv, tlEnv, fstEnv, sndEnv]
+initGamma = TypeEnv . M.fromList . map (second (Global,)) $ [printEnv, hdEnv, tlEnv, fstEnv, sndEnv]
