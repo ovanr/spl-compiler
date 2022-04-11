@@ -25,6 +25,10 @@ instance Locatable TCTVarDecl where
     setLoc l (TCTVarDecl _ t i e) = TCTVarDecl l t i e
     getLoc (TCTVarDecl l _ _ _) = l
 
+instance Locatable TCTFunDecl where
+    setLoc l (TCTFunDecl _ id args t body) = TCTFunDecl l id args t body
+    getLoc (TCTFunDecl l _ _ _ _) = l
+
 instance Locatable TCTFieldSelector where
     setLoc l (TCTFieldSelector _ f x) = TCTFieldSelector l f x
     getLoc (TCTFieldSelector l _ _) = l

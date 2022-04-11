@@ -30,6 +30,7 @@ library
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.TypeChecker.Env
+      SPL.Compiler.TypeChecker.ReturnTypeCheck
       SPL.Compiler.TypeChecker.TCon
       SPL.Compiler.TypeChecker.TCT
       SPL.Compiler.TypeChecker.TCTEntityLocation
