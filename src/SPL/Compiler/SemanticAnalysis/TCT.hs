@@ -14,6 +14,7 @@ module SPL.Compiler.SemanticAnalysis.TCT
      tvCounter,
      sourcePath,
      sourceCode,
+     DeclType(..),
      Scope(..),
      TCTLeaf(..),
      TCTFunDecl(..),
@@ -96,7 +97,7 @@ data TCTIdentifier = TCTIdentifier EntityLoc Text
 data TCTFunBody = TCTFunBody EntityLoc [TCTVarDecl] [TCTStmt]
     deriving (Eq, Show)
 
-data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier [TCTExpr]
+data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier TCTType [TCTExpr]
     deriving (Eq, Show)
 
 data TCTFieldSelector = TCTFieldSelector EntityLoc TCTIdentifier [TCTField]
@@ -149,7 +150,13 @@ data TCTType =
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
 data Scheme = Scheme (Set TypeVar) TCTType
-newtype TypeEnv = TypeEnv (Map Text (Scope, Scheme)) deriving (Show)
+data DeclType = Var | Fun | Both deriving (Eq, Ord)
+instance Show DeclType where
+    show Var = "Variable"
+    show Fun = "Function"
+    show Both = "Variable or Function"
+
+newtype TypeEnv = TypeEnv (Map (Text,DeclType) (Scope, Scheme)) deriving (Show)
 
 instance Show Scheme where
     show (Scheme tv t) =

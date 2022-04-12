@@ -18,6 +18,7 @@ import qualified Data.Set as S
 
 import SPL.Compiler.Common.Testable
 import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.TreeTransformer
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
 import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
@@ -25,7 +26,7 @@ instance Testable TCTIdentifier where
     toTestForm (TCTIdentifier _ i) = TCTIdentifier def i
 
 instance Testable TCTFunCall where
-    toTestForm (TCTFunCall _ i e) = TCTFunCall def (toTestForm i) (toTestForm e)
+    toTestForm (TCTFunCall _ i t e) = TCTFunCall def (toTestForm i) (toTestForm t) (toTestForm e)
 
 instance Testable TCTType where
     toTestForm (TCTFunType _ d t1 t2) = TCTFunType def d (toTestForm t1) (toTestForm t2)
@@ -111,13 +112,13 @@ instance ToExpr TCTFieldSelector where
     expr f = FieldSelectExpr f
 
 fun1 :: ToExpr a => Text -> a -> TCTFunCall
-fun1 id e = TCTFunCall def (TCTIdentifier def id) [expr e]
+fun1 id e = TCTFunCall def (TCTIdentifier def id) (unknownType def) [expr e]
 
 fun2 :: (ToExpr a, ToExpr b) => Text -> a -> b -> TCTFunCall
-fun2 id e1 e2 = TCTFunCall def (TCTIdentifier def id) [expr e1, expr e2]
+fun2 id e1 e2 = TCTFunCall def (TCTIdentifier def id) (unknownType def) [expr e1, expr e2]
 
 fun3 :: (ToExpr a, ToExpr b, ToExpr c) => Text -> a -> b -> c -> TCTFunCall
-fun3 id e1 e2 e3 = TCTFunCall def (TCTIdentifier def id) [expr e1, expr e2, expr e3]
+fun3 id e1 e2 e3 = TCTFunCall def (TCTIdentifier def id) (unknownType def) [expr e1, expr e2, expr e3]
 
 op1 :: (ToExpr a) => OpUnary -> a -> TCTExpr
 op1 op e = OpExpr def op (expr e)
@@ -147,7 +148,7 @@ instance ToType Bool where
 instance ToType Char where
     toType _ = TCTCharType def
 
-instance KnownSymbol a => ToType (Var (a :: Symbol)) where
+instance KnownSymbol a => ToType (TVar (a :: Symbol)) where
     toType p = TCTVarType def (T.pack . symbolVal $ Proxy @a)
 
 instance ToType a => ToType [a] where
@@ -159,7 +160,7 @@ instance (ToType a, ToType b) => ToType (a,b) where
 instance (ToType a, ToType b) => ToType ((->) a b) where
     toType _ = TCTFunType def mempty (toType (Proxy @a)) (toType (Proxy @b))
 
-data Var a = Var
+data TVar a = TVar
 
 typ :: forall a. ToType a => TCTType
 typ = toType (Proxy :: Proxy a)

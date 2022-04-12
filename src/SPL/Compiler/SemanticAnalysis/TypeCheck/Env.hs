@@ -48,4 +48,4 @@ sndEnv = ("snd", Scheme (S.fromList ["a", "b"])
                             (TCTVarType defLoc "b"))) 
 
 initGamma :: TypeEnv 
-initGamma = TypeEnv . M.fromList . map (second (Global,)) $ [printEnv, hdEnv, tlEnv, fstEnv, sndEnv]
+initGamma = TypeEnv . M.fromList . map (bimap (,Fun) (Global,)) $ [printEnv, hdEnv, tlEnv, fstEnv, sndEnv]

@@ -10,7 +10,7 @@
 
 module SPL.Compiler.SemanticAnalysis.TestTypeCheck (htf_thisModulesTests) where
 
-import Test.Framework
+import Test.Framework hiding (Fun(..))
 import Control.Monad
 import Data.Default
 import Data.Tuple
@@ -64,8 +64,8 @@ infixl 2 =\:
     ((TCTVarDecl def t (TCTIdentifier def id) e, t), Nothing)
 
 infixl 1 |= 
-(|=) :: [(Text, Scheme)] -> TypeCheckTest a -> TypeCheckTestEnv a
-(|=) env ((a, t), r) = ((TypeEnv . M.fromList . map (second (Global,)) $ env, a, t), r)
+(|=) :: [(Text, DeclType, Scheme)] -> TypeCheckTest a -> TypeCheckTestEnv a
+(|=) env ((a, t), r) = ((TypeEnv . M.fromList . map (second (Global,)) $ map (\(a,b,c) -> ((a,b),c)) env, a, t), r)
 
 thd3 :: (a,b,c) -> c
 thd3 (_,_,x) = x
@@ -110,7 +110,7 @@ typeCheckExpr' e a t = (\(a, b, c) -> (a, b, c, t)) <$> typeCheckExpr e a t
 
 test_type_check_expr_1 = do
             -- 5 :: σ = σ |-> Int
-            let test = [] |= (iexpr 5, typ @(Var "sigma")) ~= (typ @Int, [])
+            let test = [] |= (iexpr 5, typ @(TVar "sigma")) ~= (typ @Int, [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_2 = do
@@ -120,130 +120,130 @@ test_type_check_expr_2 = do
 
 test_type_check_expr_3 = do
             -- 'c' :: σ = σ |-> Char
-            let test = [] |= (expr 'c', typ @(Var "sigma")) ~= (typ @Char, [])
+            let test = [] |= (expr 'c', typ @(TVar "sigma")) ~= (typ @Char, [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_4 = do
             -- [] :: σ = σ |-> [?a]i
-            let test = [] |= (emptyList, typ @(Var "sigma")) ~= (typ @[Var "a"], [])
+            let test = [] |= (emptyList, typ @(TVar "sigma")) ~= (typ @[TVar "a"], [])
             executeTCTests [test] typeCheckExpr'
             
 test_type_check_expr_5 = do
             -- ('c', []) :: σ = σ |-> (Char, [?'l2]), ...
-            let test = [] |= (expr ('c', emptyList) , typ @(Var "sigma")) ~= (typ @(Char, [Var "a"]), [])
+            let test = [] |= (expr ('c', emptyList) , typ @(TVar "sigma")) ~= (typ @(Char, [TVar "a"]), [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_6 = do
             -- -(5 + 8) :: Int
-            let test = [] |= (op1 UnMinus (op2 (iexpr 5) Plus (iexpr 2)), typ @(Var "sigma"))
+            let test = [] |= (op1 UnMinus (op2 (iexpr 5) Plus (iexpr 2)), typ @(TVar "sigma"))
                              ~= (typ @Int, [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_7 = do
             -- 'c' : [] :: [Char]
-            let test = [] |= (op2 'c' Cons emptyList, typ @(Var "sigma"))
+            let test = [] |= (op2 'c' Cons emptyList, typ @(TVar "sigma"))
                              ~= (typ @[Char], [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_8 = do
             -- x.hd :: v? 
-            let test = [("x", forall [] $ typ @[Var "v?"])] |=
-                        (expr (fd "x" [Hd def]), typ @(Var "sigma"))
-                        ~= (typ @(Var "v?"), [])
+            let test = [("x", Var, forall [] $ typ @[TVar "v?"])] |=
+                        (expr (fd "x" [Hd def]), typ @(TVar "sigma"))
+                        ~= (typ @(TVar "v?"), [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_9 = do
             -- x :: [Int] |- x.hd : x :: [Int] = 
-            let test = [("x", forall [] (typ @[Int]))] |=
+            let test = [("x", Var, forall [] (typ @[Int]))] |=
                         (op2 (fd "x" [Hd def]) Cons (fd "x" []), 
-                        typ @(Var "sigma"))
+                        typ @(TVar "sigma"))
                         ~= (typ @[Int], [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_10 = do
             -- x :: [Int] |- x.hd : x :: [Int] = 
-            let test = [("x", forall ["a"] (typ @[Int]))] |=
+            let test = [("x", Var, forall ["a"] (typ @[Int]))] |=
                          (op2 (fd "x" [Hd def]) Cons (fd "x" []),
-                         typ @(Var "sigma"))
+                         typ @(TVar "sigma"))
                         ~= (typ @[Int], [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_11 = do
             -- id :: a -> a |- (id 'c') : [] :: [Char] 
-            let test = [("id", forall ["a"] $ typ @(Var "a" -> Var "a"))] |=
+            let test = [("id", Fun, forall ["a"] $ typ @(TVar "a" -> TVar "a"))] |=
                          (op2 (fun1 "id" 'c') Cons emptyList, 
-                         typ @(Var "sigma"))
+                         typ @(TVar "sigma"))
                         ~= (typ @[Char], [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_12 = do
             -- const :: a -> b -> a |- const True :: b -> Bool
-            let test = [("const", forall ["a", "b"] $ typ @(Var "a" -> Var "b" -> Var "a"))] |=
-                        (expr $ fun1 "const" True, typ @(Var "sigma"))
-                        ~= (typ @(Var "b" -> Bool), [])
+            let test = [("const", Fun, forall ["a", "b"] $ typ @(TVar "a" -> TVar "b" -> TVar "a"))] |=
+                        (expr $ fun1 "const" True, typ @(TVar "sigma"))
+                        ~= (typ @(TVar "b" -> Bool), [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_13 = do
             -- repl :: Int -> Char -> [Char]  |- hd (repl 3 'c') :: Char
-            let test = [("repl", forall [] $ typ @(Int -> Char -> [Char]))] |=
+            let test = [("repl", Fun, forall [] $ typ @(Int -> Char -> [Char]))] |=
                         (expr $ fun1 "hd" (fun2 "repl" (iexpr 3) 'c'),
-                         typ @(Var "sigma"))
+                         typ @(TVar "sigma"))
                         ~= (typ @Char, [])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_14 = do
             -- 'c' >= 'd' :: Bool 
-            let test = [] |= (op2 'c' GreaterEq 'd', typ @(Var "sigma")) ~= (typ @(Bool), [TOrd $ typ @Char])
+            let test = [] |= (op2 'c' GreaterEq 'd', typ @(TVar "sigma")) ~= (typ @(Bool), [TOrd $ typ @Char])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_15 = do
             -- x :: a |- x >= x :: Bool
-            let test = [("x", forall [] $ typ @(Var "a"))] |= 
-                    (op2 (fd "x" []) GreaterEq (fd "x" []), typ @(Var "sigma")) ~= (typ @(Bool), [TOrd $ typ @(Var "a")])
+            let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
+                    (op2 (fd "x" []) GreaterEq (fd "x" []), typ @(TVar "sigma")) ~= (typ @(Bool), [TOrd $ typ @(TVar "a")])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_16 = do
             -- x :: a |- (-x) >= x :: Bool
-            let test = [("x", forall [] $ typ @(Var "a"))] |= 
-                    (op2 (op1 UnMinus (fd "x" [])) GreaterEq (fd "x" []), typ @(Var "sigma")) ~= (typ @Bool, [TOrd $ typ @Int])
+            let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
+                    (op2 (op1 UnMinus (fd "x" [])) GreaterEq (fd "x" []), typ @(TVar "sigma")) ~= (typ @Bool, [TOrd $ typ @Int])
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_17 = do
             -- const :: a -> b -> a |- hd (const True []) = fail
-            let test = [("const", forall ["a","b"] $ typ @(Var "a" -> Var "b" -> Var "a"))] |=
-                        expr (fun1 "hd" $ fun2 "const" True emptyList) ~\= typ @(Var "sigma")
+            let test = [("const", Fun, forall ["a","b"] $ typ @(TVar "a" -> TVar "b" -> TVar "a"))] |=
+                        expr (fun1 "hd" $ fun2 "const" True emptyList) ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_18 = do
             -- x :: a |- (-x) >= (x . tl) :: ?v = fail
-            let test = [("x", forall [] $ typ @(Var "a"))] |= 
+            let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
                         (op2 (op1 UnMinus (fd "x" [])) GreaterEq (fd "x" [Tl def])) ~\= typ @Bool
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_19 = do
             -- True >= t :: ?v = Fail
-            let test = [] |= op2 True GreaterEq (iexpr 5) ~\= typ @(Var "sigma")
+            let test = [] |= op2 True GreaterEq (iexpr 5) ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_20 = do
             -- True <= False :: ?v = Fail
-            let test = [] |= op2 True LessEq False ~\= typ @(Var "sigma")
+            let test = [] |= op2 True LessEq False ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 
 test_type_check_expr_21 = do
             -- !('c' : []) :: ?v = Fail
-            let test = [] |= op1 UnNeg (op2 'c' Cons emptyList) ~\= typ @(Var "sigma")
+            let test = [] |= op1 UnNeg (op2 'c' Cons emptyList) ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_22 = do
             -- !('c' : []) :: ?v = Fail
-            let test = [] |= op1 UnNeg (op2 'c' Cons emptyList) ~\= typ @(Var "sigma")
+            let test = [] |= op1 UnNeg (op2 'c' Cons emptyList) ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_23 = do
             -- 'c' : 'd' :: ?v = Fail
-            let test = [] |= op2 'c' Cons 'd' ~\= typ @(Var "sigma")
+            let test = [] |= op2 'c' Cons 'd' ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 test_type_check_expr_24 = do
@@ -253,7 +253,7 @@ test_type_check_expr_24 = do
 
 test_type_check_expr_25 = do
             -- 'c' + 'd' :: ?v = Fail
-            let test = [] |= op2 'c' Plus 'd' ~\= typ @(Var "sigma")
+            let test = [] |= op2 'c' Plus 'd' ~\= typ @(TVar "sigma")
             executeTCTests [test] typeCheckExpr'
 
 
@@ -276,17 +276,17 @@ test_type_check_var_decl_3 = do
 
 test_type_check_var_decl_4 = do
                 -- y :: Bool |= Bool x = y
-                let test = [("y", forall [] $ typ @Bool)] |= ("x", typ @Bool, []) =:: expr (fd "y" [])
+                let test = [("y", Var, forall [] $ typ @Bool)] |= ("x", typ @Bool, []) =:: expr (fd "y" [])
                 executeTCTests [test] typeCheckVarDecl'
 
 test_type_check_var_decl_5 = do
                 -- [a] x = []
-                let test = [] |= ("x", typ @[Var "a"], []) =:: emptyList
+                let test = [] |= ("x", typ @[TVar "a"], []) =:: emptyList
                 executeTCTests [test] typeCheckVarDecl'
 
 test_type_check_var_decl_6 = do
                 -- [a] x = (Bool, [])
-                let test = [] |= ("x", typ @(Bool, [Var "a"]), []) =:: expr (False, emptyList)
+                let test = [] |= ("x", typ @(Bool, [TVar "a"]), []) =:: expr (False, emptyList)
                 executeTCTests [test] typeCheckVarDecl'
 
 test_type_check_var_decl_7 = do
@@ -301,57 +301,57 @@ test_type_check_var_decl_8 = do
 
 test_type_check_var_decl_9 = do
                 -- x :: a |- Var y = x == x
-                let test = [("x", forall [] $ typ @(Var "a"))] |= 
-                            ("y", typ @Bool, [TEq $ typ @(Var "a")]) =:: op2 (fd "x" []) Equal (fd "x" [])
+                let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
+                            ("y", typ @Bool, [TEq $ typ @(TVar "a")]) =:: op2 (fd "x" []) Equal (fd "x" [])
                 executeTCTests [test] typeCheckVarDecl'
 
 test_type_check_var_decl_10 = do
                 -- id : forall a. a -> a |- (b -> b) x = id
-                let test = [("id", forall ["a"] $ typ @(Var "a" -> Var "a"))] |= 
-                            ("x", typ @(Var "a" -> Var "a"), []) =:: expr (fd "id" [])
+                let test = [("id", Fun, forall ["a"] $ typ @(TVar "a" -> TVar "a"))] |= 
+                            ("x", typ @(TVar "a" -> TVar "a"), []) =:: expr (fd "id" [])
                 executeTCTests [test] typeCheckVarDecl'
                 
 test_type_check_var_decl_11 = do
                 -- id : forall a. a -> a |- (a -> b) x = id :: fail
-                let test = [("id", forall ["a"] $ typ @(Var "a" -> Var "a"))] |= 
-                            ("x", typ @(Var "a" -> Var "b")) =\: expr (fd "id" [])
+                let test = [("id", Fun, forall ["a"] $ typ @(TVar "a" -> TVar "a"))] |= 
+                            ("x", typ @(TVar "a" -> TVar "b")) =\: expr (fd "id" [])
                 executeTCTests [test] typeCheckVarDecl'
 
 test_type_check_var_decl_12 = do
                 -- a x = 5 :: fail
-                let test = [] |= ("x", typ @(Var "a")) =\: iexpr 5 
+                let test = [] |= ("x", typ @(TVar "a")) =\: iexpr 5 
                 executeTCTests [test] typeCheckVarDecl'
 
 typeCheckStmt' e a t = (\(a, s, c) -> (a, s, c, t)) <$> typeCheckStmt e a t
 
 test_type_check_stmt_1 = do
                 -- if True { return False } else { return True } :: Bool
-                let test = [] |= (ite True [ret False] [ret True], typ @(Var "a")) ~= (typ @Bool, [])
+                let test = [] |= (ite True [ret False] [ret True], typ @(TVar "a")) ~= (typ @Bool, [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_2 = do
                 -- if True {} :: ?a
-                let test = [] |= (ite True [] [], typ @(Var "a")) ~= (typ @(Var "a"), [])
+                let test = [] |= (ite True [] [], typ @(TVar "a")) ~= (typ @(TVar "a"), [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_3 = do
-                -- if True { print(x == x); } :: ?a
-                let test = [("x", forall [] $ typ @(Var "a"))] |= 
-                        (ite True [stmt $ fun1 "print" (op2 (fd "x" []) Nequal (fd "x" []))] [], typ @(Var "a")) 
-                        ~= (typ @(Var "a"), [TPrint $ typ @Bool, TEq $ typ @(Var "a")])
+                -- x :: a |- if True { print(x == x); } :: ?a
+                let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
+                        (ite True [stmt $ fun1 "print" (op2 (fd "x" []) Nequal (fd "x" []))] [], typ @(TVar "a")) 
+                        ~= (typ @(TVar "a"), [TPrint $ typ @Bool, TEq $ typ @(TVar "a")])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_4 = do
-                -- id :: forall a. a -> a |- if True { print(x == x); } else { id(x >= 5) } :: ?a, [Print Bool, Eq Int, Ord Int]
-                let test = [("x", forall [] $ typ @(Var "a")), ("id", forall ["b"] $ typ @(Var "b" -> Var "b"))] |= 
+                -- x :: a, id :: forall a. a -> a |- if True { print(x == x); } else { id(x >= 5) } :: ?a, [Print Bool, Eq Int, Ord Int]
+                let test = [("x", Var, forall [] $ typ @(TVar "a")), ("id", Fun, forall ["b"] $ typ @(TVar "b" -> TVar "b"))] |= 
                             (ite True [stmt $ fun1 "print" (op2 (fd "x" []) Nequal (fd "x" []))] 
-                                  [stmt $ fun1 "id" (op2 (fd "x" []) GreaterEq (iexpr 5))], typ @(Var "b")) 
-                            ~= (typ @(Var "b"), [TPrint $ typ @Bool, TEq $ typ @Int, TOrd $ typ @Int])
+                                  [stmt $ fun1 "id" (op2 (fd "x" []) GreaterEq (iexpr 5))], typ @(TVar "b")) 
+                            ~= (typ @(TVar "b"), [TPrint $ typ @Bool, TEq $ typ @Int, TOrd $ typ @Int])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_5 = do
                 -- if True { return [False] } else { return [True] } :: [Bool]
-                let test = [] |= (ite True [ret [False]] [ret [True]], typ @[Var "a"]) ~= (typ @[Bool], [])
+                let test = [] |= (ite True [ret [False]] [ret [True]], typ @[TVar "a"]) ~= (typ @[Bool], [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_6 = do
@@ -361,61 +361,61 @@ test_type_check_stmt_6 = do
 
 test_type_check_stmt_7 = do
                 -- while (True) { return [] } :: [?a]
-                let test = [] |= (while True [ret emptyList], typ @(Var "a")) ~= (typ @[Var "b"], [])
+                let test = [] |= (while True [ret emptyList], typ @(TVar "a")) ~= (typ @[TVar "b"], [])
                 executeTCTests [test] typeCheckStmt'
                 
 test_type_check_stmt_8 = do
                 -- while (True) { print (5); return [] } :: [?a], Printable Int
-                let test = [] |= (while True [stmt $ fun1 "print" (iexpr 5), ret emptyList], typ @(Var "a")) 
-                            ~= (typ @[Var "b"], [TPrint $ typ @Int])
+                let test = [] |= (while True [stmt $ fun1 "print" (iexpr 5), ret emptyList], typ @(TVar "a")) 
+                            ~= (typ @[TVar "b"], [TPrint $ typ @Int])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_9 = do
                 -- x : a |- while (True) { x = 5; return x; } :: Int
-                let test = [("x", forall [] $ typ @(Var "a"))] |= 
-                        (while True [ fd "x" [] =: iexpr 5, ret (fd "x" [])], typ @(Var "b")) ~= (typ @Int, [])
+                let test = [("x", Var, forall [] $ typ @(TVar "a"))] |= 
+                        (while True [ fd "x" [] =: iexpr 5, ret (fd "x" [])], typ @(TVar "b")) ~= (typ @Int, [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_10 = do
                 -- id : forall a. a -> a |- while (True) { id(5); return id; } :: b -> b
-                let test = [("id", forall ["a"] $ typ @(Var "a" -> Var "a"))] |= 
-                        (while True [ stmt (fun1 "id" (iexpr 5)), ret (fd "id" []) ], typ @(Var "b")) 
-                                ~= (typ @(Var "c" -> Var "c"), [])
+                let test = [("id", Fun, forall ["a"] $ typ @(TVar "a" -> TVar "a"))] |= 
+                        (while True [ stmt (fun1 "id" (iexpr 5)), ret (fd "id" []) ], typ @(TVar "b")) 
+                                ~= (typ @(TVar "c" -> TVar "c"), [])
                 executeTCTests [test] typeCheckStmt'
                 
 test_type_check_stmt_11 = do
                 -- x : [a] |- while (True) { x = []; x.hd = 3; return x; } :: [Int]
-                let test = [("x", forall [] $ typ @[Var "a"])] |= 
+                let test = [("x", Var, forall [] $ typ @[TVar "a"])] |= 
                         (while True [ fd "x" [] =: emptyList, 
                                       fd "x" [Hd def] =: iexpr 3, 
-                                      ret (fd "x" []) ], typ @(Var "b")) ~= (typ @[Int], [])
+                                      ret (fd "x" []) ], typ @(TVar "b")) ~= (typ @[Int], [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_12 = do
                 -- x : [[(a,b)]] |- while (True) { x.tl.hd.fst = 3; return x; } :: [[(Int, b)]]
-                let test = [("x", forall [] $ typ @[[(Var "a", Var "b")]])] |= 
+                let test = [("x", Var, forall [] $ typ @[[(TVar "a", TVar "b")]])] |= 
                         (while True [ fd "x" [Tl def, Hd def, Hd def, Fst def] =: iexpr 3, 
-                                      ret (fd "x" []) ], typ @(Var "c")) ~= (typ @[[(Int, Var "b")]], [])
+                                      ret (fd "x" []) ], typ @(TVar "c")) ~= (typ @[[(Int, TVar "b")]], [])
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_13 = do
                 -- while (True) { return True; return; } fail
-                let test = [] |= while True [ ret True, retVoid ] ~\= typ @(Var "b")
+                let test = [] |= while True [ ret True, retVoid ] ~\= typ @(TVar "b")
                 executeTCTests [test] typeCheckStmt'
                 
 test_type_check_stmt_14 = do
                 -- while ('c') { return True; } :: fail
-                let test = [] |= while 'c' [ ret True ] ~\= typ @(Var "a")
+                let test = [] |= while 'c' [ ret True ] ~\= typ @(TVar "a")
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_15 = do
                 -- if (5) { return False } { return True } fail
-                let test = [] |= ite (iexpr 5) [ret False] [ret True] ~\= typ @(Var "a")
+                let test = [] |= ite (iexpr 5) [ret False] [ret True] ~\= typ @(TVar "a")
                 executeTCTests [test] typeCheckStmt'
 
 test_type_check_stmt_16 = do
                 -- if (True) { return False } { return 5 } fail
-                let test = [] |= ite (True) [ret False] [ret (iexpr 5)] ~\= typ @(Var "a")
+                let test = [] |= ite (True) [ret False] [ret (iexpr 5)] ~\= typ @(TVar "a")
                 executeTCTests [test] typeCheckStmt'
 
 
@@ -424,8 +424,8 @@ typeCheckFunDecl' e v _ = (\(x@(TCTFunDecl _ _ _ t _),y) -> (getTypeCon t, x, y,
 
 test_type_check_fun_decl_1 = do
                 -- id (x) :: b -> b { return x; } :: a -> a
-                let test = [] |= declare "id" ["x"] (typ @(Var "b" -> Var "b")) 
-                                    [ ] [ ret (fd "x" []) ] .:: (typ @(Var "a" -> Var "a"), [])
+                let test = [] |= declare "id" ["x"] (typ @(TVar "b" -> TVar "b")) 
+                                    [ ] [ ret (fd "x" []) ] .:: (typ @(TVar "a" -> TVar "a"), [])
                 executeTCTests [test] typeCheckFunDecl' 
 
 test_type_check_fun_decl_2 = do
@@ -450,54 +450,54 @@ test_type_check_fun_decl_4 = do
 
 test_type_check_fun_decl_5 = do
                 -- infId (x) :: a -> a { Var z = weirdId(x); return x; } :: a -> a
-                let test = [] |= declare "weirdId" ["x"] (typ @(Var "a" -> Var "a")) 
+                let test = [] |= declare "weirdId" ["x"] (typ @(TVar "a" -> TVar "a")) 
                                             [defineI "z" (expr $ fun1 "weirdId" (fd "x" []))]
                                             [ ret (fd "x" []) ] 
-                                            .:: (typ @(Var "a" -> Var "a"), [])
+                                            .:: (typ @(TVar "a" -> TVar "a"), [])
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_6 = do
                 -- idPrint (x) :: a -> a { print(x); return x; }; :: a -> a, Print a
-                let test = [] |= declare "idPrint" ["x"] (typ @(Var "a" -> Var "a")) 
+                let test = [] |= declare "idPrint" ["x"] (typ @(TVar "a" -> TVar "a")) 
                                             []
                                             [ stmt $ fun1 "print" (fd "x" []), ret (fd "x" []) ] 
-                                            .:: (typ @(Var "a" -> Var "a"), [TPrint $ typ @(Var "a")])
+                                            .:: (typ @(TVar "a" -> TVar "a"), [TPrint $ typ @(TVar "a")])
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_7 = do
                 -- constPrint (x, y) :: a -> b -> a { print(y); return x; } } :: a -> b -> a
-                let test = [] |= declare "constPrint" ["x", "y"] (typ @(Var "a" -> Var "b" -> Var "a")) 
+                let test = [] |= declare "constPrint" ["x", "y"] (typ @(TVar "a" -> TVar "b" -> TVar "a")) 
                                             []
                                             [ stmt (fun1 "print" (fd "y" [])),  ret (fd "x" []) ] 
-                                            .:: (typ @(Var "a" -> Var "b" -> Var "a"), [])
+                                            .:: (typ @(TVar "a" -> TVar "b" -> TVar "a"), [])
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_8 = do
                 -- constPrint (x, y) :: a -> b -> a { print(y); return x; } } :: a -> b -> a
-                let test = [] |= declare "constPrint" ["x", "y"] (typ @(Var "a" -> Var "b" -> Var "a")) 
+                let test = [] |= declare "constPrint" ["x", "y"] (typ @(TVar "a" -> TVar "b" -> TVar "a")) 
                                             []
                                             [ stmt (fun1 "print" (fd "y" [])),  ret (fd "x" []) ] 
-                                            .:: (typ @(Var "a" -> Var "b" -> Var "a"), [])
+                                            .:: (typ @(TVar "a" -> TVar "b" -> TVar "a"), [])
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_9 = do
                 -- constPrint (x, y) :: a -> a -> a { return x; } } :: a -> a -> a
-                let test = [] |= declare "constPrint" ["x", "y"] (typ @(Var "a" -> Var "a" -> Var "a")) 
+                let test = [] |= declare "constPrint" ["x", "y"] (typ @(TVar "a" -> TVar "a" -> TVar "a")) 
                                             []
                                             [ ret (fd "x" []) ] 
-                                            .:: (typ @(Var "a" -> Var "a" -> Var "a"), [])
+                                            .:: (typ @(TVar "a" -> TVar "a" -> TVar "a"), [])
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_10 = do
                 -- constPrint (x, y) :: a -> b -> b { return x; } } :: a -> b -> a
-                let test = [] |= failure (declare "constPrint" ["x", "y"] (typ @(Var "a" -> Var "b" -> Var "b")) 
+                let test = [] |= failure (declare "constPrint" ["x", "y"] (typ @(TVar "a" -> TVar "b" -> TVar "b")) 
                                                     []
                                                     [ ret (fd "x" []) ] )
                 executeTCTests [test] typeCheckFunDecl'
 
 test_type_check_fun_decl_11 = do
                 -- invalidId (x) :: a -> a { Var z = invalidId(5); return x; } :: a -> a
-                let test = [] |= failure (declare "invalidId" ["x"] (typ @(Var "a" -> Var "a")) 
+                let test = [] |= failure (declare "invalidId" ["x"] (typ @(TVar "a" -> TVar "a")) 
                                             [defineI "z" (expr $ fun1 "invalidId" (iexpr 5))]
                                             [ ret (fd "x" []) ])
                 executeTCTests [test] typeCheckFunDecl'

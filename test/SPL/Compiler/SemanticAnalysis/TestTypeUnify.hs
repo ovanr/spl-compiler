@@ -53,65 +53,65 @@ executeSubstTests tests =
 
 test_unify_1 = do
             -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
-            let test = (typ @(Var "a" -> ([Var "b"], Int)), typ @(Var "a" -> ([Int], Int))) ~* [("b", typ @Int)]
+            let test = (typ @(TVar "a" -> ([TVar "b"], Int)), typ @(TVar "a" -> ([Int], Int))) ~* [("b", typ @Int)]
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_2 = do
             -- U( a -> [c], b -> a ) = [ a |-> [c], b |-> [c] ]
-            let test = (typ @(Var "a" -> [Var "c"]), typ @(Var "b" -> Var "a"))
-                        ~* [("a", typ @[Var "c"]), ("b", typ @[Var "c"])]
+            let test = (typ @(TVar "a" -> [TVar "c"]), typ @(TVar "b" -> TVar "a"))
+                        ~* [("a", typ @[TVar "c"]), ("b", typ @[TVar "c"])]
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_3 = do
             -- U( (Int, a) -> b, c -> (Int -> Bool) ) = [ c |-> (Int, a), b |-> (Int -> Bool)]
-            let test = (typ @((Int, Var "a") -> Var "b"), typ @(Var "c" -> Int -> Bool))
-                        ~* [("c", typ @(Int, Var "a")), ("b", typ @(Int -> Bool))]
+            let test = (typ @((Int, TVar "a") -> TVar "b"), typ @(TVar "c" -> Int -> Bool))
+                        ~* [("c", typ @(Int, TVar "a")), ("b", typ @(Int -> Bool))]
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_4 = do
             -- U( a -> a, c -> d ) = [ a |-> d, c |-> d ]
-            let test = (typ @(Var "a" -> Var "a"), typ @(Var "c" -> Var "d"))
-                        ~* [("a", typ @(Var "d")), ("c", typ @(Var "d"))]
+            let test = (typ @(TVar "a" -> TVar "a"), typ @(TVar "c" -> TVar "d"))
+                        ~* [("a", typ @(TVar "d")), ("c", typ @(TVar "d"))]
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_5 = do
             -- U( (b, b) -> c, d -> (d -> d) ) = [d |-> (b,b), c |-> ((b,b) -> (b,b))]
-            let test = (typ @((Var "b", Var "b") -> Var "c"), typ @(Var "d" -> Var "d" -> Var "d"))
-                    ~* [("d", typ @(Var "b", Var "b")), ("c", typ @((Var "b", Var "b") -> (Var "b", Var "b")))]
+            let test = (typ @((TVar "b", TVar "b") -> TVar "c"), typ @(TVar "d" -> TVar "d" -> TVar "d"))
+                    ~* [("d", typ @(TVar "b", TVar "b")), ("c", typ @((TVar "b", TVar "b") -> (TVar "b", TVar "b")))]
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_6 = do
             -- U( a -> ([b], Int), a -> ([Int], Int) ) = [ b |-> Int ]
-            let test = (typ @(Var "a" -> ([Var "b"], Int)), typ @(Var "a" -> ([Int], Int))) ~* [("b", typ @Int)]
+            let test = (typ @(TVar "a" -> ([TVar "b"], Int)), typ @(TVar "a" -> ([Int], Int))) ~* [("b", typ @Int)]
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_7 = do
             -- U( a, (b, a) ) = fail
-            let test = failure (typ @(Var "a"), typ @(Var "b", Var "a"))
+            let test = failure (typ @(TVar "a"), typ @(TVar "b", TVar "a"))
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_8 = do
             -- U( a -> b -> b -> c, a -> d -> d) = fail
-            let test = failure (typ @(Var "a" -> Var "b" -> Var "b" -> Var "c"), typ @(Var "a" -> Var "d" -> Var "d")) 
+            let test = failure (typ @(TVar "a" -> TVar "b" -> TVar "b" -> TVar "c"), typ @(TVar "a" -> TVar "d" -> TVar "d")) 
 
             executeUnifyTests [test]
             executeSubstTests [test]
 
 test_unify_9 = do
             -- U( (a -> Int) -> a, (Bool -> Int) -> Int ) = fail
-            let test = failure (typ @((Var "a" -> Int) -> Var "a"), typ @((Bool -> Int) -> Int))
+            let test = failure (typ @((TVar "a" -> Int) -> TVar "a"), typ @((Bool -> Int) -> Int))
 
             executeUnifyTests [test]
             executeSubstTests [test]

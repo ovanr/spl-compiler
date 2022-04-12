@@ -76,7 +76,7 @@ optimizeExpr (FunCallExpr f) = FunCallExpr (optimizeFunCall f)
 optimizeExpr e = e
 
 optimizeFunCall :: TCTFunCall -> TCTFunCall
-optimizeFunCall (TCTFunCall l name args) = TCTFunCall l name (map optimizeExpr args)
+optimizeFunCall (TCTFunCall l name t args) = TCTFunCall l name t (map optimizeExpr args)
 
 evaluateI :: EntityLoc -> Integer -> OpBin -> Integer -> TCTExpr
 evaluateI l i1 op i2 =

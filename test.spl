@@ -1,0 +1,11 @@
+
+var z = [];
+foo (x) {
+    return (x,x);
+}
+
+bar (y) {
+    foo(y);
+    return 333;
+}
+

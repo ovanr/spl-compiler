@@ -94,7 +94,7 @@ instance PrettyPrint TCTStmt where
     toCode n (ReturnStmt _ (Just expr)) = mkIdent n <> "return " <> toCode n expr <> ";"
 
 instance PrettyPrint TCTFunCall where
-    toCode n (TCTFunCall _ id args) = toCode n id <> "(" <> T.intercalate "," (map (toCode n) args) <> ")"
+    toCode n (TCTFunCall _ id _ args) = toCode n id <> "(" <> T.intercalate "," (map (toCode n) args) <> ")"
 
 instance PrettyPrint OpUnary where
     toCode _ UnNeg = " ! "

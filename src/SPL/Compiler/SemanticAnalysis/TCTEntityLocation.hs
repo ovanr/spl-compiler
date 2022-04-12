@@ -8,8 +8,8 @@ instance Locatable TCTIdentifier where
     getLoc (TCTIdentifier l _) = l
 
 instance Locatable TCTFunCall where
-    setLoc l (TCTFunCall _ f r) = TCTFunCall l f r
-    getLoc (TCTFunCall l _ _) = l
+    setLoc l (TCTFunCall _ f t xs) = TCTFunCall l f t xs
+    getLoc (TCTFunCall l _ _ _) = l
 
 instance Locatable TCTField where
     setLoc l (Hd _) = Hd l
@@ -38,7 +38,7 @@ instance Locatable TCTExpr where
     setLoc l (IntExpr _ i) = IntExpr l i
     setLoc l (CharExpr _ c) = CharExpr l c
     setLoc l (BoolExpr _ b) = BoolExpr l b
-    setLoc l (FunCallExpr (TCTFunCall _ f x)) = FunCallExpr (TCTFunCall l f x)
+    setLoc l (FunCallExpr f) = FunCallExpr (setLoc l f)
     setLoc l (OpExpr _ o a) = OpExpr l o a 
     setLoc l (Op2Expr _ o a b) = Op2Expr l o a b
     setLoc l (EmptyListExpr _) = EmptyListExpr l
@@ -47,7 +47,7 @@ instance Locatable TCTExpr where
     getLoc (IntExpr l _) = l
     getLoc (CharExpr l _) = l
     getLoc (BoolExpr l _) = l
-    getLoc (FunCallExpr (TCTFunCall l _ _)) = l
+    getLoc (FunCallExpr f) = getLoc f
     getLoc (OpExpr l _ _) = l 
     getLoc (Op2Expr l _ _ _) = l  
     getLoc (EmptyListExpr l) = l

@@ -31,11 +31,7 @@ infixr 1 $*
 instance Semigroup Subst where
     -- `(s1 <> s2) t` means 
     -- first apply `s2` to `t` and then apply `s1` on result
-    -- Note that order of application matters, e.g.:
-    -- s2 = [a |-> Int] , 
-    -- s1 = [b |-> (a -> Int)]
-    -- s1(s2(b -> b)) = (Int -> Int) -> (Int -> Int)
-    -- s2(s1(b -> b)) = (a -> Int) -> (a -> Int)
+    -- Note that composition of substitutions is not commutative 
     s1@(Subst s1') <> (Subst s2') = Subst ( (($*) s1 <$> s2') `M.union` s1')
 
 instance Monoid Subst where
@@ -103,9 +99,44 @@ instance Types TCTFunBody where
     s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) stmts
     freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl
 
+instance Types TCTStmt where
+    s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
+    s $* (WhileStmt loc e stmt) = WhileStmt loc (s $* e) (s $* stmt)
+    s $* (AssignStmt loc fd stmt) = AssignStmt loc fd (s $* stmt)
+    s $* (ReturnStmt loc me) = ReturnStmt loc (($*) s <$> me)
+    s $* (FunCallStmt l f) = FunCallStmt l (s $* f)
+    freeVars (IfElseStmt _ e s1 s2) = freeVars e <> freeVars s1 <> freeVars s2
+    freeVars (WhileStmt _ e stmt) = freeVars e <> freeVars stmt
+    freeVars (AssignStmt loc fd stmt) = freeVars stmt
+    freeVars (ReturnStmt loc me) = maybe mempty freeVars me
+    freeVars (FunCallStmt l f) = freeVars f
+
+instance Types TCTExpr where
+    s $* (FunCallExpr f) = FunCallExpr (s $* f)
+    s $* (FieldSelectExpr fd) = FieldSelectExpr (s $* fd)
+    s $* (OpExpr l op e) = OpExpr l op (s $* e)
+    s $* (Op2Expr l e1 op e2) = Op2Expr l (s $* e1) op (s $* e2)
+    s $* (TupExpr l e1 e2) = TupExpr l (s $* e1) (s $* e2)
+    s $* e = e
+    freeVars (FunCallExpr f) = freeVars f
+    freeVars (FieldSelectExpr fd) = freeVars fd
+    freeVars (OpExpr l op e) = freeVars e
+    freeVars (Op2Expr l e1 op e2) = freeVars e1 <> freeVars e2
+    freeVars (TupExpr l e1 e2) = freeVars e1 <> freeVars e2
+    freeVars e = mempty
+
+instance Types TCTFunCall where
+    s $* (TCTFunCall l id t args) = TCTFunCall l id (s $* t) (s $* args)
+    freeVars (TCTFunCall _ _ t args) = freeVars t <> freeVars args
+
+instance Types TCTFieldSelector where
+    s $* fd@TCTFieldSelector{} = fd
+    freeVars _ = mempty
+
 generalise :: TypeEnv -> TCTType -> Scheme
 generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
 
+-- liftToScheme lifts a type to a scheme that has no quantified variables
 liftToScheme :: TCTType -> Scheme
 liftToScheme = Scheme mempty
 
