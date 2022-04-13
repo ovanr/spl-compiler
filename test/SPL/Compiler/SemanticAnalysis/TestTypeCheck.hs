@@ -420,7 +420,7 @@ test_type_check_stmt_16 = do
 
 
 
-typeCheckFunDecl' e v _ = (\(x@(TCTFunDecl _ _ _ t _),y) -> (getTypeCon t, x, y, t)) <$> typeCheckFunDecl e v
+typeCheckFunDecl' e v _ = (\([x@(TCTFunDecl _ _ _ t _)],y) -> (getTypeCon t, x, y, t)) <$> typeCheckFunDecls e [v]
 
 test_type_check_fun_decl_1 = do
                 -- id (x) :: b -> b { return x; } :: a -> a

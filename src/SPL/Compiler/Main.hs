@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Data.Foldable
 import Data.Either
 import Data.Bifunctor
+import Data.Functor
 import Data.Maybe
 
 import SPL.Compiler.Lexer.AlexLexGen (tokenize)
@@ -18,8 +19,13 @@ import SPL.Compiler.Parser.ASTParser
 import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
 
 import SPL.Compiler.SemanticAnalysis.TCT(TCT(..), Error, TypeCheckState(..))
-import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckTCT)
 import SPL.Compiler.SemanticAnalysis.TreeTransformer (ast2tct)
+import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (detectDuplicateFunctionNames)
+import SPL.Compiler.SemanticAnalysis.ConstantGlobalVar (globalVarConstantCheck)
+import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderTct)
+import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckTCT)
+import SPL.Compiler.SemanticAnalysis.ReturnPathCheck (returnPathCheck)
+import SPL.Compiler.SemanticAnalysis.StaticEvaluation (staticlyEvaluate) 
 import qualified SPL.Compiler.SemanticAnalysis.TCTPrettyPrint as TCTPP (PrettyPrint(..))
 
 data Options = Options {
@@ -28,6 +34,7 @@ data Options = Options {
     lexerDump :: Bool,
     parserDump :: Bool,
     typeCheckDump :: Bool,
+    staticEvaluationDump :: Bool,
     verbosity :: Int
 }
 
@@ -46,7 +53,7 @@ printTypeCheckError errors =
       in T.init $ T.unlines $ header: "": errors
 
 compilerMain :: Options -> Either Text Text
-compilerMain (Options path content lexDump parserDump typeCheckDump v) = do
+compilerMain (Options path content lexDump parserDump typeCheckDump staticEvalDump v) = do
     tokens <- tokenize path content
     let source = T.lines . decodeUtf8 . B.toStrict $ content
     let state = ParserState 0 tokens path source
@@ -62,12 +69,20 @@ compilerMain (Options path content lexDump parserDump typeCheckDump v) = do
             Right . ASTPP.toCode 0 $ ast
         else do
             let tcState = TypeCheckState 0 path source
-            initTCT <- Right . ast2tct $ ast
-            tct <- case runStateT (typeCheckTCT initTCT) tcState of
+            initTCT <- Right . reorderTct . ast2tct $ ast
+            let typeCheck = detectDuplicateFunctionNames initTCT >> 
+                            globalVarConstantCheck initTCT >> 
+                            typeCheckTCT initTCT 
+                            >>= (\r -> returnPathCheck r $> r)
+            tct <- case runStateT typeCheck tcState of
                 Left err -> Left . printTypeCheckError $ err
                 Right (tct, _) -> Right tct
 
             if typeCheckDump then
                 Right . TCTPP.toCode 0 $ tct
-            else
-                Left "Not implemented"
+            else do
+                let optimizedTCT = staticlyEvaluate tct
+                if staticEvalDump then
+                    Right . TCTPP.toCode 0 $ optimizedTCT
+                else
+                    Left "Not implemented"

@@ -16,7 +16,6 @@ module SPL.Compiler.SemanticAnalysis.TCT
      sourceCode,
      DeclType(..),
      Scope(..),
-     TCTLeaf(..),
      TCTFunDecl(..),
      TCTVarDecl(..),
      TCTIdentifier(..),
@@ -72,12 +71,7 @@ tcError = lift . Left
 
 makeLenses 'TypeCheckState
 
-newtype TCT = TCT [TCTLeaf] deriving (Eq)
-
-data TCTLeaf =
-        TCTVar TCTVarDecl
-    |   TCTFun TCTFunDecl
-    deriving (Eq)
+data TCT = TCT [TCTVarDecl] [[TCTFunDecl]] deriving (Eq)
 
 data TCTFunDecl =
     TCTFunDecl
