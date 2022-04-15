@@ -78,14 +78,8 @@ instance Types TypeEnv where
     freeVars (TypeEnv env) = freeVars . map snd $ M.elems env
 
 instance Types TCT where
-    s $* (TCT leaves) = TCT $ map (s $*) leaves
-    freeVars (TCT leaves) = freeVars leaves
-
-instance Types TCTLeaf where
-    s $* (TCTVar varDecl) = TCTVar $ s $* varDecl
-    s $* (TCTFun funDecl) = TCTFun $ s $* funDecl
-    freeVars (TCTVar varDecl) = freeVars varDecl
-    freeVars (TCTFun funDecl) = freeVars funDecl
+    s $* (TCT varDecls funDecls) = TCT (map (s $*) varDecls) (map (map (s $*)) funDecls)
+    freeVars (TCT varDecls funDecls) = freeVars varDecls <> foldMap (foldMap freeVars) funDecls
 
 instance Types TCTVarDecl where
     s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id expr

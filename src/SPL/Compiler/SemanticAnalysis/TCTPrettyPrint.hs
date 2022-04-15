@@ -16,7 +16,6 @@ import SPL.Compiler.SemanticAnalysis.TCT
      TCTIdentifier(..),
      TCTVarDecl(..),
      TCTFunDecl(..),
-     TCTLeaf(..),
      TCT(..))
 import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import Data.List (intercalate)
@@ -32,11 +31,12 @@ class PrettyPrint a where
     toCode :: Int -> a -> Text
 
 instance PrettyPrint TCT where
-    toCode _ (TCT leaves) = T.unlines $ init $ concatMap ((\i -> [i, mempty]) . toCode 0) leaves
+    toCode _ (TCT varDecls funDecls) =
+        T.unlines . 
+        init .
+        concatMap (\i -> [i, mempty]) $
+        map (toCode 0) varDecls <> concatMap (map (toCode 0)) funDecls
 
-instance PrettyPrint TCTLeaf where
-    toCode _ (TCTVar vd) = toCode 0 vd
-    toCode _ (TCTFun fd) = toCode 0 fd
 
 instance PrettyPrint TCTVarDecl where
     toCode n (TCTVarDecl _ t id expr) =
@@ -54,8 +54,8 @@ instance PrettyPrint TCTFunDecl where
 instance PrettyPrint (Set TCon) where
     toCode n = toCodeCon . S.toList
         where
-            toCodeCon = foldMap (\x -> "( " <> T.pack (show x) <> " ), ") 
-        
+            toCodeCon = foldMap (\x -> "( " <> T.pack (show x) <> " ), ")
+
 instance PrettyPrint TCTField where
     toCode _ (Hd _) = "hd"
     toCode _ (Tl _) = "tl"

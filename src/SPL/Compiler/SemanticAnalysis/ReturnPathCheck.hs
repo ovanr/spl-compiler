@@ -1,13 +1,20 @@
-module SPL.Compiler.SemanticAnalysis.ReturnPathCheck where
+module SPL.Compiler.SemanticAnalysis.ReturnPathCheck (
+    returnPathCheck
+    ) where
 
-import SPL.Compiler.SemanticAnalysis.TCT
 import qualified Data.Text as T
 import SPL.Compiler.Common.Error (definition)
+
+import SPL.Compiler.SemanticAnalysis.TCT
 import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
 
-returnPathCheck :: TCTFunDecl -> TCMonad ()
-returnPathCheck f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ stmts)) = do
+returnPathCheck :: TCT -> TCMonad ()
+returnPathCheck (TCT _ funDecls) =
+    mapM_ (mapM_ returnPathCheck') funDecls
+
+returnPathCheck' :: TCTFunDecl -> TCMonad ()
+returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ stmts)) = do
     if returnsVoid t || guaranteedReturn' stmts then
         return ()
     else do

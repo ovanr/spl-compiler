@@ -84,6 +84,10 @@ getTypeCon (TCTTupleType _ t1 t2) = getTypeCon t1 <> getTypeCon t2
 getTypeCon (TCTListType _ t) = getTypeCon t
 getTypeCon _ = mempty
 
+updateTCon :: Set TCon -> TCTType -> TCTType
+updateTCon tcon (TCTFunType l _ t1 t2) = TCTFunType l tcon t1 t2
+updateTCon _ t = t
+
 validateTCon :: Set TCon -> TCMonad ()
 validateTCon = validateTCon' . S.toList
     where

@@ -27,7 +27,11 @@ optionsParser = Options
     <*> switch (
             long "typeCheckerDump" <>
             short 't' <>
-            help "parse file and typecheck ast, then pretty print the result")
+            help "Parse and typecheck, then pretty print the result")
+    <*> switch (
+            long "staticEvaluationDump" <>
+            short 's' <>
+            help "Parse, typecheck and staticly evaluate expressions, then pretty print the result")
     <*> option auto (
             long "verbosity" <>
             help "The level of verbosity" <>

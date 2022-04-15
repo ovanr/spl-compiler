@@ -73,7 +73,7 @@ sourceFiles = [
 test_type_check_property_check = do
     forM_ sourceFiles $ \fp -> do
         contents <- B.readFile fp
-        let options = Options fp contents False False True 0
+        let options = Options fp contents False False True False 0
         print fp
         let pass1 = compilerMain options
         when (isLeft pass1) $ print $ "---> " <> fp

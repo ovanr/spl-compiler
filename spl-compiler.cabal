@@ -30,7 +30,10 @@ library
       SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis
+      SPL.Compiler.SemanticAnalysis.CallGraphAnalysis
+      SPL.Compiler.SemanticAnalysis.ConstantGlobalVar
       SPL.Compiler.SemanticAnalysis.ReturnPathCheck
+      SPL.Compiler.SemanticAnalysis.StaticEvaluation
       SPL.Compiler.SemanticAnalysis.TCT
       SPL.Compiler.SemanticAnalysis.TCTEntityLocation
       SPL.Compiler.SemanticAnalysis.TCTPrettyPrint

@@ -23,6 +23,7 @@ import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
 import SPL.Compiler.SemanticAnalysis.TCT
 import SPL.Compiler.SemanticAnalysis.TreeTransformer
+import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (duplicateDefError)
 import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
@@ -39,9 +40,9 @@ instantiate (Scheme tv t) = do
 
     where
         reverseSubst :: Subst -> Subst
-        reverseSubst (Subst s) = Subst . 
-                                 M.fromList . 
-                                 map (\(k, TCTVarType l a) -> (a, TCTVarType l k)) . 
+        reverseSubst (Subst s) = Subst .
+                                 M.fromList .
+                                 map (\(k, TCTVarType l a) -> (a, TCTVarType l k)) .
                                  M.toList $ s
         findLoc :: TypeVar -> TCTType -> Maybe EntityLoc
         findLoc v1 (TCTVarType l v2)
@@ -221,11 +222,11 @@ typeCheckVar :: TypeEnv ->
                 TCTType ->
                 TCMonad (Set TCon, TCTIdentifier, Subst)
 typeCheckVar (TypeEnv gamma) id@(TCTIdentifier l idName) declType tau = do
-    let value = 
-            if declType == Both then 
+    let value =
+            if declType == Both then
                 M.lookup (idName, Fun) gamma <|> M.lookup (idName, Var) gamma
             else
-                M.lookup (idName, declType) gamma 
+                M.lookup (idName, declType) gamma
 
     case value of
         Just (scope, sch) -> do
@@ -366,33 +367,57 @@ typeCheckStmtList gamma (st:sts) tau = do
     return (subst $* tcon1 <> tcon2, st':sts', subst)
 
 retTypeToVoid :: TCTType -> TCTType -> Subst
-retTypeToVoid (TCTVarType l v) t 
-    | countOccurances v t == 1 = Subst . M.singleton v $ TCTVoidType l 
+retTypeToVoid (TCTVarType l v) t
+    | countOccurances v t == 1 = Subst . M.singleton v $ TCTVoidType l
     | otherwise = mempty
 retTypeToVoid _ _ = error "internal typecheck error: not given var type"
 
 countOccurances :: TypeVar -> TCTType -> Int
 countOccurances var (TCTVarType _ nm)
-    | var == nm = 1 
+    | var == nm = 1
     | otherwise = 0
 countOccurances var (TCTListType _ t) = countOccurances var t
 countOccurances var (TCTTupleType _ t1 t2) = countOccurances var t1 + countOccurances var t2
 countOccurances var (TCTFunType _ _ t1 t2) = countOccurances var t1 + countOccurances var t2
 countOccurances _ _ = 0
 
-typeCheckFunDecl ::  TypeEnv ->
-                     TCTFunDecl ->
-                     TCMonad (TCTFunDecl, Subst)
-typeCheckFunDecl gamma@(TypeEnv gamma') (TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau funBody) = do
+makeAbstractFunType :: TCTFunDecl -> TCMonad TCTType
+makeAbstractFunType (TCTFunDecl loc id@(TCTIdentifier idLoc idName) args _ _) = do
     retType <- freshVar idLoc "fun"
     alphaArgs <- mapM (\(TCTIdentifier l i) -> freshVar l "arg") args
-    let expectedType = foldr (TCTFunType loc mempty) retType alphaArgs
+    return $ foldr (TCTFunType loc mempty) retType alphaArgs
 
-    let newGamma = M.insert (idName, Fun) (Local idName, liftToScheme expectedType) gamma'
-    let newGamma' = foldr insertToGamma newGamma (zip args alphaArgs)
-    (tcon, funBody', bSubst) <- typeCheckFunBody id (TypeEnv newGamma') funBody retType
+addFunTypeToEnv :: TypeEnv -> (TCTType, TCTFunDecl) -> TCMonad TypeEnv
+addFunTypeToEnv gamma@(TypeEnv gamma') (abstractType, TCTFunDecl _ id@(TCTIdentifier _ idName) _ _ _) = do
+    checkNotInGamma id Fun gamma
+    return . TypeEnv $
+        M.insert (idName, Fun)
+                 (Local idName, liftToScheme abstractType)
+                 gamma'
 
-    let expectedType' = bSubst $* foldr (TCTFunType loc tcon) retType alphaArgs
+addArgsToEnv :: [TCTType] -> TCTFunDecl -> TypeEnv -> TCMonad TypeEnv
+addArgsToEnv argTypes (TCTFunDecl _ _ args _ _) (TypeEnv gamma) = do
+    return . TypeEnv $ foldr insertToGamma gamma (zip args argTypes)
+    where
+        insertToGamma (TCTIdentifier l arg, t) g =
+            M.insert (arg, Var) (Arg, liftToScheme t) g
+
+breakFunType :: TCTType -> ([TCTType], TCTType)
+breakFunType (TCTFunType _ _ a r) = 
+    let (as, r') = breakFunType r
+     in (a : as , r')
+breakFunType x = ([], x)
+
+typeCheckFunDecl :: TypeEnv ->
+                    TCTFunDecl ->
+                    TCTType ->
+                    TCMonad (TCTFunDecl, Subst)
+typeCheckFunDecl gamma@(TypeEnv gamma') f@(TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau body) funType = do
+    let (argTypes, retType) = breakFunType funType
+    newGamma <- addArgsToEnv argTypes f gamma
+    (tcon, funBody', bSubst) <- typeCheckFunBody id newGamma body retType
+
+    let expectedType' = bSubst $* updateTCon tcon funType
     let voidSubst = retTypeToVoid retType expectedType'
     let expectedType'' = voidSubst $* expectedType'
 
@@ -401,13 +426,28 @@ typeCheckFunDecl gamma@(TypeEnv gamma') (TCTFunDecl loc id@(TCTIdentifier idLoc 
             validateTCon tcon
             return (TCTFunDecl loc id args expectedType'' funBody', voidSubst <> bSubst)
         _ -> do
-            tSubst <- tau <=* generalise gamma expectedType''
+            tSubst <- tau <=* generalise (TypeEnv $ M.delete (idName, Fun) gamma') expectedType''
             validateTCon (tSubst $* tcon)
             return (TCTFunDecl loc id args (tSubst $* expectedType'') funBody', voidSubst <> tSubst <> bSubst)
 
+typeCheckFunDecls :: TypeEnv ->
+                     [TCTFunDecl] ->
+                     TCMonad ([TCTFunDecl], Subst)
+typeCheckFunDecls _ [] = return ([], mempty)
+typeCheckFunDecls gamma@(TypeEnv gamma') funcs = do
+    funTypes <- mapM makeAbstractFunType funcs
+    newGamma <- foldM addFunTypeToEnv gamma (zip funTypes funcs)
+
+    (_, funcs', subst) <- foldM funcDeclFold (newGamma, [], mempty) (zip funcs funTypes)
+    return (funcs', subst)
+
     where
-        insertToGamma (TCTIdentifier l arg, t) g =
-            M.insert (arg, Var) (Arg, liftToScheme t) g
+        funcDeclFold :: (TypeEnv, [TCTFunDecl], Subst) ->
+                        (TCTFunDecl, TCTType) ->
+                        TCMonad (TypeEnv, [TCTFunDecl], Subst)
+        funcDeclFold (prevGamma,prevFuncs,prevSubst) (fun, funType) = do
+            (fun', subst) <- typeCheckFunDecl prevGamma fun funType
+            return (subst $* prevGamma, prevFuncs <> [fun'], subst <> prevSubst)
 
 typeCheckFunBody :: TCTIdentifier -> TypeEnv -> TCTFunBody -> TCTType -> TCMonad (Set TCon, TCTFunBody, Subst)
 typeCheckFunBody (TCTIdentifier _ funName) gamma@(TypeEnv gamma') (TCTFunBody loc varDecl stmts) tau = do
@@ -433,43 +473,60 @@ typeCheckFunBody (TCTIdentifier _ funName) gamma@(TypeEnv gamma') (TCTFunBody lo
         isLocal (Local _) = True
         isLocal _ = False
 
-duplicateDefError :: TCTIdentifier -> TCMonad a
-duplicateDefError id@(TCTIdentifier _ idName) = do
-    let header = [ 
-            "Redefinition of identifier '" <> idName <> "' not allowed."
-            ]
-    typeLocTrace <- definition ("'" <> idName <> "' has been declared here:") id
-    tcError $ header <> typeLocTrace
-
 checkNotInGamma :: TCTIdentifier -> DeclType -> TypeEnv -> TCMonad ()
-checkNotInGamma id@(TCTIdentifier _ idName) declType (TypeEnv env) = 
-    when (M.member (idName, declType) env) $ 
-        duplicateDefError id 
+checkNotInGamma id@(TCTIdentifier _ idName) declType (TypeEnv env) =
+    when (M.member (idName, declType) env) $
+        duplicateDefError id
 
 typeCheckTCT :: TCT -> TCMonad TCT
-typeCheckTCT (TCT leafs) = do
-    (tcon, leafs', _, subst) <- foldlM typeCheckLeaf (mempty, [], initGamma, mempty) leafs
+typeCheckTCT (TCT varDecls funDecls) = do
+    (tcon, varDecls', env, vSubst) <- foldlM typeCheckVarDecls (mempty, [], initGamma, mempty) varDecls
+
+    (tcon, funDecls', _, fSubst) <- foldlM typeCheckAndGenFunDecls (mempty, [], env, vSubst) funDecls
+
+    let subst = fSubst <> vSubst
+
     validateTCon (subst $* tcon)
     -- TODO: validate type constraints here `tcon`
     -- variable declarations containing non concrete TCon should
     -- be invalid
-    return $ subst $* TCT leafs'
+
+
+    return $ TCT (subst $* varDecls') (subst $* funDecls')
 
     where
-        typeCheckLeaf :: (Set TCon, [TCTLeaf], TypeEnv, Subst) ->
-                         TCTLeaf ->
-                         TCMonad (Set TCon, [TCTLeaf], TypeEnv, Subst)
-        typeCheckLeaf (prevCon, prevLeafs, prevGamma@(TypeEnv prevGamma'), prevSubst) (TCTVar v@(TCTVarDecl _ _ id _))  = do
+        typeCheckVarDecls :: (Set TCon, [TCTVarDecl], TypeEnv, Subst) ->
+                             TCTVarDecl ->
+                             TCMonad (Set TCon, [TCTVarDecl], TypeEnv, Subst)
+        typeCheckVarDecls (prevCon, prevLeafs, prevGamma@(TypeEnv prevGamma'), prevSubst) v@(TCTVarDecl _ _ id _)  = do
             checkNotInGamma id Var prevGamma
+
             (tcon, v'@(TCTVarDecl _ t (TCTIdentifier _ id) _), vSubst) <- typeCheckVarDecl prevGamma v
+
             let newGamma = vSubst $* TypeEnv (M.insert (id, Var) (Global, liftToScheme t) prevGamma')
             let subst = vSubst <> prevSubst
-            return (subst $* tcon <> prevCon, prevLeafs ++ [TCTVar v'], newGamma, subst)
+            return (subst $* tcon <> prevCon, prevLeafs ++ [v'], newGamma, subst)
 
-        typeCheckLeaf (tcon, prevLeafs, prevGamma@(TypeEnv prevGamma'), prevSubst) (TCTFun f@(TCTFunDecl _ id _ _ _))  = do
-            checkNotInGamma id Fun prevGamma
-            (f'@(TCTFunDecl _ (TCTIdentifier _ id) _ t _), fSubst) <- typeCheckFunDecl prevGamma f
+
+        typeCheckAndGenFunDecls :: (Set TCon, [[TCTFunDecl]], TypeEnv, Subst) ->
+                             [TCTFunDecl] ->
+                             TCMonad (Set TCon, [[TCTFunDecl]], TypeEnv, Subst)
+        typeCheckAndGenFunDecls context [] = return context
+
+        typeCheckAndGenFunDecls (tcon, prevFuncs, prevGamma@(TypeEnv prevGamma'), prevSubst) mutRecFuncs  = do
+            mapM_ (\(TCTFunDecl _ id _ _ _) -> checkNotInGamma id Fun prevGamma) mutRecFuncs
+
+            (mutRecFuncs', fSubst) <- typeCheckFunDecls prevGamma mutRecFuncs
             let interGamma@(TypeEnv interGamma') = fSubst $* prevGamma
-            let newGamma = TypeEnv $ M.insert (id, Fun) (Global, generalise interGamma t) interGamma'
+
+            let newGamma =
+                    TypeEnv $
+                        foldl (\env' (TCTFunDecl _ (TCTIdentifier _ id) _ t _) ->
+                            M.insert (id, Fun) (Global, generalise (TypeEnv env') t) env')
+                        interGamma' mutRecFuncs'
+
             let subst = fSubst <> prevSubst
-            return (subst $* tcon, prevLeafs ++ [TCTFun f'], newGamma, subst)
+            return (subst $* foldMap getTConFromFunc mutRecFuncs', prevFuncs ++ [mutRecFuncs'], newGamma, subst)
+
+        getTConFromFunc :: TCTFunDecl -> Set TCon
+        getTConFromFunc (TCTFunDecl _ _ _ t _) = getTypeCon t
