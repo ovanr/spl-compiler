@@ -1,0 +1,13 @@
+foo() :: -> Void {
+	var x = 3;
+}
+
+bar(b) :: Bool -> Void {
+	if (b) {
+		return foo();
+	}
+
+	else {
+		return;
+	}
+} 

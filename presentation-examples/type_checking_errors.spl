@@ -1,0 +1,13 @@
+int a = False;
+
+foo(x) {
+	var b = False;
+	b = 3;
+	var c = 3 + True;
+	if (x) {
+		return 'x';
+	}
+	else {
+		return False;
+	}
+}
