@@ -88,14 +88,9 @@ pBasicType =
             Just . ASTBoolType $ getLoc t
         toASTBasicType t@(MkToken _ (TypeToken Lex.CharType)) =
             Just . ASTCharType $ getLoc t
+        toASTBasicType t@(MkToken _ (TypeToken Lex.VoidType)) =
+            Just . ASTVoidType $ getLoc t
         toASTBasicType _ = Nothing
-
-pVoidType :: Parser Token e ASTType
-pVoidType =
-    satisfyAs $
-        \case
-            t@(MkToken _ (TypeToken Lex.VoidType)) -> Just $ ASTVoidType (getLoc t)
-            _ -> Nothing
 
 pType :: SPLParser ASTType
 pType =
@@ -136,7 +131,7 @@ pFunType =
         pFtype :: SPLParser [ASTType]
         pFtype = many' pType
         pRetType :: SPLParser ASTType
-        pRetType = pType <<|> pVoidType
+        pRetType = pType
 
 pVarDecl :: SPLParser ASTVarDecl
 pVarDecl =

@@ -1,7 +1,6 @@
 
 
-
-id (x) :: a -> a {
-    var z = x;
+id (x) :: a -> [[b]] {
+    [[a]] z = [];
     return z;
 }

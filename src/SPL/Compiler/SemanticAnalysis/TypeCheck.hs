@@ -76,9 +76,10 @@ freshVar loc prefix = do
             | not (S.member a tv) && a == t = return mempty
             | otherwise = typeMismatchError (re $* v2) (re $* v)
 
-        isInstanceOf re t (Scheme tv v@(TCTVarType l a))
+        isInstanceOf re t (Scheme tv v2@(TCTVarType l a))
             | S.member a tv = return . Subst $ M.singleton a (setLoc l t)
-            | otherwise = typeMismatchError (re $* v) (re $* t)
+            | S.null (freeVars t) = return . Subst $ M.singleton a (setLoc l t)
+            | otherwise = typeMismatchError (re $* v2) (re $* t)
 
         isInstanceOf re (TCTListType _ t1) (Scheme tv (TCTListType _ t2)) =
            isInstanceOf re t1 (Scheme tv t2)
@@ -425,7 +426,7 @@ typeCheckFunDecl gamma@(TypeEnv gamma') f@(TCTFunDecl loc id@(TCTIdentifier idLo
             validateTCon tcon
             return (TCTFunDecl loc id args expectedType'' funBody', voidSubst <> bSubst)
         _ -> do
-            tSubst <- tau <=* generalise (TypeEnv $ M.delete (idName, Fun) gamma') expectedType''
+            tSubst <- tau <=* generalise (voidSubst <> bSubst $* TypeEnv (M.delete (idName, Fun) gamma')) expectedType''
             validateTCon (tSubst $* tcon)
             return (TCTFunDecl loc id args (tSubst $* expectedType'') funBody', voidSubst <> tSubst <> bSubst)
 
