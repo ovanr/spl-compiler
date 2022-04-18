@@ -1,0 +1,7 @@
+
+
+
+id (x) :: a -> a {
+    var z = x;
+    return z;
+}

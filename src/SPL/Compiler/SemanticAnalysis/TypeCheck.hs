@@ -17,7 +17,6 @@ import Data.Maybe
 import Control.Monad.State
 import Control.Applicative
 import Control.Lens
-import Debug.Trace
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
@@ -349,7 +348,7 @@ typeCheckVarDecl gamma (TCTVarDecl loc tau (TCTIdentifier l i) e) = do
         TCTVarType _ "" -> -- Use of Var
             return (tcon, TCTVarDecl loc mgt (TCTIdentifier l i) e', eSubst)
         _ -> do
-            tauSubst <- tau <=* generalise gamma mgt
+            tauSubst <- tau <=* generalise (eSubst $* gamma) mgt
             let subst = tauSubst <> eSubst
             return (tauSubst $* tcon,
                     TCTVarDecl loc (subst $* alpha) (TCTIdentifier l i) e',
@@ -402,18 +401,18 @@ addArgsToEnv argTypes (TCTFunDecl _ _ args _ _) (TypeEnv gamma) = do
         insertToGamma (TCTIdentifier l arg, t) g =
             M.insert (arg, Var) (Arg, liftToScheme t) g
 
-breakFunType :: TCTType -> ([TCTType], TCTType)
-breakFunType (TCTFunType _ _ a r) = 
-    let (as, r') = breakFunType r
+decomposeFunType :: TCTType -> ([TCTType], TCTType)
+decomposeFunType (TCTFunType _ _ a r) = 
+    let (as, r') = decomposeFunType r
      in (a : as , r')
-breakFunType x = ([], x)
+decomposeFunType x = ([], x)
 
 typeCheckFunDecl :: TypeEnv ->
                     TCTFunDecl ->
                     TCTType ->
                     TCMonad (TCTFunDecl, Subst)
 typeCheckFunDecl gamma@(TypeEnv gamma') f@(TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau body) funType = do
-    let (argTypes, retType) = breakFunType funType
+    let (argTypes, retType) = decomposeFunType funType
     newGamma <- addArgsToEnv argTypes f gamma
     (tcon, funBody', bSubst) <- typeCheckFunBody id newGamma body retType
 

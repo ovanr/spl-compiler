@@ -1,0 +1,11 @@
+
+
+
+foo (x, y, z) :: a b a -> Bool {
+    print((x,y));
+
+    if ((x, y) == (z, y))
+        return True;
+    else
+        return False;
+}

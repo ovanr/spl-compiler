@@ -86,3 +86,4 @@ compilerMain (Options path content lexDump parserDump typeCheckDump staticEvalDu
                     Right . TCTPP.toCode 0 $ optimizedTCT
                 else
                     Left "Not implemented"
+
