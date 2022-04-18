@@ -501,3 +501,10 @@ test_type_check_fun_decl_11 = do
                                             [defineI "z" (expr $ fun1 "invalidId" (iexpr 5))]
                                             [ ret (fd "x" []) ])
                 executeTCTests [test] typeCheckFunDecl'
+
+test_type_check_fun_decl_12 = do
+                -- infinite(x) { return f( (x, x) ); }
+                let test = [] |= failure (declare "infinite" ["x"] (typ @(TVar "a" -> TVar "b")) 
+                                            []
+                                            [ ret (fun1 "infinite" [(fd "x" [], fd "x" [])]) ])
+                executeTCTests [test] typeCheckFunDecl'

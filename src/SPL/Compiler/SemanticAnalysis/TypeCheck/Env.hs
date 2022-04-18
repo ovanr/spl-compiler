@@ -23,6 +23,11 @@ printEnv = ("print",
              in Scheme (S.singleton "a") (TCTFunType defLoc (S.singleton $ TPrint var) 
                                                      var (TCTVoidType defLoc)))
 
+isEmptyEnv :: (Text, Scheme)
+isEmptyEnv = ("isEmpty", 
+             let listType = TCTListType defLoc (TCTVarType defLoc "a")
+             in Scheme (S.singleton "a") (TCTFunType defLoc mempty
+                                                     listType (TCTBoolType defLoc)))
 hdEnv :: (Text, Scheme)
 hdEnv = ("hd", Scheme (S.singleton "a") 
                 (TCTFunType defLoc mempty
@@ -48,4 +53,4 @@ sndEnv = ("snd", Scheme (S.fromList ["a", "b"])
                             (TCTVarType defLoc "b"))) 
 
 initGamma :: TypeEnv 
-initGamma = TypeEnv . M.fromList . map (bimap (,Fun) (Global,)) $ [printEnv, hdEnv, tlEnv, fstEnv, sndEnv]
+initGamma = TypeEnv . M.fromList . map (bimap (,Fun) (Global,)) $ [printEnv, isEmptyEnv, hdEnv, tlEnv, fstEnv, sndEnv]

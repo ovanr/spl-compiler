@@ -224,7 +224,7 @@ typeCheckVar :: TypeEnv ->
 typeCheckVar (TypeEnv gamma) id@(TCTIdentifier l idName) declType tau = do
     let value =
             if declType == Both then
-                M.lookup (idName, Fun) gamma <|> M.lookup (idName, Var) gamma
+                M.lookup (idName, Var) gamma <|> M.lookup (idName, Fun) gamma
             else
                 M.lookup (idName, declType) gamma
 
@@ -275,7 +275,7 @@ typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
 typeCheckFunCall :: TypeEnv -> TCTFunCall -> TCTType -> TCMonad (Set TCon, TCTFunCall, Subst)
 typeCheckFunCall gamma (TCTFunCall locF id@(TCTIdentifier locI _) _ args) tau = do
     (tcon1, args', funType, argsSubst) <- foldrM typeCheckArgs (mempty, [], tau, mempty) args
-    (tcon2, id', idSubst) <- typeCheckVar gamma id Fun funType
+    (tcon2, id', idSubst) <- typeCheckVar (argsSubst $* gamma) id Fun funType
     let subst = idSubst <> argsSubst
     return (subst $* tcon1 <> tcon2, TCTFunCall locF id' (subst $* funType) args', subst)
 

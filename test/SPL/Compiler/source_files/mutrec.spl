@@ -7,5 +7,6 @@ g (x) {
 }
 
 main () {
-	print(g(42));
+	Int x = (g(42));
+    return x;
 }
