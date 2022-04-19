@@ -29,9 +29,10 @@ optionsParser = Options
             short 't' <>
             help "Parse and typecheck, then pretty print the result")
     <*> switch (
-            long "staticEvaluationDump" <>
+            long "noStaticEvaluation" <>
             short 's' <>
-            help "Parse, typecheck and staticly evaluate expressions, then pretty print the result")
+            showDefault <>
+            help "Do not staticly evaluate expressions and eliminate dead code")
     <*> option auto (
             long "verbosity" <>
             help "The level of verbosity" <>

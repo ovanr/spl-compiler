@@ -9,3 +9,9 @@ foo(x) {
         return 4;
     }
 }
+
+
+bar(x) {
+    if (True)
+        return 4;
+}

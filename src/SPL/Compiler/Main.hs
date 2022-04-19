@@ -34,7 +34,7 @@ data Options = Options {
     lexerDump :: Bool,
     parserDump :: Bool,
     typeCheckDump :: Bool,
-    staticEvaluationDump :: Bool,
+    noStaticEvaluation :: Bool,
     verbosity :: Int
 }
 
@@ -53,7 +53,7 @@ printTypeCheckError errors =
       in T.init $ T.unlines $ header: "": errors
 
 compilerMain :: Options -> Either Text Text
-compilerMain (Options path content lexDump parserDump typeCheckDump staticEvalDump v) = do
+compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEvaluation v) = do
     tokens <- tokenize path content
     let source = T.lines . decodeUtf8 . B.toStrict $ content
     let state = ParserState 0 tokens path source
@@ -72,8 +72,9 @@ compilerMain (Options path content lexDump parserDump typeCheckDump staticEvalDu
             initTCT <- Right . reorderTct . ast2tct $ ast
             let typeCheck = detectDuplicateFunctionNames initTCT >> 
                             globalVarConstantCheck initTCT >> 
-                            typeCheckTCT initTCT 
-                            >>= (\r -> returnPathCheck r $> r)
+                            typeCheckTCT initTCT  >>=
+                            (if noStaticEvaluation then pure else pure . staticlyEvaluate) >>= 
+                            (\r -> returnPathCheck r $> r)
             tct <- case runStateT typeCheck tcState of
                 Left err -> Left . printTypeCheckError $ err
                 Right (tct, _) -> Right tct
@@ -81,9 +82,5 @@ compilerMain (Options path content lexDump parserDump typeCheckDump staticEvalDu
             if typeCheckDump then
                 Right . TCTPP.toCode 0 $ tct
             else do
-                let optimizedTCT = staticlyEvaluate tct
-                if staticEvalDump then
-                    Right . TCTPP.toCode 0 $ optimizedTCT
-                else
-                    Left "Not implemented"
+                Left "Not implemented"
 
