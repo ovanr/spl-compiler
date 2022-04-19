@@ -1,13 +1,17 @@
-foo() :: -> Void {
-	var x = 3;
+genVoid() :: -> Void {
+    // do nothing
+    var z = True;
+    if (True)
+        z = True;
 }
 
-bar(b) :: Bool -> Void {
-	if (b) {
-		return foo();
-	}
+id(x) {
+    return x;
+}
 
-	else {
-		return;
-	}
-} 
+main () :: -> Void {
+    Void z = genVoid();
+    if (z == z)
+        print(id(genVoid()));
+}
+

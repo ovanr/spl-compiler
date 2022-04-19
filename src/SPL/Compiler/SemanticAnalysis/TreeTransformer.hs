@@ -74,7 +74,7 @@ ast2tctExpr (AST.Op2Expr loc e1 op e2) = Op2Expr loc (ast2tctExpr e1) op (ast2tc
 ast2tctExpr (AST.EmptyListExpr loc) = EmptyListExpr loc
 ast2tctExpr (AST.TupExpr loc e1 e2) = TupExpr loc (ast2tctExpr e1) (ast2tctExpr e2)
 
-unknownType loc = TCTVarType loc mempty
+unknownType loc = TCTVarType loc mempty mempty
 
 ast2tctType :: AST.ASTType -> TCTType
 ast2tctType (AST.ASTUnknownType loc) = unknownType loc
@@ -84,10 +84,10 @@ ast2tctType (AST.ASTFunType loc ts) = typeFold loc $ map ast2tctType ts
         typeFold loc [] = error "internal failure: transformation from AST tree type to TCT tree type failed"
         typeFold loc [t] = t
         typeFold loc (t:ts) = TCTFunType loc mempty t (typeFold loc ts)
-ast2tctType (AST.ASTTupleType loc tl tr) = TCTTupleType loc (ast2tctType tl) (ast2tctType tr)
-ast2tctType (AST.ASTListType loc t) = TCTListType loc (ast2tctType t)
-ast2tctType (AST.ASTVarType loc t) = TCTVarType loc t
-ast2tctType (AST.ASTIntType loc) = TCTIntType loc
-ast2tctType (AST.ASTBoolType loc) = TCTBoolType loc
-ast2tctType (AST.ASTCharType loc) = TCTCharType loc
-ast2tctType (AST.ASTVoidType loc) = TCTVoidType loc
+ast2tctType (AST.ASTTupleType loc tl tr) = TCTTupleType loc mempty (ast2tctType tl) (ast2tctType tr)
+ast2tctType (AST.ASTListType loc t) = TCTListType loc  mempty(ast2tctType t)
+ast2tctType (AST.ASTVarType loc t) = TCTVarType loc mempty t
+ast2tctType (AST.ASTIntType loc) = TCTIntType loc mempty
+ast2tctType (AST.ASTBoolType loc) = TCTBoolType loc mempty
+ast2tctType (AST.ASTCharType loc) = TCTCharType loc mempty
+ast2tctType (AST.ASTVoidType loc) = TCTVoidType loc mempty

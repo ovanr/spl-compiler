@@ -29,14 +29,14 @@ instance Testable TCTFunCall where
     toTestForm (TCTFunCall _ i t e) = TCTFunCall def (toTestForm i) (toTestForm t) (toTestForm e)
 
 instance Testable TCTType where
-    toTestForm (TCTFunType _ d t1 t2) = TCTFunType def d (toTestForm t1) (toTestForm t2)
-    toTestForm (TCTTupleType _ t1 t2) = TCTTupleType def (toTestForm t1) (toTestForm t2)
-    toTestForm (TCTListType _ t) = TCTListType def (toTestForm t)
-    toTestForm (TCTVarType _ v) = TCTVarType def v
-    toTestForm (TCTIntType _) = TCTIntType def
-    toTestForm (TCTBoolType _) = TCTBoolType def
-    toTestForm (TCTCharType _) = TCTCharType def
-    toTestForm (TCTVoidType _) = TCTVoidType def
+    toTestForm (TCTFunType _ c t1 t2) = TCTFunType def c (toTestForm t1) (toTestForm t2)
+    toTestForm (TCTTupleType _ c t1 t2) = TCTTupleType def c (toTestForm t1) (toTestForm t2)
+    toTestForm (TCTListType _ c t) = TCTListType def c (toTestForm t)
+    toTestForm (TCTVarType _ c v) = TCTVarType def c v
+    toTestForm (TCTIntType _ c) = TCTIntType def c
+    toTestForm (TCTBoolType _ c) = TCTBoolType def c
+    toTestForm (TCTCharType _ c) = TCTCharType def c
+    toTestForm (TCTVoidType _ c) = TCTVoidType def c
 
 instance Testable TCTField where
     toTestForm (Hd _) = Hd def
@@ -140,22 +140,22 @@ class ToType a where
     toType :: Proxy a -> TCTType
 
 instance ToType Int where
-    toType _ = TCTIntType def
+    toType _ = TCTIntType def mempty
 
 instance ToType Bool where
-    toType _ = TCTBoolType def
+    toType _ = TCTBoolType def mempty
 
 instance ToType Char where
-    toType _ = TCTCharType def
+    toType _ = TCTCharType def mempty
 
 instance KnownSymbol a => ToType (TVar (a :: Symbol)) where
-    toType p = TCTVarType def (T.pack . symbolVal $ Proxy @a)
+    toType p = TCTVarType def mempty (T.pack . symbolVal $ Proxy @a)
 
 instance ToType a => ToType [a] where
-    toType _ = TCTListType def (toType (Proxy @a))
+    toType _ = TCTListType def mempty (toType (Proxy @a))
 
 instance (ToType a, ToType b) => ToType (a,b) where
-    toType _ = TCTTupleType def (toType (Proxy @a)) (toType (Proxy @b))
+    toType _ = TCTTupleType def mempty (toType (Proxy @a)) (toType (Proxy @b))
 
 instance (ToType a, ToType b) => ToType ((->) a b) where
     toType _ = TCTFunType def mempty (toType (Proxy @a)) (toType (Proxy @b))
@@ -193,7 +193,7 @@ retVoid :: TCTStmt
 retVoid = ReturnStmt def Nothing
 
 defineI :: Text -> TCTExpr -> TCTVarDecl
-defineI id  = TCTVarDecl def (TCTVarType def "") (TCTIdentifier def id)
+defineI id  = TCTVarDecl def (TCTVarType def mempty "") (TCTIdentifier def id)
 
 define :: Text -> TCTType -> TCTExpr -> TCTVarDecl
 define id t = TCTVarDecl def t (TCTIdentifier def id)

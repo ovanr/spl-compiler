@@ -22,7 +22,7 @@ returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ st
         tcError returnTrace
     where
         returnsVoid :: TCTType -> Bool
-        returnsVoid (TCTVoidType _) = True
+        returnsVoid (TCTVoidType _ _) = True
         returnsVoid (TCTFunType _ _ _ t) = returnsVoid t
         returnsVoid _ = False
 

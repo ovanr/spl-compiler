@@ -1,0 +1,21 @@
+
+odd(x) {
+    myPrint(x);
+    if (x == 0)
+        return False;
+    else
+        return even(x-1);
+}
+
+even(x) {
+    myPrint(x);
+    if (x == 0)
+        return True;
+    else
+        return odd(x-1);
+}
+
+myPrint(x) :: a -> Void {
+    print('v':'a':'l':'u':'e':[]);
+    print(x);
+}

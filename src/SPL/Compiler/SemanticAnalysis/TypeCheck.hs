@@ -41,14 +41,14 @@ instantiate (Scheme tv t) = do
         reverseSubst :: Subst -> Subst
         reverseSubst (Subst s) = Subst .
                                  M.fromList .
-                                 map (\(k, TCTVarType l a) -> (a, TCTVarType l k)) .
+                                 map (\(k, TCTVarType l c a) -> (a, TCTVarType l c k)) .
                                  M.toList $ s
         findLoc :: TypeVar -> TCTType -> Maybe EntityLoc
-        findLoc v1 (TCTVarType l v2)
+        findLoc v1 (TCTVarType l _ v2)
             | v1 == v2 = Just l
             | otherwise = Nothing
-        findLoc v1 (TCTListType _ t) = findLoc v1 t
-        findLoc v1 (TCTTupleType _ t1 t2) =
+        findLoc v1 (TCTListType _ _ t) = findLoc v1 t
+        findLoc v1 (TCTTupleType _ _ t1 t2) =
             listToMaybe $ catMaybes [findLoc v1 t1, findLoc v1 t2]
         findLoc v1 (TCTFunType _ _ t1 t2) =
             listToMaybe $ catMaybes [findLoc v1 t1, findLoc v1 t2]
@@ -58,7 +58,7 @@ freshVar :: EntityLoc -> Text -> TCMonad TCTType
 freshVar loc prefix = do
     suffix <- T.pack . show <$> use tvCounter
     tvCounter += 1
-    return $ TCTVarType loc (prefix <> suffix)
+    return $ TCTVarType loc mempty (prefix <> suffix)
 
 
 (<=*) :: TCTType -> Scheme -> TCMonad Subst
@@ -71,20 +71,20 @@ freshVar loc prefix = do
         isInstanceOf _ TCTIntType{}  (Scheme _ TCTIntType{}) = return mempty
         isInstanceOf _ TCTCharType{} (Scheme _ TCTCharType{}) = return mempty
         isInstanceOf _ TCTBoolType{} (Scheme _ TCTBoolType{}) = return mempty
-        isInstanceOf re v@(TCTVarType _ t) (Scheme tv v2@(TCTVarType l a))
+        isInstanceOf re v@(TCTVarType _ _ t) (Scheme tv v2@(TCTVarType l _ a))
             | S.member a tv = return . Subst $ M.singleton a (setLoc l v)
             | not (S.member a tv) && a == t = return mempty
             | otherwise = typeMismatchError (re $* v2) (re $* v)
 
-        isInstanceOf re t (Scheme tv v2@(TCTVarType l a))
+        isInstanceOf re t (Scheme tv v2@(TCTVarType l _ a))
             | S.member a tv = return . Subst $ M.singleton a (setLoc l t)
             | S.null (freeVars t) = return . Subst $ M.singleton a (setLoc l t)
             | otherwise = typeMismatchError (re $* v2) (re $* t)
 
-        isInstanceOf re (TCTListType _ t1) (Scheme tv (TCTListType _ t2)) =
+        isInstanceOf re (TCTListType _ _ t1) (Scheme tv (TCTListType _ _ t2)) =
            isInstanceOf re t1 (Scheme tv t2)
 
-        isInstanceOf re (TCTTupleType _ a1 b1) (Scheme tv (TCTTupleType _ a2 b2)) = do
+        isInstanceOf re (TCTTupleType _ _ a1 b1) (Scheme tv (TCTTupleType _ _ a2 b2)) = do
             subst1 <- isInstanceOf re a1 (Scheme tv a2)
             subst2 <- isInstanceOf re b1 (Scheme tv $ subst1 $* b2)
             return $ subst2 <> subst1
@@ -101,19 +101,19 @@ typeCheckExpr :: TypeEnv ->
                  TCTType ->
                  TCMonad (Set TCon, TCTExpr, Subst)
 typeCheckExpr _ e@(IntExpr loc _) tau = do
-    let expectedType = TCTIntType loc
+    let expectedType = TCTIntType loc mempty
     subst <- unify expectedType tau
     return (mempty, e, subst)
 typeCheckExpr _ e@(CharExpr loc _) tau = do
-    let expectedType = TCTCharType loc
+    let expectedType = TCTCharType loc mempty
     subst <- unify expectedType tau
     return (mempty, e, subst)
 typeCheckExpr _ e@(BoolExpr loc _) tau = do
-    let expectedType = TCTBoolType loc
+    let expectedType = TCTBoolType loc mempty
     subst <- unify expectedType tau
     return (mempty, e, subst)
 typeCheckExpr _ e@(EmptyListExpr loc) tau = do
-    expectedType <- TCTListType loc <$> freshVar loc "l"
+    expectedType <- TCTListType loc mempty <$> freshVar loc "l"
     subst <- unify expectedType tau
     return (mempty, e, subst)
 typeCheckExpr gamma e@(FunCallExpr f) tau = do
@@ -128,18 +128,18 @@ typeCheckExpr gamma e@(TupExpr loc e1 e2) tau = do
     alpha2 <- freshVar (getLoc e2) "tup2"
     (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 alpha2
     let eSubst = e2Subst <> e1Subst
-    let expectedType = eSubst $* TCTTupleType loc alpha1 alpha2
+    let expectedType = eSubst $* TCTTupleType loc mempty alpha1 alpha2
     tauSubst <- unify expectedType (eSubst $* tau)
     let subst = tauSubst <> eSubst
     return (subst $* tcon1 <> tcon2, TupExpr loc e1' e2', subst)
 typeCheckExpr gamma e@(OpExpr loc UnNeg e1) tau = do
-    (tcon, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType loc)
-    let expectedType = TCTBoolType loc
+    (tcon, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType loc mempty)
+    let expectedType = TCTBoolType loc mempty
     tauSubst <- unify expectedType (e1Subst $* tau)
     return (tauSubst $* tcon, OpExpr loc UnNeg e1', tauSubst <> e1Subst)
 typeCheckExpr gamma e@(OpExpr loc UnMinus e1) tau = do
-    (tcon, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType loc)
-    let expectedType = TCTIntType loc
+    (tcon, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType loc mempty)
+    let expectedType = TCTIntType loc mempty
     tauSubst <- unify expectedType (e1Subst $* tau)
     return (tauSubst $* tcon, OpExpr loc UnMinus e1', tauSubst <> e1Subst)
 typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
@@ -157,19 +157,19 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
 
     where
         handleIntOp = do
-            (tcon1, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType $ getLoc e1)
-            (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTIntType $ getLoc e2)
+            (tcon1, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTIntType (getLoc e1) mempty)
+            (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTIntType (getLoc e2) mempty)
             let eSubst = e2Subst <> e1Subst
-            let expectedType = TCTIntType loc
+            let expectedType = TCTIntType loc mempty
             tauSubst <- unify expectedType (eSubst $* tau)
             let subst = tauSubst <> eSubst
             return (subst $* tcon1 <> tcon2, Op2Expr loc e1' op e2', subst)
 
         handleBoolOp = do
-            (tcon1, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType $ getLoc e1)
-            (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTBoolType $ getLoc e2)
+            (tcon1, e1', e1Subst) <- typeCheckExpr gamma e1 (TCTBoolType (getLoc e1) mempty)
+            (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2 (TCTBoolType (getLoc e2) mempty)
             let eSubst = e2Subst <> e1Subst
-            let expectedType = TCTBoolType loc
+            let expectedType = TCTBoolType loc mempty
             tauSubst <- unify expectedType (eSubst $* tau)
             return (tcon1 <> tcon2, Op2Expr loc e1' op e2', tauSubst <> eSubst)
 
@@ -177,9 +177,9 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
             alpha <- freshVar (getLoc e1) "cons"
             (tcon1, e1', e1Subst) <- typeCheckExpr gamma e1 alpha
             (tcon2, e2', e2Subst) <- typeCheckExpr (e1Subst $* gamma) e2
-                                            (TCTListType (getLoc e2) (e1Subst $* alpha))
+                                            (TCTListType (getLoc e2) mempty (e1Subst $* alpha))
             let eSubst = e2Subst <> e1Subst
-            let expectedType = eSubst $* TCTListType (getLoc e) alpha
+            let expectedType = eSubst $* TCTListType (getLoc e) mempty alpha
             tauSubst <- unify expectedType (eSubst $* tau)
             let subst = tauSubst <> eSubst
             return (subst $* tcon1 <> tcon2, Op2Expr loc e1' op e2', subst)
@@ -200,7 +200,7 @@ typeCheckExpr gamma e@(Op2Expr loc e1 op e2) tau =
                         LessEq -> TOrd argType
                         GreaterEq -> TOrd argType
                         _ -> error "internal error: operator pattern should not occur"
-            let expectedType = TCTBoolType loc
+            let expectedType = TCTBoolType loc mempty
             tauSubst <- unify expectedType (eSubst $* tau)
             let subst = tauSubst <> eSubst
 
@@ -299,7 +299,7 @@ typeCheckStmt :: TypeEnv ->
                  TCTType ->
                  TCMonad (Set TCon, TCTStmt, Subst)
 typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) tau = do
-    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
+    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
     (tcon2, _, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts (condSubst $* tau)
     let combSubst = thenSubst <> condSubst
     (tcon3, _, elseSubst) <- typeCheckStmtList (combSubst $* gamma) elseStmts (combSubst $* tau)
@@ -307,7 +307,7 @@ typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) tau = do
     return (subst $* tcon1 <> tcon2 <> tcon3, stmt, subst)
 
 typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) tau = do
-    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType $ getLoc cond)
+    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
     (tcon2, _, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts (condSubst $* tau)
     let subst = bodySubst <> condSubst
     return (subst $* tcon1 <> tcon2, stmt, subst)
@@ -323,7 +323,7 @@ typeCheckStmt gamma stmt@(AssignStmt loc field expr) tau = do
     return (subst $* tcon1 <> tcon2, stmt, subst)
 
 typeCheckStmt gamma stmt@(ReturnStmt loc Nothing) tau = do
-    subst <- unify (TCTVoidType loc) tau
+    subst <- unify (TCTVoidType loc mempty) tau
     return (mempty, stmt, mempty)
 
 typeCheckStmt gamma stmt@(ReturnStmt loc (Just expr)) tau = do
@@ -346,7 +346,7 @@ typeCheckVarDecl gamma (TCTVarDecl loc tau (TCTIdentifier l i) e) = do
     (tcon, e', eSubst) <- typeCheckExpr gamma e alpha
     let mgt = eSubst $* alpha
     case tau of
-        TCTVarType _ "" -> -- Use of Var
+        TCTVarType _ _ "" -> -- Use of Var
             return (tcon, TCTVarDecl loc mgt (TCTIdentifier l i) e', eSubst)
         _ -> do
             tauSubst <- tau <=* generalise (eSubst $* gamma) mgt
@@ -367,17 +367,17 @@ typeCheckStmtList gamma (st:sts) tau = do
     return (subst $* tcon1 <> tcon2, st':sts', subst)
 
 retTypeToVoid :: TCTType -> TCTType -> Subst
-retTypeToVoid (TCTVarType l v) t
-    | countOccurances v t == 1 = Subst . M.singleton v $ TCTVoidType l
+retTypeToVoid (TCTVarType l c v) t
+    | countOccurances v t == 1 = Subst . M.singleton v $ TCTVoidType l c
     | otherwise = mempty
 retTypeToVoid _ _ = error "internal typecheck error: not given var type"
 
 countOccurances :: TypeVar -> TCTType -> Int
-countOccurances var (TCTVarType _ nm)
+countOccurances var (TCTVarType _ _ nm)
     | var == nm = 1
     | otherwise = 0
-countOccurances var (TCTListType _ t) = countOccurances var t
-countOccurances var (TCTTupleType _ t1 t2) = countOccurances var t1 + countOccurances var t2
+countOccurances var (TCTListType _ _ t) = countOccurances var t
+countOccurances var (TCTTupleType _ _ t1 t2) = countOccurances var t1 + countOccurances var t2
 countOccurances var (TCTFunType _ _ t1 t2) = countOccurances var t1 + countOccurances var t2
 countOccurances _ _ = 0
 
@@ -422,7 +422,7 @@ typeCheckFunDecl gamma@(TypeEnv gamma') f@(TCTFunDecl loc id@(TCTIdentifier idLo
     let expectedType'' = voidSubst $* expectedType'
 
     case tau of
-        TCTVarType _ "" -> do
+        TCTVarType _ _ "" -> do
             validateTCon tcon
             return (TCTFunDecl loc id args expectedType'' funBody', voidSubst <> bSubst)
         _ -> do

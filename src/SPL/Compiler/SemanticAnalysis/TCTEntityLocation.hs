@@ -67,21 +67,21 @@ instance Locatable TCTStmt where
     
 instance Locatable TCTType where
     setLoc l (TCTFunType _ c a b) = TCTFunType l c a b
-    setLoc l (TCTTupleType _ a b) = TCTTupleType l a b
-    setLoc l (TCTListType _ x) = TCTListType l x
-    setLoc l (TCTVarType _ x) = TCTVarType l x
-    setLoc l (TCTIntType _) = TCTIntType l
-    setLoc l (TCTBoolType _) = TCTBoolType l
-    setLoc l (TCTCharType _) = TCTCharType l
-    setLoc l (TCTVoidType _) = TCTVoidType l
+    setLoc l (TCTTupleType _ c a b) = TCTTupleType l c a b
+    setLoc l (TCTListType _ c x) = TCTListType l c x
+    setLoc l (TCTVarType _ c x) = TCTVarType l c x
+    setLoc l (TCTIntType _ c) = TCTIntType l c
+    setLoc l (TCTBoolType _ c) = TCTBoolType l c
+    setLoc l (TCTCharType _ c) = TCTCharType l c
+    setLoc l (TCTVoidType _ c) = TCTVoidType l c
     getLoc (TCTFunType l _ _ _) = l
-    getLoc (TCTTupleType l _ _) = l
-    getLoc (TCTListType l _) = l
-    getLoc (TCTVarType l _) = l
-    getLoc (TCTIntType l) = l
-    getLoc (TCTBoolType l) = l
-    getLoc (TCTCharType l) = l
-    getLoc (TCTVoidType l) = l
+    getLoc (TCTTupleType l _ _ _) = l
+    getLoc (TCTListType l _ _) = l
+    getLoc (TCTVarType l _ _) = l
+    getLoc (TCTIntType l _) = l
+    getLoc (TCTBoolType l _) = l
+    getLoc (TCTCharType l _) = l
+    getLoc (TCTVoidType l _) = l
 
 instance Locatable TCon where
     setLoc l (TEq t) = TEq $ setLoc l t

@@ -39,17 +39,17 @@ instance Monoid Subst where
     mappend = (<>)
 
 instance Types TCTType where
-    s $* (TCTIntType e) = TCTIntType e
-    s $* (TCTCharType e) = TCTCharType e
-    s $* (TCTBoolType e) = TCTBoolType e
-    s $* (TCTVoidType e) = TCTVoidType e
-    (Subst s) $* v@(TCTVarType l a) = setLoc l (M.findWithDefault v a s)
-    s $* (TCTListType e a) = TCTListType e (s $* a)
-    s $* (TCTTupleType e a b) = TCTTupleType e (s $* a) (s $* b)
+    s $* (TCTIntType e c) = TCTIntType e (s $* c)
+    s $* (TCTCharType e c) = TCTCharType e (s $* c)
+    s $* (TCTBoolType e c) = TCTBoolType e (s $* c)
+    s $* (TCTVoidType e c) = TCTVoidType e (s $* c)
+    s@(Subst s') $* v@(TCTVarType l c a) = updateTCon (s $* c) $ setLoc l (M.findWithDefault v a s')
+    s $* (TCTListType e c a) = TCTListType e (s $* c) (s $* a)
+    s $* (TCTTupleType e c a b) = TCTTupleType e (s $* c) (s $* a) (s $* b)
     s $* (TCTFunType d e a b) = TCTFunType d (s $* e) (s $* a) (s $* b)
-    freeVars v@(TCTVarType l a) = S.singleton a
-    freeVars (TCTListType _ a) = freeVars a
-    freeVars (TCTTupleType _ a b) = freeVars a <> freeVars b
+    freeVars v@(TCTVarType l _ a) = S.singleton a
+    freeVars (TCTListType _ _ a) = freeVars a
+    freeVars (TCTTupleType _ _ a b) = freeVars a <> freeVars b
     freeVars (TCTFunType _ _ a b) = freeVars a <> freeVars b
     freeVars _ = mempty
 
@@ -167,30 +167,30 @@ unify :: TCTType -> TCTType -> TCMonad Subst
 unify t1 t2 = unify' t1 t2
     where
         unify' :: TCTType -> TCTType -> TCMonad Subst
-        unify' (TCTIntType _) (TCTIntType _) = return mempty
-        unify' (TCTCharType _) (TCTCharType _) = return mempty
-        unify' (TCTBoolType _) (TCTBoolType _) = return mempty
-        unify' (TCTVoidType _) (TCTVoidType _) = return mempty
+        unify' TCTIntType{} TCTIntType{} = return mempty
+        unify' TCTCharType{} TCTCharType{} = return mempty
+        unify' TCTBoolType{} TCTBoolType{} = return mempty
+        unify' TCTVoidType{} TCTVoidType{} = return mempty
 
-        unify' v1@(TCTVarType _ a) v2@(TCTVarType _ b)
+        unify' v1@(TCTVarType _ _ a) v2@(TCTVarType _ _ b)
             | a == b = return mempty
             | otherwise = return . Subst $ M.singleton a v2
 
-        unify' v@(TCTVarType _ a) t = do
+        unify' v@(TCTVarType _ _ a) t = do
             if not $ occurs a t then
                 return . Subst $ M.singleton a t
             else
                 occursError a t
 
-        unify' t v@(TCTVarType _ a) = do
+        unify' t v@(TCTVarType _ _ a) = do
             if not $ occurs a t then
                 return . Subst $ M.singleton a t
             else
                 occursError a t
 
-        unify' (TCTListType _ a) (TCTListType _ b) = unify' a b
+        unify' (TCTListType _ _ a) (TCTListType _ _ b) = unify' a b
 
-        unify' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+        unify' (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = do
             subst1 <- unify' a1 a2
             subst2 <- unify' (subst1 $* b1) (subst1 $* b2)
             return $ subst2 <> subst1

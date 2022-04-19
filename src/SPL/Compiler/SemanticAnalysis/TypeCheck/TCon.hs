@@ -2,8 +2,10 @@
 module SPL.Compiler.SemanticAnalysis.TypeCheck.TCon where
 
 import SPL.Compiler.Common.Error
+import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.List as L
 import qualified Data.Text as T
 
 import SPL.Compiler.SemanticAnalysis.TCT
@@ -20,14 +22,14 @@ instance Eq TCon where
     (TPrint t1) == (TPrint t2) = t1 `strictTypeEq` t2
     _ == _ = False
 
-strictTypeEq (TCTIntType _) (TCTIntType _) = True
-strictTypeEq (TCTBoolType _) (TCTBoolType _) = True
-strictTypeEq (TCTCharType _) (TCTCharType _) = True
-strictTypeEq (TCTVoidType _) (TCTVoidType _) = True
-strictTypeEq (TCTVarType _ a) (TCTVarType _ b) = a == b 
-strictTypeEq (TCTListType _ a) (TCTListType _ b) = a `strictTypeEq` b
-strictTypeEq (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = 
-    a1 `strictTypeEq` a2 && b1 `strictTypeEq` b2
+strictTypeEq (TCTIntType _ c1) (TCTIntType _ c2) = c1 == c2
+strictTypeEq (TCTBoolType _ c1) (TCTBoolType _ c2) = c1 == c2
+strictTypeEq (TCTCharType _ c1) (TCTCharType _ c2) = c1 == c2
+strictTypeEq (TCTVoidType _ c1) (TCTVoidType _ c2) = c1 == c2
+strictTypeEq (TCTVarType _ c1 a) (TCTVarType _ c2 b) = c1 == c2 && a == b 
+strictTypeEq (TCTListType _ c1 a) (TCTListType _ c2 b) = c1 == c2 && a `strictTypeEq` b
+strictTypeEq (TCTTupleType _ c1 a1 b1) (TCTTupleType _ c2 a2 b2) = 
+    c1 == c2 && a1 `strictTypeEq` a2 && b1 `strictTypeEq` b2
 strictTypeEq (TCTFunType _ c1 a1 b1) (TCTFunType _ c2 a2 b2) =
     c1 == c2 && a1 `strictTypeEq` a2 && b1 `strictTypeEq` b2
 strictTypeEq _ _ = False
@@ -41,52 +43,61 @@ instance Ord TCon where
     TOrd{} `compare` TEq{} = LT
     TPrint{} `compare` _ = LT
 
-strictTypeOrd TCTVoidType{} TCTVoidType{} = EQ
+getFirstNonEq :: [Ordering] -> Ordering
+getFirstNonEq = fromMaybe EQ . L.find (/= EQ)
+
+strictTypeOrd (TCTVoidType _ c1) (TCTVoidType _ c2) = c1 `compare` c2
 strictTypeOrd TCTVoidType{} _ = LT
-strictTypeOrd TCTBoolType{} TCTBoolType{} = EQ
+strictTypeOrd (TCTBoolType _ c1) (TCTBoolType _ c2) = c1 `compare` c2
 strictTypeOrd TCTBoolType{} TCTVoidType{} = GT
 strictTypeOrd TCTBoolType{} _ = LT
-strictTypeOrd TCTCharType{} TCTCharType{} = EQ
+strictTypeOrd (TCTCharType _ c1) (TCTCharType _ c2) = c1 `compare` c2
 strictTypeOrd TCTCharType{} TCTVoidType{}  = GT
 strictTypeOrd TCTCharType{} TCTBoolType{}  = GT
 strictTypeOrd TCTCharType{} _ = LT
-strictTypeOrd TCTIntType{} TCTIntType{} = EQ
+strictTypeOrd (TCTIntType _ c1) (TCTIntType _ c2) = c1 `compare` c2
 strictTypeOrd TCTIntType{} TCTVoidType{} = GT
 strictTypeOrd TCTIntType{} TCTBoolType{} = GT
 strictTypeOrd TCTIntType{} TCTCharType{} = GT
 strictTypeOrd TCTIntType{} _ = LT
-strictTypeOrd (TCTVarType _ a) (TCTVarType _ b) = a `compare` b 
+strictTypeOrd (TCTVarType _ c1 a) (TCTVarType _ c2 b) = 
+    getFirstNonEq [c1 `compare` c2, a `compare` b]
 strictTypeOrd TCTVarType{} TCTListType{} = LT
 strictTypeOrd TCTVarType{} TCTTupleType{} = LT
 strictTypeOrd TCTVarType{} TCTFunType{} = LT
 strictTypeOrd TCTVarType{} _ = GT
-strictTypeOrd (TCTListType _ a) (TCTListType _ b) = a `strictTypeOrd` b
+strictTypeOrd (TCTListType _ c1 a) (TCTListType _ c2 b) = 
+    getFirstNonEq [c1 `compare` c2, a `strictTypeOrd` b]
 strictTypeOrd TCTListType{} TCTTupleType{} = LT
 strictTypeOrd TCTListType{} TCTFunType{} = LT
 strictTypeOrd TCTListType{} _ = GT
 strictTypeOrd (TCTFunType _ c1 a1 b1) (TCTFunType _ c2 a2 b2) =
-    case c1 `compare` c2 of
-        EQ -> case a1 `strictTypeOrd` a2 of
-                    EQ -> b1 `strictTypeOrd` b2
-                    x -> x
-        y -> y
+    getFirstNonEq [c1 `compare` c2, a1 `strictTypeOrd` a2, b1 `strictTypeOrd` b2]
 strictTypeOrd TCTFunType{} TCTTupleType{} = LT
 strictTypeOrd TCTFunType{} _ = GT
-strictTypeOrd (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) =
-    case a1 `strictTypeOrd` a2 of
-        EQ -> b1 `strictTypeOrd` b2
-        x -> x
+strictTypeOrd (TCTTupleType _ c1 a1 b1) (TCTTupleType _ c2 a2 b2) =
+    getFirstNonEq [c1 `compare` c2, a1 `strictTypeOrd` a2, b1 `strictTypeOrd` b2]
 strictTypeOrd TCTTupleType{} _ = GT
 
 getTypeCon :: TCTType -> Set TCon
 getTypeCon (TCTFunType _ tc t1 t2) = tc <> getTypeCon t1 <> getTypeCon t2
-getTypeCon (TCTTupleType _ t1 t2) = getTypeCon t1 <> getTypeCon t2
-getTypeCon (TCTListType _ t) = getTypeCon t
-getTypeCon _ = mempty
+getTypeCon (TCTTupleType _ tc t1 t2) = tc <> getTypeCon t1 <> getTypeCon t2
+getTypeCon (TCTListType _ tc t) = tc <> getTypeCon t
+getTypeCon (TCTVarType _ tc t) = tc
+getTypeCon (TCTIntType _ tc) = tc
+getTypeCon (TCTBoolType _ tc) = tc
+getTypeCon (TCTCharType _ tc) = tc
+getTypeCon (TCTVoidType _ tc) = tc
 
 updateTCon :: Set TCon -> TCTType -> TCTType
 updateTCon tcon (TCTFunType l _ t1 t2) = TCTFunType l tcon t1 t2
-updateTCon _ t = t
+updateTCon tcon (TCTTupleType l _ t1 t2) = TCTTupleType l tcon t1 t2
+updateTCon tcon (TCTListType l _ t) = TCTListType l tcon t
+updateTCon tcon (TCTVarType l _ t) = TCTVarType l tcon t 
+updateTCon tcon (TCTIntType l _) = TCTIntType l tcon
+updateTCon tcon (TCTBoolType l _) = TCTBoolType l tcon
+updateTCon tcon (TCTCharType l _) = TCTCharType l tcon
+updateTCon tcon (TCTVoidType l _) = TCTVoidType l tcon
 
 validateTCon :: Set TCon -> TCMonad ()
 validateTCon = validateTCon' . S.toList

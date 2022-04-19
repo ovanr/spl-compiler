@@ -19,38 +19,38 @@ defLoc = EntityLoc (0,0) (0,0)
 
 printEnv :: (Text, Scheme)
 printEnv = ("print", 
-             let var = TCTVarType defLoc "a" 
+             let var = TCTVarType defLoc mempty "a" 
              in Scheme (S.singleton "a") (TCTFunType defLoc (S.singleton $ TPrint var) 
-                                                     var (TCTVoidType defLoc)))
+                                                     var (TCTVoidType defLoc mempty)))
 
 isEmptyEnv :: (Text, Scheme)
 isEmptyEnv = ("isEmpty", 
-             let listType = TCTListType defLoc (TCTVarType defLoc "a")
+             let listType = TCTListType defLoc mempty (TCTVarType defLoc mempty "a")
              in Scheme (S.singleton "a") (TCTFunType defLoc mempty
-                                                     listType (TCTBoolType defLoc)))
+                                                     listType (TCTBoolType defLoc mempty)))
 hdEnv :: (Text, Scheme)
 hdEnv = ("hd", Scheme (S.singleton "a") 
                 (TCTFunType defLoc mempty
-                            (TCTListType defLoc (TCTVarType defLoc "a")) 
-                            (TCTVarType defLoc "a")))
+                            (TCTListType defLoc mempty (TCTVarType defLoc mempty "a")) 
+                            (TCTVarType defLoc mempty "a")))
 
 tlEnv :: (Text, Scheme)
 tlEnv = ("tl", Scheme (S.singleton "a") 
                    (TCTFunType defLoc mempty
-                            (TCTListType defLoc (TCTVarType defLoc "a")) 
-                            (TCTListType defLoc (TCTVarType defLoc "a")))) 
+                            (TCTListType defLoc mempty (TCTVarType defLoc mempty "a")) 
+                            (TCTListType defLoc mempty (TCTVarType defLoc mempty "a")))) 
 
 fstEnv :: (Text, Scheme)
 fstEnv = ("fst", Scheme (S.fromList ["a", "b"]) 
                     (TCTFunType defLoc mempty 
-                            (TCTTupleType defLoc (TCTVarType defLoc "a") (TCTVarType defLoc "b")) 
-                            (TCTVarType defLoc "a"))) 
+                            (TCTTupleType defLoc mempty (TCTVarType defLoc mempty "a") (TCTVarType defLoc mempty "b")) 
+                            (TCTVarType defLoc mempty "a"))) 
 
 sndEnv :: (Text, Scheme)
 sndEnv = ("snd", Scheme (S.fromList ["a", "b"]) 
                     (TCTFunType defLoc mempty 
-                            (TCTTupleType defLoc (TCTVarType defLoc "a") (TCTVarType defLoc "b")) 
-                            (TCTVarType defLoc "b"))) 
+                            (TCTTupleType defLoc mempty (TCTVarType defLoc mempty "a") (TCTVarType defLoc mempty "b")) 
+                            (TCTVarType defLoc mempty "b"))) 
 
 initGamma :: TypeEnv 
 initGamma = TypeEnv . M.fromList . map (bimap (,Fun) (Global,)) $ [printEnv, isEmptyEnv, hdEnv, tlEnv, fstEnv, sndEnv]

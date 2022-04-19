@@ -100,9 +100,9 @@ executeTCTests tests evaluator =
             Nothing -> print actual >> void (assertLeft actual)
 
 matchVars :: TCTType -> TCTType -> Subst
-matchVars (TCTVarType _ a) v = Subst $ M.singleton a v
-matchVars (TCTListType _ t1) (TCTListType _ t2) = matchVars t1 t2
-matchVars (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
+matchVars (TCTVarType _ _ a) v = Subst $ M.singleton a v
+matchVars (TCTListType _ _ t1) (TCTListType _ _ t2) = matchVars t1 t2
+matchVars (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
 matchVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
 matchVars _ _ = mempty
 

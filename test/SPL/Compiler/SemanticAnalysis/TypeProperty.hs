@@ -24,13 +24,13 @@ instance Arbitrary TCTType where
         ]
 
        where
-            intGen = return (TCTIntType def)
-            boolGen = return (TCTBoolType def)
-            charGen = return (TCTCharType def)
-            varGen = oneof $ return . TCTVarType def <$> ["a", "b", "c", "d"]
-            tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
+            intGen = return (TCTIntType def mempty)
+            boolGen = return (TCTBoolType def mempty)
+            charGen = return (TCTCharType def mempty)
+            varGen = oneof $ return . TCTVarType def mempty <$> ["a", "b", "c", "d"]
+            tupleGen = liftA2 (TCTTupleType def mempty) arbitrary arbitrary
             funGen = liftA2 (TCTFunType def mempty) arbitrary arbitrary
-            listGen = TCTListType def <$> arbitrary
+            listGen = TCTListType def mempty <$> arbitrary
 
 instance Arbitrary Text where
     arbitrary =  oneof $ return <$> ["a", "b", "c", "d"]

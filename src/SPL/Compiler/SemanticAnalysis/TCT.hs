@@ -133,13 +133,13 @@ data TCon =
     |   TPrint TCTType
 
 data TCTType =
-        TCTIntType EntityLoc
-    |   TCTBoolType EntityLoc
-    |   TCTCharType EntityLoc
-    |   TCTVoidType EntityLoc
-    |   TCTVarType EntityLoc TypeVar
-    |   TCTTupleType EntityLoc TCTType TCTType
-    |   TCTListType EntityLoc TCTType
+        TCTIntType EntityLoc (Set TCon)
+    |   TCTBoolType EntityLoc (Set TCon)
+    |   TCTCharType EntityLoc (Set TCon)
+    |   TCTVoidType EntityLoc (Set TCon)
+    |   TCTVarType EntityLoc (Set TCon) TypeVar
+    |   TCTTupleType EntityLoc (Set TCon) TCTType TCTType
+    |   TCTListType EntityLoc (Set TCon) TCTType
     |   TCTFunType EntityLoc (Set TCon) TCTType TCTType
 
 newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
@@ -172,11 +172,11 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
         alphaEq' :: TCTType ->
                     TCTType ->
                     State [(TypeVar, TypeVar)] Bool
-        alphaEq' (TCTIntType _) (TCTIntType _) = return True
-        alphaEq' (TCTBoolType _) (TCTBoolType _) = return True
-        alphaEq' (TCTCharType _) (TCTCharType _) = return True
-        alphaEq' (TCTVoidType _) (TCTVoidType _) = return True
-        alphaEq' (TCTVarType _ a) (TCTVarType _ b) = do
+        alphaEq' (TCTIntType _ _) (TCTIntType _ _) = return True
+        alphaEq' (TCTBoolType _ _) (TCTBoolType _ _) = return True
+        alphaEq' (TCTCharType _ _) (TCTCharType _ _) = return True
+        alphaEq' (TCTVoidType _ _) (TCTVoidType _ _) = return True
+        alphaEq' (TCTVarType _ _ a) (TCTVarType _ _ b) = do
             pairs <- get
             if (a,b) `elem` pairs then
                 return True
@@ -187,25 +187,25 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
                 else
                     return False
 
-        alphaEq' (TCTListType _ a) (TCTListType _ b) = a `alphaEq'` b
-        alphaEq' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+        alphaEq' (TCTListType _ _ a) (TCTListType _ _ b) = a `alphaEq'` b
+        alphaEq' (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = do
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
-        alphaEq' (TCTFunType _ c1 a1 b1) (TCTFunType _ c2 a2 b2) = do
+        alphaEq' (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
         alphaEq' _ _ = return False
 
 instance Show TCTType where
-    show (TCTIntType _) = "Int"
-    show (TCTBoolType _) = "Bool"
-    show (TCTCharType _) = "Char"
-    show (TCTVoidType _) = "Void"
-    show (TCTVarType _ a) = T.unpack a
-    show (TCTListType _ a) = "[" <> show a <> "]"
-    show (TCTTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
+    show (TCTIntType _ _) = "Int"
+    show (TCTBoolType _ _) = "Bool"
+    show (TCTCharType _ _) = "Char"
+    show (TCTVoidType _ _) = "Void"
+    show (TCTVarType _ _ a) = T.unpack a
+    show (TCTListType _ _ a) = "[" <> show a <> "]"
+    show (TCTTupleType _ _ a b) = "(" <> show a <> "," <> show b <> ")"
     show (TCTFunType _ _ a b) =
         case a of
             TCTFunType {} -> "(" <> show a <> ")" <> " -> " <> show b

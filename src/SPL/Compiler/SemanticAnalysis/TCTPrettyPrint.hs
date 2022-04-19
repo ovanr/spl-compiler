@@ -32,7 +32,7 @@ class PrettyPrint a where
 
 instance PrettyPrint TCT where
     toCode _ (TCT varDecls funDecls) =
-        T.unlines . 
+        T.unlines .
         init .
         concatMap (\i -> [i, mempty]) $
         map (toCode 0) varDecls <> concatMap (map (toCode 0)) funDecls
@@ -48,8 +48,12 @@ instance PrettyPrint TCTFunDecl where
                     <> toCodeFunType n t <> " " <> toCode (n + 1) body
         where
             toCodeFunType :: Int -> TCTType -> Text
-            toCodeFunType n t@(TCTFunType _ tcon _ _) = toCode n tcon <> toCode n t
-            toCodeFunType n t = "-> " <> toCode n t
+            toCodeFunType n t =
+                let tcon = getTypeCon t
+                in if S.null tcon then
+                    "-> " <> toCode n t
+                else
+                    toCode n tcon <> "-> " <> toCode n t
 
 instance PrettyPrint (Set TCon) where
     toCode n = toCodeCon . S.toList
@@ -125,13 +129,13 @@ instance PrettyPrint TCTFunBody where
         "}"
 
 instance PrettyPrint TCTType where
-    toCode n (TCTTupleType _ lType rType) = "(" <> toCode n lType <> "," <> toCode n rType <> ")"
-    toCode n (TCTListType _ t) = "[" <> toCode n t <> "]"
-    toCode n (TCTVarType _ id) = id
-    toCode n (TCTIntType _) = "Int"
-    toCode n (TCTBoolType _) = "Bool"
-    toCode n (TCTCharType _) = "Char"
-    toCode n (TCTVoidType _) = "Void"
+    toCode n (TCTTupleType _ _ lType rType) = "(" <> toCode n lType <> "," <> toCode n rType <> ")"
+    toCode n (TCTListType _ _ t) = "[" <> toCode n t <> "]"
+    toCode n (TCTVarType _ _ id) = id
+    toCode n (TCTIntType _ _) = "Int"
+    toCode n (TCTBoolType _ _) = "Bool"
+    toCode n (TCTCharType _ _) = "Char"
+    toCode n (TCTVoidType _ _) = "Void"
     toCode n (TCTFunType _ _ t1 t2) = toCode n t1 <> " " <>
         case t2 of
             TCTFunType{} -> toCode n t2
