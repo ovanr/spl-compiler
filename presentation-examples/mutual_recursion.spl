@@ -16,6 +16,6 @@ even(x) {
 }
 
 myPrint(x) :: a -> Void {
-    print('v':'a':'l':'u':'e':[]);
+    print("Value is: ");
     print(x);
 }
