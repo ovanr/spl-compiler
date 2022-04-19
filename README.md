@@ -31,6 +31,12 @@ Parse the source file and print the parsed result as actual code
 
 - `stack run -- spl-compiler -p --file SPL_FILE`
 
+### Semantic Analysis dump
+
+Parse, type-check and optimize source file and finally print the result
+
+- `stack run -- spl-compiler -t --file SPL_FILE`
+
 ## Running the tests
 
 We have an extensive test suite which can be run using:

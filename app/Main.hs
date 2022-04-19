@@ -30,7 +30,6 @@ optionsParser = Options
             help "Parse and typecheck, then pretty print the result")
     <*> switch (
             long "noStaticEvaluation" <>
-            short 's' <>
             showDefault <>
             help "Do not staticly evaluate expressions and eliminate dead code")
     <*> option auto (
