@@ -77,6 +77,9 @@ tokens :-
     -- character
     <0> \'.\'                            { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
     <0> \'\\.\'                          { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
+
+    -- strings
+    <0> \".*\"                            { token (produceToken (\ctx len -> StringToken . T.dropEnd 1 .  T.drop 1 $ getCurrentToken ctx len )) }
 {
 
 -- token :: (AlexInput -> Int64 -> token) -> AlexAction token
@@ -94,6 +97,7 @@ data SPLToken =
       KeywordToken Keyword
     | TypeToken Type
     | SymbolToken Char
+    | StringToken T.Text
     | IntToken Integer
     | CharToken Char
     | BoolToken Bool
@@ -132,6 +136,7 @@ instance Show SPLToken where
     show (KeywordToken k) = show k
     show (TypeToken t) = show t
     show (SymbolToken c) = [c]
+    show (StringToken str) = T.unpack str
     show (IntToken i) = show i
     show (CharToken c) = show c
     show (BoolToken b) = show b

@@ -51,6 +51,7 @@ instance Locatable Token where
             tokenLength (TypeToken v) = length (show v)
             tokenLength (IntToken i) = length (show i)
             tokenLength (IdentifierToken v) = T.length v
+            tokenLength (StringToken str) = T.length str + 2
             tokenLength (BoolToken v) = length $ show v
             tokenLength (CharToken _) = 1
             tokenLength (SymbolToken _) = 1

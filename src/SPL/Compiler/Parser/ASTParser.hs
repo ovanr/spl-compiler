@@ -204,7 +204,7 @@ pFunCallStmt :: SPLParser ASTStmt
 pFunCallStmt =
     pWrapErrors (\_ -> (<>) ["Function call statement"]) $
     (\call col -> FunCallStmt (call |-| col) call)
-        <$> (pFunCall False)
+        <$> pFunCall False
         <*> pIsSymbol ';'
 
 pReturnStmt :: SPLParser ASTStmt
@@ -257,6 +257,7 @@ _pExpr =
                    <<|> pFunCallExpr
                    <<|> pEmptyListExpr
                    <<|> pCharExpr
+                   <<|> pStringExpr
                    <<|> pFieldSelectExpr
                    <<|> pError (mkError "Unknown expression encountered here")
 
@@ -318,6 +319,14 @@ pCharExpr = (\token@(MkToken loc (CharToken c)) -> CharExpr (getLoc token) c) <$
                             MkToken _ (CharToken _) -> True
                             _ -> False)
 
+pStringExpr :: SPLParser ASTExpr
+pStringExpr = satisfyAs (\case
+                            t@(MkToken _ (StringToken str)) -> Just $ toConsCharExpr (getLoc t) str
+                            _ -> Nothing)
+    where
+        toConsCharExpr loc str = foldr (\c acc -> Op2Expr loc (CharExpr loc c) Cons acc) 
+                                       (EmptyListExpr loc) 
+                                       (T.unpack str)
 pBoolExpr :: SPLParser ASTExpr
 pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$>
                 satisfy (\case
