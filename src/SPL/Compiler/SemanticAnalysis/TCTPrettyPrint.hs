@@ -51,14 +51,17 @@ instance PrettyPrint TCTFunDecl where
             toCodeFunType n t =
                 let tcon = getTypeCon t
                 in if S.null tcon then
-                    "-> " <> toCode n t
+                    maybeArrow <> toCode n t
                 else
-                    toCode n tcon <> "-> " <> toCode n t
+                    "/* " <> toCode n tcon <> "*/ " <> maybeArrow <> toCode n t
+            needsArrow TCTFunType{} = False
+            needsArrow _ = True
+            maybeArrow = if needsArrow t then "-> " else ""
 
 instance PrettyPrint (Set TCon) where
-    toCode n = toCodeCon . S.toList
+    toCode n xs = "(" <> toCodeCon (S.toList xs) <> ") "
         where
-            toCodeCon = foldMap (\x -> "( " <> T.pack (show x) <> " ), ")
+            toCodeCon = T.intercalate ", " . map (T.pack . show) 
 
 instance PrettyPrint TCTField where
     toCode _ (Hd _) = "hd"

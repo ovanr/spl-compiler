@@ -1,0 +1,23 @@
+myPrint (x) :: /* (Printable a20, Printable [Char]) */ a20 -> Void {
+   print(('V' : ('a' : ('l' : ('u' : ('e' : (' ' : ('i' : ('s' : (':' : (' ' : [])))))))))));
+   print(x);
+}
+
+even (x) :: /* (Printable Int, Printable [Char], Equality Int) */ Int -> Bool {
+   myPrint(x);
+   if ((x == 0)) {
+      return True;
+   } else {
+      return odd((x - 1));
+   }
+}
+
+odd (x) :: /* (Printable Int, Printable [Char], Equality Int) */ Int -> Bool {
+   myPrint(x);
+   if ((x == 0)) {
+      return False;
+   } else {
+      return even((x - 1));
+   }
+}
+
