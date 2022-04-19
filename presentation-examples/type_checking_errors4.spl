@@ -1,0 +1,6 @@
+
+
+foo (x, y) :: Int -> [Char] {
+    var z = 3 : "hello";
+    return z;
+}

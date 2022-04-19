@@ -1,0 +1,4 @@
+foo (x) :: a -> a {
+    a z = x;
+    return z;
+}

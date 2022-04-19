@@ -1,0 +1,11 @@
+foo(x) {
+	if (True || x) 
+		return 3;
+	else 
+        return 5;
+
+	return 4;
+    if (x) {
+        return 4;
+    }
+}
