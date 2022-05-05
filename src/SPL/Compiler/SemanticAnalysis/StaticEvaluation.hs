@@ -37,8 +37,8 @@ optimizeStmt (FunCallStmt l f) = [FunCallStmt l (optimizeFunCall f)]
 optimizeStmt (ReturnStmt l e) = [ReturnStmt l (optimizeExpr <$> e)]
 
 syntaxEqFieldSelectors :: TCTFieldSelector -> TCTFieldSelector -> Bool
-syntaxEqFieldSelectors (TCTFieldSelector _ (TCTIdentifier _ id1) fd1) 
-                       (TCTFieldSelector _ (TCTIdentifier _ id2) fd2)
+syntaxEqFieldSelectors (TCTFieldSelector _ (TCTIdentifier _ id1) _ fd1) 
+                       (TCTFieldSelector _ (TCTIdentifier _ id2) _ fd2)
     | id1 == id2 = and $ zipWith (==) fd1 fd2
     | otherwise = False
 

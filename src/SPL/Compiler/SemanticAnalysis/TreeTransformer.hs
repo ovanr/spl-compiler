@@ -52,7 +52,7 @@ ast2tctFunCall (AST.ASTFunCall loc id exprs) =
 
 ast2tctFldSlct :: AST.ASTFieldSelector -> TCTFieldSelector
 ast2tctFldSlct (AST.ASTFieldSelector loc id fields) =
-    TCTFieldSelector loc (ast2tctId id) (map ast2tctFld fields)
+    TCTFieldSelector loc (ast2tctId id) (unknownType loc) (map ast2tctFld fields)
 
 ast2tctFld :: AST.ASTField -> TCTField
 ast2tctFld (AST.Hd loc) = Hd loc
@@ -71,7 +71,7 @@ ast2tctExpr (AST.FunCallExpr f) = FunCallExpr $ ast2tctFunCall f
 ast2tctExpr (AST.FieldSelectExpr f) = FieldSelectExpr $ ast2tctFldSlct f
 ast2tctExpr (AST.OpExpr loc op e1) = OpExpr loc op (ast2tctExpr e1)
 ast2tctExpr (AST.Op2Expr loc e1 op e2) = Op2Expr loc (ast2tctExpr e1) op (ast2tctExpr e2)
-ast2tctExpr (AST.EmptyListExpr loc) = EmptyListExpr loc
+ast2tctExpr (AST.EmptyListExpr loc) = EmptyListExpr loc (unknownType loc)
 ast2tctExpr (AST.TupExpr loc e1 e2) = TupExpr loc (ast2tctExpr e1) (ast2tctExpr e2)
 
 unknownType loc = TCTVarType loc mempty mempty

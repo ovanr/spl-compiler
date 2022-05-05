@@ -111,12 +111,14 @@ instance Types TCTExpr where
     s $* (OpExpr l op e) = OpExpr l op (s $* e)
     s $* (Op2Expr l e1 op e2) = Op2Expr l (s $* e1) op (s $* e2)
     s $* (TupExpr l e1 e2) = TupExpr l (s $* e1) (s $* e2)
+    s $* (EmptyListExpr l t) = EmptyListExpr l (s $* t)
     s $* e = e
     freeVars (FunCallExpr f) = freeVars f
     freeVars (FieldSelectExpr fd) = freeVars fd
     freeVars (OpExpr l op e) = freeVars e
     freeVars (Op2Expr l e1 op e2) = freeVars e1 <> freeVars e2
     freeVars (TupExpr l e1 e2) = freeVars e1 <> freeVars e2
+    freeVars (EmptyListExpr l t) = freeVars t 
     freeVars e = mempty
 
 instance Types TCTFunCall where
@@ -124,8 +126,8 @@ instance Types TCTFunCall where
     freeVars (TCTFunCall _ _ t args) = freeVars t <> freeVars args
 
 instance Types TCTFieldSelector where
-    s $* fd@TCTFieldSelector{} = fd
-    freeVars _ = mempty
+    s $* (TCTFieldSelector l id t fds) = TCTFieldSelector l id (s $* t) fds
+    freeVars (TCTFieldSelector _ _ t _) = freeVars t
 
 generalise :: TypeEnv -> TCTType -> Scheme
 generalise env t = Scheme (freeVars t `S.difference` freeVars env) t

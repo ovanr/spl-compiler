@@ -94,11 +94,16 @@ data TCTFunBody = TCTFunBody EntityLoc [TCTVarDecl] [TCTStmt]
 data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier TCTType [TCTExpr]
     deriving (Eq, Show)
 
-data TCTFieldSelector = TCTFieldSelector EntityLoc TCTIdentifier [TCTField]
+data TCTFieldSelector = TCTFieldSelector EntityLoc TCTIdentifier TCTType [TCTField]
     deriving (Eq, Show)
 
 data TCTField = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc
-    deriving (Show)
+
+instance Show TCTField where
+    show (Hd _) = "hd"
+    show (Tl _) = "tl"
+    show (Fst _) = "fst"
+    show (Snd _) = "snd"
 
 instance Eq TCTField where
     (Hd _) == (Hd _) = True
@@ -123,7 +128,7 @@ data TCTExpr =
     |   FieldSelectExpr TCTFieldSelector
     |   OpExpr EntityLoc OpUnary TCTExpr
     |   Op2Expr EntityLoc TCTExpr OpBin TCTExpr
-    |   EmptyListExpr EntityLoc
+    |   EmptyListExpr EntityLoc TCTType
     |   TupExpr EntityLoc TCTExpr TCTExpr
     deriving (Eq, Show)
 

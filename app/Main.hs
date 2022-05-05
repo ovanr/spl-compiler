@@ -32,6 +32,10 @@ optionsParser = Options
             long "noStaticEvaluation" <>
             showDefault <>
             help "Do not staticly evaluate expressions and eliminate dead code")
+    <*> switch (
+            long "coreDump" <>
+            short 'c' <>
+            help "Parse, typecheck, transform to CoreLang, then pretty print result")
     <*> option auto (
             long "verbosity" <>
             help "The level of verbosity" <>

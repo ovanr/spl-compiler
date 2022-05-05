@@ -30,8 +30,8 @@ instance Locatable TCTFunDecl where
     getLoc (TCTFunDecl l _ _ _ _) = l
 
 instance Locatable TCTFieldSelector where
-    setLoc l (TCTFieldSelector _ f x) = TCTFieldSelector l f x
-    getLoc (TCTFieldSelector l _ _) = l
+    setLoc l (TCTFieldSelector _ f t x) = TCTFieldSelector l f t x
+    getLoc (TCTFieldSelector l _ _ _) = l
 
 instance Locatable TCTExpr where
     setLoc l (FieldSelectExpr f) = FieldSelectExpr (setLoc l f)
@@ -41,7 +41,7 @@ instance Locatable TCTExpr where
     setLoc l (FunCallExpr f) = FunCallExpr (setLoc l f)
     setLoc l (OpExpr _ o a) = OpExpr l o a 
     setLoc l (Op2Expr _ o a b) = Op2Expr l o a b
-    setLoc l (EmptyListExpr _) = EmptyListExpr l
+    setLoc l (EmptyListExpr _ t) = EmptyListExpr l t
     setLoc l (TupExpr _ a b) = TupExpr l a b
     getLoc (FieldSelectExpr f) = getLoc f
     getLoc (IntExpr l _) = l
@@ -50,7 +50,7 @@ instance Locatable TCTExpr where
     getLoc (FunCallExpr f) = getLoc f
     getLoc (OpExpr l _ _) = l 
     getLoc (Op2Expr l _ _ _) = l  
-    getLoc (EmptyListExpr l) = l
+    getLoc (EmptyListExpr l _) = l
     getLoc (TupExpr l _ _) = l
 
 instance Locatable TCTStmt where

@@ -70,7 +70,7 @@ instance PrettyPrint TCTField where
     toCode _ (Snd _) = "snd"
 
 instance PrettyPrint TCTFieldSelector where
-    toCode n (TCTFieldSelector _ id fs) = toCode n id <> foldMap ((<>) "." .toCode n) fs
+    toCode n (TCTFieldSelector _ id _ fs) = toCode n id <> foldMap ((<>) "." .toCode n) fs
 
 instance PrettyPrint TCTExpr where
     toCode n (FieldSelectExpr f) = toCode n f
@@ -80,7 +80,7 @@ instance PrettyPrint TCTExpr where
     toCode n (FunCallExpr fCall) = toCode n fCall
     toCode n (OpExpr _ op expr) = "(" <> toCode n op <> toCode n expr <> ")"
     toCode n (Op2Expr _ lExpr op rExpr) = "(" <> toCode n lExpr <> toCode n op <> toCode n rExpr <> ")"
-    toCode _ (EmptyListExpr _) = "[]"
+    toCode _ (EmptyListExpr _ _) = "[]"
     toCode n (TupExpr _ lVal rVal) = "(" <> toCode n lVal <> "," <> toCode n rVal <> ")"
 
 instance PrettyPrint TCTStmt where

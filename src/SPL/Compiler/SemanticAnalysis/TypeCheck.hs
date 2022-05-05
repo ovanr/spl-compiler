@@ -112,10 +112,10 @@ typeCheckExpr _ e@(BoolExpr loc _) tau = do
     let expectedType = TCTBoolType loc mempty
     subst <- unify expectedType tau
     return (mempty, e, subst)
-typeCheckExpr _ e@(EmptyListExpr loc) tau = do
+typeCheckExpr _ (EmptyListExpr loc _) tau = do
     expectedType <- TCTListType loc mempty <$> freshVar loc "l"
     subst <- unify expectedType tau
-    return (mempty, e, subst)
+    return (mempty, EmptyListExpr loc (subst $* tau), subst)
 typeCheckExpr gamma e@(FunCallExpr f) tau = do
     (tcon, f', fSubst) <- typeCheckFunCall gamma f tau
     return (tcon, FunCallExpr f', fSubst)
@@ -240,7 +240,7 @@ typeCheckFieldSelector :: TypeEnv ->
                           TCTFieldSelector ->
                           TCTType ->
                           TCMonad (Set TCon, TCTFieldSelector, Subst)
-typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
+typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id _ fields) tau = do
     alpha <- freshVar (getLoc id) "fd"
     (tcon, id', idSubst) <- typeCheckVar gamma id Both alpha
 
@@ -249,7 +249,7 @@ typeCheckFieldSelector gamma fd@(TCTFieldSelector loc id fields) tau = do
     let fidSubst = fSubst <> idSubst
     rSubst <- unify rType (fidSubst $* tau)
     let subst = rSubst <> fidSubst
-    return (subst $* tcon, TCTFieldSelector loc id' fields, subst)
+    return (subst $* tcon, TCTFieldSelector loc id' (subst $* tau) fields, subst)
 
     where
         toVar :: TCTField -> TCTIdentifier
@@ -407,6 +407,9 @@ decomposeFunType (TCTFunType _ _ a r) =
     let (as, r') = decomposeFunType r
      in (a : as , r')
 decomposeFunType x = ([], x)
+
+getReturnType :: TCTType -> TCTType
+getReturnType = snd . decomposeFunType 
 
 typeCheckFunDecl :: TypeEnv ->
                     TCTFunDecl ->

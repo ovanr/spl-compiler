@@ -106,6 +106,37 @@ matchVars (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = matchVars b1 b2 <>
 matchVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
 matchVars _ _ = mempty
 
+typeCheckFieldSelector' e a t = (\(a, b@(TCTFieldSelector _ _ t' _), c) -> (a, b, c, t')) <$> typeCheckFieldSelector e a t
+
+test_type_check_field_selector_1 = do
+            -- x :: [Int] |- x.hd : Int = 
+            let test = [("x", Var, forall ["a"] (typ @[Int]))] |=
+                        (fd "x" [Hd def], typ @(TVar "sigma")) ~= (typ @Int, [])
+            executeTCTests [test] typeCheckFieldSelector'
+
+test_type_check_field_selector_2 = do
+            -- x :: [Int] |- x.tl : [Int] = 
+            let test = [("x", Var, forall ["a"] (typ @[Int]))] |=
+                        (fd "x" [Tl def], typ @(TVar "sigma")) ~= (typ @[Int], [])
+            executeTCTests [test] typeCheckFieldSelector'
+
+test_type_check_field_selector_3 = do
+            -- x :: [Int] |- x.tl.hd : Int = 
+            let test = [("x", Var, forall ["a"] (typ @[Int]))] |=
+                        (fd "x" [Tl def, Hd def], typ @(TVar "sigma")) ~= (typ @Int, [])
+            executeTCTests [test] typeCheckFieldSelector'
+
+test_type_check_field_selector_4 = do
+            -- x :: ([Int], a) |- x.fst.tl.hd : Int = 
+            let test = [("x", Var, forall ["a"] (typ @([Int], TVar "a")))] |=
+                        (fd "x" [Fst def, Tl def, Hd def], typ @(TVar "sigma")) ~= (typ @Int, [])
+            executeTCTests [test] typeCheckFieldSelector'
+
+test_type_check_field_selector_5 = do
+            -- x :: (a, [(a, Int)]) |- x.snd.hd.fst : a = 
+            let test = [("x", Var, forall ["a"] (typ @(TVar "a", [(TVar "a", Int)])))] |=
+                        (fd "x" [Snd def, Hd def, Fst def], typ @(TVar "sigma")) ~= (typ @(TVar "a"), [])
+            executeTCTests [test] typeCheckFieldSelector'
 typeCheckExpr' e a t = (\(a, b, c) -> (a, b, c, t)) <$> typeCheckExpr e a t
 
 test_type_check_expr_1 = do

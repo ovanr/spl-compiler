@@ -45,7 +45,7 @@ instance Testable TCTField where
     toTestForm (Snd _) = Snd def
 
 instance Testable TCTFieldSelector where
-    toTestForm (TCTFieldSelector _ i fs) = TCTFieldSelector def (toTestForm i) (toTestForm fs)
+    toTestForm (TCTFieldSelector _ i t fs) = TCTFieldSelector def (toTestForm i) (toTestForm t) (toTestForm fs)
 
 instance Testable TCTExpr where
     toTestForm (TupExpr _ p1 p2) = TupExpr def (toTestForm p1) (toTestForm p2)
@@ -56,7 +56,7 @@ instance Testable TCTExpr where
     toTestForm (BoolExpr _ b) = BoolExpr def b
     toTestForm (OpExpr _ o e) = OpExpr def o (toTestForm e)
     toTestForm (Op2Expr _ e1 o e2) = Op2Expr def (toTestForm e1) o (toTestForm e2)
-    toTestForm (EmptyListExpr _ ) = EmptyListExpr def
+    toTestForm (EmptyListExpr _ t) = EmptyListExpr def (toTestForm t)
 
 instance Testable TCTVarDecl where
     toTestForm (TCTVarDecl _ t i e) = TCTVarDecl def (toTestForm t) (toTestForm i) (toTestForm e)
@@ -99,7 +99,7 @@ instance ToExpr TCTExpr where
     expr e = e
 
 instance ToExpr a => ToExpr [a] where
-    expr [] = EmptyListExpr def
+    expr [] = EmptyListExpr def (unknownType def)
     expr (x:xs) = Op2Expr def (expr x) Cons (expr xs)
 
 instance (ToExpr a, ToExpr b) => ToExpr (a,b) where
@@ -131,10 +131,10 @@ ident = TCTIdentifier def
 iexpr = expr @Int
 
 emptyList :: TCTExpr
-emptyList = EmptyListExpr def
+emptyList = EmptyListExpr def (unknownType def)
 
 fd :: Text -> [TCTField] -> TCTFieldSelector
-fd name = TCTFieldSelector def (ident name)
+fd name = TCTFieldSelector def (ident name) (unknownType def) 
 
 class ToType a where
     toType :: Proxy a -> TCTType

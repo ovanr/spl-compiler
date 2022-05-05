@@ -5,13 +5,15 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Control.Lens (maximumOf, _Left, folded)
-import Control.Monad.State (StateT(StateT, runStateT))
+import Control.Monad.State (StateT(StateT, runStateT), evalStateT)
 import Data.Text (Text)
 import Data.Foldable
 import Data.Either
 import Data.Bifunctor
 import Data.Functor
 import Data.Maybe
+
+import SPL.Compiler.Common.TypeFunc
 
 import SPL.Compiler.Lexer.AlexLexGen (tokenize)
 import SPL.Compiler.Parser.ParserCombinator (Parser(..), ParserState(..), Error(..))
@@ -28,6 +30,11 @@ import SPL.Compiler.SemanticAnalysis.ReturnPathCheck (returnPathCheck)
 import SPL.Compiler.SemanticAnalysis.StaticEvaluation (staticlyEvaluate) 
 import qualified SPL.Compiler.SemanticAnalysis.TCTPrettyPrint as TCTPP (PrettyPrint(..))
 
+import SPL.Compiler.CodeGen.CoreLang
+import SPL.Compiler.CodeGen.CoreLangGen
+import SPL.Compiler.CodeGen.CoreLangGenLib
+import SPL.Compiler.CodeGen.CoreLangPrinter
+
 data Options = Options {
     filePath :: FilePath,
     fileContents :: B.ByteString,
@@ -35,6 +42,7 @@ data Options = Options {
     parserDump :: Bool,
     typeCheckDump :: Bool,
     noStaticEvaluation :: Bool,
+    coreLangDump :: Bool,
     verbosity :: Int
 }
 
@@ -52,8 +60,10 @@ printTypeCheckError errors =
     let header = "Error occurred during type checking phase!"
       in T.init $ T.unlines $ header: "": errors
 
+printCoreError = id
+
 compilerMain :: Options -> Either Text Text
-compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEvaluation v) = do
+compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEvaluation coreLangDump v) = do
     tokens <- tokenize path content
     let source = T.lines . decodeUtf8 . B.toStrict $ content
     let state = ParserState 0 tokens path source
@@ -82,5 +92,10 @@ compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEval
             if typeCheckDump then
                 Right . TCTPP.toCode 0 $ tct
             else do
-                Left "Not implemented"
+                if coreLangDump then do
+                    let clState = CoreState (Some1 HNil) (Some1 HNil) [] 1 1
+                    Some2 core <- evalStateT (tctToCoreLang tct) clState
+                    Right $ showCL 0 core
+                else
+                    Left "Not implemented"
 
