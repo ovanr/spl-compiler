@@ -51,6 +51,6 @@ test_type_check_expected_failures = do
     forM_ failing_input_paths $ \input_path -> do
         print input_path
         input <- B.readFile input_path
-        let options = Options input_path input False False True False 0
+        let options = Options input_path input False False True False False 0
         let checked_input = compilerMain options
         assertLeft checked_input

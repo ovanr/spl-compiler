@@ -7,7 +7,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 
-module SPL.Compiler.SemanticAnalysis.Testable where
+module SPL.Compiler.CodeGen.Testable where
 
 import GHC.TypeLits
 import Data.Proxy
