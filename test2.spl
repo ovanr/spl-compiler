@@ -1,0 +1,17 @@
+
+
+
+g (x, y) {
+    if (x >= y) {
+        return 5;
+    }
+    if (x == y) {
+        return 3;
+    }
+    print(x);
+    return 7;
+}
+
+main () {
+    g (12, 32);
+}

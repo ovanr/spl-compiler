@@ -26,49 +26,44 @@ instance CoreLangPrinter Char where
     showCL _ c = T.pack (show c)
 
 instance CoreLangPrinter Label where
-    showCL _ l = l
+    showCL ident l = mkIdent ident <> l
 
 instance CoreLangPrinter (CoreType a) where
     showCL _ t = T.pack (show t)
 
 instance CoreLangPrinter (Var a) where
-    showCL _ (Var id t) = id <> showCL 0 t
+    showCL _ (Var id t) = id <> "%" <> showCL 0 t
 
 instance CoreLangPrinter (HList Var xs) where
-    showCL _ HNil = ""
-    showCL _ (var :+: vars) = showCL 0 var <> " " <> showCL 0 vars
+    showCL _ = T.intercalate " " . hListMapToList (showCL 0)
 
 instance CoreLangPrinter (CoreLang gs fs) where 
     showCL ident (CoreLang globals funcs) = 
         showCL ident globals <> "\n" <> showCL ident funcs
 
 instance CoreLangPrinter (HList CoreGlobal gs) where
-    showCL ident HNil = ""
-    showCL ident (g :+: gs) = showCL ident g <> "\n" <> showCL ident gs
+    showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)
 
 instance CoreLangPrinter (CoreGlobal a) where
     showCL ident (CoreGlobal _ init) = showCL ident init
 
 instance CoreLangPrinter (HList CoreFunDecl' gs) where
-    showCL ident HNil = ""
-    showCL ident (f :+:fs) = showCL ident f <> "\n" <> showCL ident fs
+    showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)
 
 instance CoreLangPrinter (CoreFunDef xs) where
     showCL ident (CoreFunDef decl body) = 
-        showCL ident decl <> "\n" <> showCL ident body
+        showCL ident decl <> "\n" <> showCL (ident + 2) body
 
 instance CoreLangPrinter (HList CoreFunDef gs) where
-    showCL ident HNil = ""
-    showCL ident (f :+: fs) = showCL ident f <> "\n" <> showCL ident fs
+    showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)
 
 instance CoreLangPrinter (CoreFunDecl' xs) where
     showCL ident (CoreFunDecl' decl) = showCL ident decl
 
-instance CoreLangPrinter (CoreFunDecl as vs r) where
-    showCL ident (CoreFunDecl label args vars retType) =
+instance CoreLangPrinter (CoreFunDecl as r) where
+    showCL ident (CoreFunDecl label args retType) =
         mkIdent ident <> showCL 0 label <> 
-            "(" <> showCL 0 args <> ") " <> showCL 0 retType <> 
-            " [" <> showCL 0 vars <> "]" 
+            "(" <> showCL 0 args <> ") %" <> showCL 0 retType <> ":"
 
 instance CoreLangPrinter [CoreInstr] where
     showCL ident = T.unlines . map (showCL ident)
@@ -95,16 +90,19 @@ instance CoreLangPrinter CoreInstr where
     showCL ident (Declare var) =
         mkIdent ident <> "Declare " <> showCL 0 var
     showCL ident (SetLabel label) =
-        showCL 0 label <> ":"
+        showCL (ident - 1) label <> ":"
     showCL ident (BrTrue var label) =
         mkIdent ident <> "BrTrue " <> showCL 0 var <> " " <> showCL 0 label
     showCL ident (BrFalse var label) =
         mkIdent ident <> "BrFalse " <> showCL 0 var <> " " <> showCL 0 label
     showCL ident (BrAlways label) =
         mkIdent ident <> "BrAlways " <> showCL 0 label
-    showCL ident (Call dst (CoreFunDecl label _ _ _) args) =
+    showCL ident (Call dst (CoreFunDecl label _ _) args) =
         mkIdent ident <> "Call " <> showCL 0 dst <> " " <>
             showCL 0 label <> " " <> showCL 0 args
+    showCL ident (CallV dst src args) =
+        mkIdent ident <> "CallV " <> showCL 0 dst <> " " <>
+            showCL 0 src <> " " <> showCL 0 args
     showCL ident (StoreI dst i) =
         mkIdent ident <> "StoreI " <> showCL 0 dst <> " " <> showCL 0 i
     showCL ident (StoreC dst c) =
@@ -115,6 +113,8 @@ instance CoreLangPrinter CoreInstr where
         mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (StoreA dst src) =
         mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 src
+    showCL ident (StoreL dst (CoreFunDecl label _ _)) =
+        mkIdent ident <> "StoreL " <> showCL 0 dst <> " " <> label
     showCL ident (StoreVUnsafe dst src) =
         mkIdent ident <> "StoreVUnsafe " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (LoadA dst src) =
@@ -129,3 +129,9 @@ instance CoreLangPrinter CoreInstr where
         mkIdent ident <> "MkTup " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (RetV src) =
         mkIdent ident <> "RetV " <> showCL 0 src
+    showCL ident Halt =
+        mkIdent ident <> "Halt"
+    showCL ident (PrintI i) =
+        mkIdent ident <> "PrintI " <> showCL 0 i
+    showCL ident (PrintC c) =
+        mkIdent ident <> "PrintC " <> showCL 0 c

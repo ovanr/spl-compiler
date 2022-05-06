@@ -2,7 +2,7 @@
 f (x) :: a -> a {
 	print(x);
 	f((x, x));
-	return f((x, x)).fst;
+	return f((x, x));
 }
 
 main () :: -> Void {

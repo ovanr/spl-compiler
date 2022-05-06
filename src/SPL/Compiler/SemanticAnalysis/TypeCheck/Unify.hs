@@ -90,7 +90,7 @@ instance Types TCTFunDecl where
     freeVars (TCTFunDecl loc id args t body) = freeVars t
 
 instance Types TCTFunBody where
-    s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) stmts
+    s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) (map (s $*) stmts)
     freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl
 
 instance Types TCTStmt where

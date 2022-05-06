@@ -277,7 +277,8 @@ typeCheckFunCall gamma (TCTFunCall locF id@(TCTIdentifier locI _) _ args) tau = 
     (tcon1, args', funType, argsSubst) <- foldrM typeCheckArgs (mempty, [], tau, mempty) args
     (tcon2, id', idSubst) <- typeCheckVar (argsSubst $* gamma) id Fun funType
     let subst = idSubst <> argsSubst
-    return (subst $* tcon1 <> tcon2, TCTFunCall locF id' (subst $* funType) args', subst)
+    let tconAll = subst $* (tcon1 <> tcon2)
+    return (tconAll, TCTFunCall locF id' (updateTCon tconAll $ subst $* funType) args', subst)
 
     where
         typeCheckArgs :: TCTExpr ->
@@ -299,28 +300,28 @@ typeCheckStmt :: TypeEnv ->
                  TCTType ->
                  TCMonad (Set TCon, TCTStmt, Subst)
 typeCheckStmt gamma stmt@(IfElseStmt loc cond thenStmts elseStmts) tau = do
-    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
-    (tcon2, _, thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts (condSubst $* tau)
+    (tcon1, cond', condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
+    (tcon2, thenStmts', thenSubst) <- typeCheckStmtList (condSubst $* gamma) thenStmts (condSubst $* tau)
     let combSubst = thenSubst <> condSubst
-    (tcon3, _, elseSubst) <- typeCheckStmtList (combSubst $* gamma) elseStmts (combSubst $* tau)
+    (tcon3, elseStmts', elseSubst) <- typeCheckStmtList (combSubst $* gamma) elseStmts (combSubst $* tau)
     let subst = elseSubst <> combSubst
-    return (subst $* tcon1 <> tcon2 <> tcon3, stmt, subst)
+    return (subst $* tcon1 <> tcon2 <> tcon3, IfElseStmt loc cond' thenStmts' elseStmts', subst)
 
 typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) tau = do
-    (tcon1, _, condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
-    (tcon2, _, bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts (condSubst $* tau)
+    (tcon1, cond', condSubst) <- typeCheckExpr gamma cond (TCTBoolType (getLoc cond) mempty)
+    (tcon2, bodyStmts', bodySubst) <- typeCheckStmtList (condSubst $* gamma) bodyStmts (condSubst $* tau)
     let subst = bodySubst <> condSubst
-    return (subst $* tcon1 <> tcon2, stmt, subst)
+    return (subst $* tcon1 <> tcon2, WhileStmt loc cond' bodyStmts', subst)
 
 typeCheckStmt gamma stmt@(AssignStmt loc field expr) tau = do
     alpha1 <- freshVar (getLoc field) "fd"
-    (tcon1, _, fieldSubst) <- typeCheckFieldSelector gamma field alpha1
+    (tcon1, field', fieldSubst) <- typeCheckFieldSelector gamma field alpha1
     alpha2 <- freshVar (getLoc expr) "expr"
-    (tcon2, _, exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
+    (tcon2, expr', exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
     let combSubst = exprSubst <> fieldSubst
     aSubst <- unify (combSubst $* alpha1) (combSubst $* alpha2)
     let subst = aSubst <> combSubst
-    return (subst $* tcon1 <> tcon2, stmt, subst)
+    return (subst $* tcon1 <> tcon2, AssignStmt loc field' expr', subst)
 
 typeCheckStmt gamma stmt@(ReturnStmt loc Nothing) tau = do
     subst <- unify (TCTVoidType loc mempty) tau
@@ -366,11 +367,11 @@ typeCheckStmtList gamma (st:sts) tau = do
     let subst = substSts <> substSt
     return (subst $* tcon1 <> tcon2, st':sts', subst)
 
-retTypeToVoid :: TCTType -> TCTType -> Subst
+retTypeToVoid :: TCTType -> TCTType -> Maybe Subst
 retTypeToVoid (TCTVarType l c v) t
-    | countOccurances v t == 1 = Subst . M.singleton v $ TCTVoidType l c
-    | otherwise = mempty
-retTypeToVoid _ _ = error "internal typecheck error: not given var type"
+    | countOccurances v t == 1 = Just . Subst . M.singleton v $ TCTVoidType l c
+    | otherwise = Nothing
+retTypeToVoid _ _ = Nothing
 
 countOccurances :: TypeVar -> TCTType -> Int
 countOccurances var (TCTVarType _ _ nm)
@@ -418,20 +419,25 @@ typeCheckFunDecl :: TypeEnv ->
 typeCheckFunDecl gamma@(TypeEnv gamma') f@(TCTFunDecl loc id@(TCTIdentifier idLoc idName) args tau body) funType = do
     let (argTypes, retType) = decomposeFunType funType
     newGamma <- addArgsToEnv argTypes f gamma
-    (tcon, funBody', bSubst) <- typeCheckFunBody id newGamma body retType
+    (tcon, body'@(TCTFunBody bdLoc varDecl stmts), bSubst) <- typeCheckFunBody id newGamma body retType
 
     let expectedType' = bSubst $* updateTCon tcon funType
-    let voidSubst = retTypeToVoid retType expectedType'
+    let (body'', voidSubst) =
+                case retTypeToVoid retType expectedType' of
+                    Just subst ->
+                        let returnVoid = ReturnStmt loc Nothing
+                        in (TCTFunBody bdLoc varDecl (stmts ++ [returnVoid]), subst)
+                    Nothing -> (body', mempty)
     let expectedType'' = voidSubst $* expectedType'
 
     case tau of
         TCTVarType _ _ "" -> do
             validateTCon tcon
-            return (TCTFunDecl loc id args expectedType'' funBody', voidSubst <> bSubst)
+            return (TCTFunDecl loc id args expectedType'' body'', voidSubst <> bSubst)
         _ -> do
             tSubst <- tau <=* generalise (voidSubst <> bSubst $* TypeEnv (M.delete (idName, Fun) gamma')) expectedType''
             validateTCon (tSubst $* tcon)
-            return (TCTFunDecl loc id args (tSubst $* expectedType'') funBody', voidSubst <> tSubst <> bSubst)
+            return (TCTFunDecl loc id args (tSubst $* expectedType'') body'', voidSubst <> tSubst <> bSubst)
 
 typeCheckFunDecls :: TypeEnv ->
                      [TCTFunDecl] ->
