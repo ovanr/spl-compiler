@@ -87,6 +87,16 @@ instance CoreLangPrinter CoreInstr where
         mkIdent ident <> "Not " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (Neg dst src) =
         mkIdent ident <> "Neg " <> showCL 0 dst <> " " <> showCL 0 src
+    showCL ident (Eq dst src1 src2) =
+        mkIdent ident <> "Eq " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
+    showCL ident (Lt dst src1 src2) =
+        mkIdent ident <> "Lt " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
+    showCL ident (Le dst src1 src2) =
+        mkIdent ident <> "Le " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
+    showCL ident (Gt dst src1 src2) =
+        mkIdent ident <> "Gt " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
+    showCL ident (Ge dst src1 src2) =
+        mkIdent ident <> "Ge " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (Declare var) =
         mkIdent ident <> "Declare " <> showCL 0 var
     showCL ident (SetLabel label) =

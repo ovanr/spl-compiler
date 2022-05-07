@@ -3,6 +3,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module SPL.Compiler.CodeGen.CoreLangGenLib where
@@ -13,13 +14,13 @@ import qualified Data.List as L
 import qualified Data.Set as S
 import Data.Bifunctor
 import Data.Either
-import Control.Lens
+import Control.Lens hiding (Snoc)
 import Control.Monad.State
 import GHC.Stack
 import Control.Applicative
 
 import SPL.Compiler.CodeGen.CoreLang
-import SPL.Compiler.Common.TypeFunc 
+import SPL.Compiler.Common.TypeFunc
 import qualified SPL.Compiler.SemanticAnalysis.TCT as TCT
 import qualified SPL.Compiler.SemanticAnalysis.TypeCheck as TCT
 
@@ -70,9 +71,9 @@ mkLabel prefix = do
 mkTmpVar :: CoreType a -> CoreMonad (Var a)
 mkTmpVar ct = do
     id <- mkName "tmp"
-    someCtx <- use vars
-    case someCtx of
-        Some1 ctx' -> pure $ Var id ct
+    let var = Var id ct
+    body <>= [Declare var]
+    pure var
 
 unsafeCast :: Var a -> CoreType b -> CoreMonad (Var b)
 unsafeCast var@(Var varId varT) resultType = do
@@ -86,20 +87,20 @@ unsafeCast var@(Var varId varT) resultType = do
 copyV :: Var a -> CoreMonad (Var a)
 copyV var@(Var id ct) = do
     newVar <- mkTmpVar ct
-    body <>= [Declare var, StoreV newVar var]
+    body <>= [StoreV newVar var]
     return newVar
 
 getRef :: Var a -> CoreMonad (Var (Ptr a))
 getRef var = do
     varRef <- mkTmpVar (CorePtrType $ var ^. varType)
-    body <>= [Declare varRef, Ref varRef var]
+    body <>= [Ref varRef var]
     return varRef
 
-ifCoreTypeEq :: forall a b c. 
-                CoreType a -> 
-                CoreType b -> 
-                (CoreType a -> CoreType a -> c) -> 
-                (CoreType a -> c) -> 
+ifCoreTypeEq :: forall a b c.
+                CoreType a ->
+                CoreType b ->
+                (CoreType a -> CoreType a -> c) ->
+                (CoreType a -> c) ->
                 c
 ifCoreTypeEq ta tb f g = fromRight (g ta)
     (whenCoreTypeEq ta tb (\ta tb -> Right (f ta tb)) :: Either () c)
@@ -130,12 +131,12 @@ whenCoreTypeEq ta tb _ = fail $
     "Unexpected Type mismatch: " <>
     show ta <> " /= " <> show tb <> "\n" <> stackTrace
 
-whenListCoreTypeEq :: (HasCallStack, MonadFail m) => 
-                      HList CoreType xs -> 
-                      HList CoreType ys -> 
-                      (HList CoreType xs -> HList CoreType xs -> m c) 
+whenListCoreTypeEq :: (HasCallStack, MonadFail m) =>
+                      HList CoreType xs ->
+                      HList CoreType ys ->
+                      (HList CoreType xs -> HList CoreType xs -> m c)
                       -> m c
-whenListCoreTypeEq HNil HNil f = f HNil HNil 
+whenListCoreTypeEq HNil HNil f = f HNil HNil
 whenListCoreTypeEq (x :+: xs) (y :+: ys) f =
     whenCoreTypeEq x y $ \x' y' -> do
         whenListCoreTypeEq xs ys $ \xs' ys' ->
@@ -171,6 +172,27 @@ whenListVarTEq ta tb _ = fail $
     show (hListLength ta) <> " /= " <> show (hListLength tb) <>
     "\n" <> stackTrace
 
+whenFunTEq :: (HasCallStack, MonadFail m) =>
+              CoreFunDecl as1 r1 ->
+              CoreType (Ptr (as2 --> r2)) ->
+              (CoreFunDecl as2 r2 -> m c)
+              -> m c
+whenFunTEq (CoreFunDecl label funArgs funRet) (CoreFunType argT retT) f =
+    whenListVarTEq (hListZip2 (\t' (Var id _) -> Var id t') (Var "") argT funArgs) funArgs $
+        \funArgs' _ ->
+            whenCoreTypeEq retT funRet $
+                \retT' _ -> f $ CoreFunDecl label funArgs' retT'
+whenFunTEq _ _ _ = coreError
+
+ifFunTypeEq :: forall as1 r1 as2 r2 c.
+               CoreFunDecl as1 r1 ->
+               CoreType (Ptr (as2 --> r2)) ->
+               (CoreFunDecl as2 r2 -> c) ->
+               c ->
+               c
+ifFunTypeEq decl expT f g = fromRight g
+    (whenFunTEq decl expT (Right . f) :: Either () c)
+
 tctTypeToCoreType :: TCT.TCTType -> Some1 CoreType
 tctTypeToCoreType TCT.TCTIntType{} = Some1 CoreIntType
 tctTypeToCoreType TCT.TCTBoolType{} = Some1 CoreBoolType
@@ -201,18 +223,75 @@ tctTConToCoreType (TCT.TOrd t) =
     case tctTypeToCoreType t of
         Some1 t' -> Some1 $ CoreFunType (t' :+: t' :+: HNil) CoreBoolType
 
-findFun :: Identifier -> CoreMonad (Some1 CoreFunDecl')
-findFun id = do
+castFunArg :: Var a -> Var b -> CoreMonad (Var a)
+castFunArg arg@(Var _ argT) concreteArg = do
+    if hasUnknownType argT then do
+        concreteArg' <- mkTmpVar argT
+        body <>= [StoreVUnsafe concreteArg' concreteArg]
+        pure concreteArg'
+    else
+        whenVarTEq arg concreteArg $ \arg' concreteArg' -> return concreteArg'
+
+castFunArgs :: HList Var xs -> [Some1 Var] -> CoreMonad (HList Var xs)
+castFunArgs HNil [] = pure HNil
+castFunArgs (arg :+: args) (Some1 concreteArg:concreteArgs) = do
+    concreteArg' <- castFunArg arg concreteArg
+    concreteArgs' <- castFunArgs args concreteArgs
+    return (concreteArg' :+: concreteArgs')
+castFunArgs hs ys = coreErrorWithDesc . T.pack $
+    "Mismatched number of function arguments: " <>
+    show (hListLength hs) <> " /= " <> show (length ys)
+
+callFunWith :: Identifier -> [Some1 Var] -> CoreMonad (Some1 Var)
+callFunWith funName args = do
+    Some1 (CoreFunDecl' fun) <- findFunByName funName
+    args' <- castFunArgs (fun ^. funArgs) args
+    dst <- mkTmpVar (fun ^. funRetType)
+    body <>= [ Call dst fun args' ] 
+    return (Some1 dst)
+
+findFunByName :: Identifier -> CoreMonad (Some1 CoreFunDecl')
+findFunByName id = do
     Some1 funDecls <- use funcs
-    findFun' funDecls id
+    findFunByName' funDecls id
 
     where
-        findFun' :: HList CoreFunDecl' xs -> Identifier -> CoreMonad (Some1 CoreFunDecl')
-        findFun' HNil _ = coreError
-        findFun' (CoreFunDecl' f :+: rest) id
+        findFunByName' :: HList CoreFunDecl' xs -> Identifier -> CoreMonad (Some1 CoreFunDecl')
+        findFunByName' HNil _ = coreError
+        findFunByName' (CoreFunDecl' f :+: rest) id
             | f ^. funId == id = return $ Some1 (CoreFunDecl' f)
-            | otherwise = findFun' rest id
+            | otherwise = findFunByName' rest id
 
+getFunType :: CoreFunDecl xs a -> CoreType (Ptr (xs --> a))
+getFunType (CoreFunDecl _ args ret) = CoreFunType (hListTCMap _varType args) ret
+
+findFun :: forall as r. (Identifier -> Bool) -> CoreType (Ptr (as --> r)) -> CoreMonad (CoreFunDecl as r)
+findFun pred reqT@CoreFunType{} = do
+    Some1 funDecls <- use funcs
+    findFun' funDecls
+
+    where
+        findFun' :: HList CoreFunDecl' xs -> CoreMonad (CoreFunDecl as r)
+        findFun' HNil = coreError
+        findFun' (CoreFunDecl' f :+: rest)
+            | pred (f ^. funId) =
+                ifFunTypeEq f reqT return (findFun' rest)
+            | otherwise = findFun' rest
+findFun _ _ = coreError
+
+searchFunByName :: (Identifier -> Bool) -> CoreMonad (Maybe (Some1 CoreFunDecl')) 
+searchFunByName pred = do
+    Some1 funDecls <- use funcs
+    pure $ searchByName funDecls
+
+    where
+        searchByName :: HList CoreFunDecl' xs -> Maybe (Some1 CoreFunDecl')
+        searchByName HNil = Nothing
+        searchByName (CoreFunDecl' f :+: rest)
+            | pred (f ^. funId) = Just $ Some1 (CoreFunDecl' f)
+            | otherwise = searchByName rest
+
+    
 findVarByName :: Identifier -> CoreMonad (Some1 Var)
 findVarByName id = findVarByPred (\(Var varId _) -> varId == id)
 
@@ -223,9 +302,9 @@ findVar f reqT = do
     where
         findVar' :: HList Var xs -> CoreMonad (Var a)
         findVar' HNil = coreError
-        findVar' (v@(Var varId varT) :+: rest) 
+        findVar' (v@(Var varId varT) :+: rest)
             | f varId = do
-                ifCoreTypeEq reqT varT (\reqT' varT' -> return (Var varId varT')) 
+                ifCoreTypeEq reqT varT (\reqT' varT' -> return (Var varId varT'))
                                                (const (findVar' rest))
             | otherwise = findVar' rest
 
@@ -237,18 +316,18 @@ findVarByPred f = do
     where
         findVarByPred' :: HList Var xs -> CoreMonad (Some1 Var)
         findVarByPred' HNil = coreError
-        findVarByPred' (v :+: rest) 
+        findVarByPred' (v :+: rest)
             | f v = pure $ Some1 v
             | otherwise = findVarByPred' rest
 
 findConVar :: TCT.TCon -> CoreMonad (Some1 Var)
 findConVar tcon =
     case tctTConToCoreType tcon of
-        Some1 tconT -> 
+        Some1 tconT ->
             case tcon of
-                TCT.TPrint _ -> findVarByPred $ \(Var id varT) -> 
+                TCT.TPrint _ -> findVarByPred $ \(Var id varT) ->
                     ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'print_con" id) (const False)
-                TCT.TEq _ -> findVarByPred $ \(Var id varT) -> 
+                TCT.TEq _ -> findVarByPred $ \(Var id varT) ->
                     ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'eq_con" id) (const False)
-                TCT.TOrd _ -> findVarByPred $ \(Var id varT) -> 
+                TCT.TOrd _ -> findVarByPred $ \(Var id varT) ->
                     ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'ord_con" id) (const False)

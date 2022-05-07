@@ -14,4 +14,11 @@ g (x, y) {
 
 main () {
     g (12, 32);
+    g (12:[], 23:[]);
+}
+
+f () {
+    while (True) {
+        return False;
+    }
 }

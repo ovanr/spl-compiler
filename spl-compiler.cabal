@@ -23,6 +23,7 @@ library
       SPL.Compiler.CodeGen.CoreLangGen
       SPL.Compiler.CodeGen.CoreLangGenLib
       SPL.Compiler.CodeGen.CoreLangPrinter
+      SPL.Compiler.CodeGen.CoreLangTConGen
       SPL.Compiler.Common.EntityLocation
       SPL.Compiler.Common.Error
       SPL.Compiler.Common.TypeFunc
@@ -57,6 +58,7 @@ library
     , array
     , base >=4.7 && <5
     , bytestring
+    , constraints
     , containers
     , data-default
     , directory
@@ -81,6 +83,7 @@ executable spl-compiler
     , array
     , base >=4.7 && <5
     , bytestring
+    , constraints
     , containers
     , data-default
     , directory
@@ -120,6 +123,7 @@ test-suite spl-compiler-test
     , array
     , base >=4.7 && <5
     , bytestring
+    , constraints
     , containers
     , data-default
     , directory

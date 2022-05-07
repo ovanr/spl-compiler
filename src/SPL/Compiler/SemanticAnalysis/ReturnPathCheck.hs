@@ -28,6 +28,7 @@ returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ st
 
         guaranteedReturn :: TCTStmt -> Bool
         guaranteedReturn (ReturnStmt _ _) = True 
+        guaranteedReturn (WhileStmt _ (BoolExpr _ True) _) = True 
         guaranteedReturn (IfElseStmt _ _ thenStmts elseStmts) = guaranteedReturn' thenStmts && guaranteedReturn' elseStmts
         guaranteedReturn _ = False
 

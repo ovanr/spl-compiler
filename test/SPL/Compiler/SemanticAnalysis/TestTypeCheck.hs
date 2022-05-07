@@ -258,7 +258,7 @@ test_type_check_expr_19 = do
 
 test_type_check_expr_20 = do
             -- True <= False :: ?v = Fail
-            let test = [] |= op2 True LessEq False ~\= typ @(TVar "sigma")
+            let test = [] |= (op2 True LessEq False, typ @(TVar "sigma")) ~= (typ @Bool, [TOrd $ typ @Bool])
             executeTCTests [test] typeCheckExpr'
 
 

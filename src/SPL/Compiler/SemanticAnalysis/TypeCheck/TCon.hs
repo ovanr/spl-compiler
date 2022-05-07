@@ -105,10 +105,8 @@ validateTCon = validateTCon' . S.toList
         validateTCon' [] = return ()
         validateTCon' (t@(TEq TCTFunType{}):_) = mkError t >>= tcError
         validateTCon' (TEq _:xs) = validateTCon' xs
-        validateTCon' (TOrd TCTIntType{}:xs) = validateTCon' xs
-        validateTCon' (TOrd TCTCharType{}:xs) = validateTCon' xs
-        validateTCon' (TOrd TCTVarType{}:xs) = validateTCon' xs
-        validateTCon' (t@(TOrd _):_) = mkError t >>= tcError
+        validateTCon' (t@(TOrd TCTFunType{}):_) = mkError t >>= tcError
+        validateTCon' (TOrd _:xs) = validateTCon' xs
         validateTCon' (t@(TPrint TCTFunType{}):_) = mkError t >>= tcError
         validateTCon' ((TPrint _):xs) = validateTCon' xs
         mkError tcon = do

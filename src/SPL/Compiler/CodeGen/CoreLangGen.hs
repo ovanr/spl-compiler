@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module SPL.Compiler.CodeGen.CoreLangGen where
@@ -18,6 +19,7 @@ import Control.Applicative
 
 import SPL.Compiler.CodeGen.CoreLang
 import SPL.Compiler.CodeGen.CoreLangGenLib
+import SPL.Compiler.CodeGen.CoreLangTConGen
 import SPL.Compiler.Common.TypeFunc
 import qualified SPL.Compiler.SemanticAnalysis.TCT as TCT
 import qualified SPL.Compiler.SemanticAnalysis.TypeCheck.TCon as TCT
@@ -27,17 +29,17 @@ exprToCoreInstr ::TCT.TCTExpr -> CoreMonad (Some1 Var)
 
 exprToCoreInstr (TCT.IntExpr _ i) = do
     tmp <- mkTmpVar CoreIntType
-    body <>= [ Declare tmp, StoreI tmp (fromInteger i)]
+    body <>= [StoreI tmp (fromInteger i)]
     pure (Some1 tmp)
 
 exprToCoreInstr (TCT.CharExpr _ c) = do
     tmp <- mkTmpVar CoreCharType
-    body <>= [ Declare tmp, StoreC tmp c ]
+    body <>= [StoreC tmp c ]
     pure (Some1 tmp)
 
 exprToCoreInstr (TCT.BoolExpr _ b) = do
     tmp <- mkTmpVar CoreBoolType
-    body <>= [ Declare tmp, StoreB tmp b ]
+    body <>= [StoreB tmp b ]
     pure (Some1 tmp)
 
 exprToCoreInstr (TCT.OpExpr _ op e) = do
@@ -52,7 +54,7 @@ exprToCoreInstr (TCT.EmptyListExpr _ t) = do
     case tctTypeToCoreType t of
         Some1 t@(CoreListType elemT) -> do
             tmp <- mkTmpVar t
-            body <>= [ Declare tmp, MkNilList tmp ]
+            body <>= [MkNilList tmp]
             pure (Some1 tmp)
         _ -> coreError
 
@@ -60,7 +62,7 @@ exprToCoreInstr (TCT.TupExpr _ e1 e2) = do
     (Some1 src1@(Var _ ct1)) <- exprToCoreInstr e1
     (Some1 src2@(Var _ ct2)) <- exprToCoreInstr e2
     tmp <- mkTmpVar (CoreTupleType ct1 ct2)
-    body <>= [ Declare tmp, MkTup tmp src1 src2]
+    body <>= [MkTup tmp src1 src2]
     pure (Some1 tmp)
 
 exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
@@ -82,7 +84,7 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
         TCT.LogOr -> handleSimpleOp CoreBoolType e1 Or e2
     where
         greaterIsNotLessEq loc e1 e2 = TCT.OpExpr loc TCT.UnNeg (TCT.Op2Expr loc e1 TCT.LessEq e2)
-        lessEqIsEqOrLess loc e1 e2 = 
+        lessEqIsEqOrLess loc e1 e2 =
             TCT.Op2Expr loc (TCT.Op2Expr loc e1 TCT.Equal e2) TCT.LogOr (TCT.Op2Expr loc e1 TCT.Less e2)
         greaterEqIsNotLess loc e1 e2 = TCT.OpExpr loc TCT.UnNeg (TCT.Op2Expr loc e1 TCT.Less e2)
         nEqIsNotEq loc e1 e2 = TCT.OpExpr loc TCT.UnNeg $ TCT.Op2Expr loc e1 TCT.Equal e2
@@ -97,7 +99,7 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
             tmp <- mkTmpVar t
             whenVarTEq tmp src1 $ \tmp' src1' ->
                 whenVarTEq src1' src2 $ \src1'' src2' -> do
-                    body <>= [ Declare tmp', opInstr tmp' src1'' src2' ]
+                    body <>= [opInstr tmp' src1'' src2' ]
                     return (Some1 tmp')
 
         handleOverloadedOp :: (Identifier -> Bool) ->
@@ -110,7 +112,7 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
             let conType = CoreFunType (arg1T :+: arg2T :+: HNil) CoreBoolType
             solver <- findVar varConPredicate conType
             dst <- mkTmpVar CoreBoolType
-            body <>= [ Declare dst, CallV dst solver (src1 :+: src2 :+: HNil) ]
+            body <>= [CallV dst solver (src1 :+: src2 :+: HNil)]
             return $ Some1 dst
 
         handleConsOp :: TCT.TCTExpr ->
@@ -121,14 +123,14 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
             (Some1 list@(Var _ lct@(CoreListType _))) <- exprToCoreInstr e2
             whenVarTListEq list elem $ \list' elem' -> do
                 tmp <- mkTmpVar lct
-                body <>= [Declare tmp, ConsList tmp list' elem']
+                body <>= [ConsList tmp list' elem']
                 return (Some1 tmp)
 
 exprToCoreInstr (TCT.FunCallExpr f) = funCallToCoreInstr f
 
 exprToCoreInstr (TCT.FieldSelectExpr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier _ id) tau fds)) = do
     Some1 src <- findVarByName id
-    funDecl <- mapM (findFun . tctFieldToId) fds
+    funDecl <- mapM (findFunByName . tctFieldToId) fds
     Some1 dst@(Var _ dstT) <- mkFieldSelectorCall src funDecl
     if hasUnknownType dstT then
         case tctTypeToCoreType tau of
@@ -152,41 +154,22 @@ mkFieldSelectorCall src (Some1 (CoreFunDecl' f): fs) = do
             mkFieldSelectorCall dst fs
         _ -> coreError
 
-castFunArg :: Var a -> Var b -> CoreMonad (Var a)
-castFunArg arg@(Var _ argT) concreteArg = do
-    if hasUnknownType argT then do
-        concreteArg' <- mkTmpVar argT
-        body <>= [ Declare concreteArg', StoreVUnsafe concreteArg' concreteArg ]
-        pure concreteArg'
-    else
-        whenVarTEq arg concreteArg $ \arg' concreteArg' -> return concreteArg'
-
-castFunArgs :: HList Var xs -> [Some1 Var] -> CoreMonad (HList Var xs)
-castFunArgs HNil [] = pure HNil
-castFunArgs (arg :+: args) (Some1 concreteArg:concreteArgs) = do
-    concreteArg' <- castFunArg arg concreteArg
-    concreteArgs' <- castFunArgs args concreteArgs
-    return (concreteArg' :+: concreteArgs')
-castFunArgs hs ys = coreErrorWithDesc . T.pack $
-    "Mismatched number of function arguments: " <>
-    show (hListLength hs) <> " /= " <> show (length ys)
-
 funCallToCoreInstr :: TCT.TCTFunCall -> CoreMonad (Some1 Var)
 funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ args) = do
     [Some1 arg@(Var _ argT)] <- mapM exprToCoreInstr args
     let printType = CoreFunType (argT :+: HNil) CoreVoidType
     conVar <- findVar (T.isPrefixOf "'print_con") printType
     dst <- mkTmpVar CoreVoidType
-    body <>= [Declare dst, CallV dst conVar (arg :+: HNil)]
+    body <>= [CallV dst conVar (arg :+: HNil)]
     return (Some1 dst)
 
 funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ id) tau args) = do
     argVars <- mapM exprToCoreInstr args
-    Some1 (CoreFunDecl' f) <- findFun id
-    conVars <- mapM findConVar (S.toList $ TCT.getTypeCon tau) 
+    Some1 (CoreFunDecl' f) <- findFunByName id
+    conVars <- mapM findConVar (S.toList $ TCT.getTypeCon tau)
     argVars' <- castFunArgs (f ^. funArgs) (conVars ++ argVars)
     dst <- mkTmpVar (f ^. funRetType)
-    body <>= [Declare dst, Call dst f argVars']
+    body <>= [Call dst f argVars']
     case tctTypeToCoreType (TCT.getReturnType tau) of
         Some1 concreteRetType -> Some1 <$> unsafeCast dst concreteRetType
 
@@ -194,7 +177,7 @@ fieldSelectorStmtToCoreInstr :: TCT.TCTFieldSelector ->
                                 CoreMonad (Some1 Var)
 fieldSelectorStmtToCoreInstr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier _ id) tau fds) = do
     Some1 src <- findVarByName id
-    funDecls <- mapM findFun $ getFunNames fds
+    funDecls <- mapM findFunByName $ getFunNames fds
     Some1 dst <- case funDecls of
         [] -> Some1 <$> getRef src
         _ -> mkFieldSelectorCall src funDecls
@@ -244,7 +227,7 @@ stmtToCoreInstr (TCT.ReturnStmt _ ma) = do
     case ma of
         Nothing -> do
             voidVar <- mkTmpVar CoreVoidType
-            body <>= [ Declare voidVar, RetV voidVar ]
+            body <>= [ RetV voidVar ]
         Just e -> do
             (Some1 dst) <- exprToCoreInstr e
             body <>= [RetV dst]
@@ -274,7 +257,7 @@ varDeclToCoreInstr (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
 mkTConArgs :: [TCT.TCon] -> CoreMonad (Some1 (HList Var))
 mkTConArgs [] = pure (Some1 HNil)
 mkTConArgs (tcon:xs) = do
-    argName <- 
+    argName <-
         case tcon of
             TCT.TPrint _ -> mkName "print_con"
             TCT.TEq _ -> mkName "eq_con"
@@ -294,7 +277,7 @@ mkFunArgs _ _ = pureCoreError
 funDeclToCoreFunDecl :: TCT.TCTFunDecl -> CoreMonad (Some1 CoreFunDecl')
 funDeclToCoreFunDecl (TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) args tau _) = do
     Some1 conVars <- mkTConArgs (S.toList $ TCT.getTypeCon tau)
-    
+
     case (mkFunArgs args tau, tctTypeToCoreType (TCT.getReturnType tau)) of
         (Some1 argVars, Some1 retType) -> do
             return . Some1 . CoreFunDecl' $ CoreFunDecl id (conVars +++ argVars) retType
@@ -348,6 +331,30 @@ mkMagicFuncs = Some1 $ isEmpty :+: hd :+: tl :+: fst :+: snd :+: HNil
                         (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil)
                         (CorePtrType (CoreUnknownType "b"))
 
+mkTConFuncs :: CoreMonad [Some1 CoreFunDef]
+mkTConFuncs = do
+    mainFun <- searchFunByName (== "main")
+    case mainFun of 
+        Nothing -> pure []
+        Just (Some1 (CoreFunDecl' mainFun')) -> solveFunDeclConstraints mainFun'
+
+mkStartFun :: HList CoreFunDecl' xs -> CoreMonad (CoreFunDef '[Unit])
+mkStartFun tconFuncs = do
+    let startFunDecl = CoreFunDecl' (CoreFunDecl "'start" HNil CoreVoidType)
+    mainFun <- searchFunByName (== "main")
+    case mainFun of
+        Nothing -> pure $ CoreFunDef startFunDecl [Halt]
+        Just (Some1 (CoreFunDecl' main@(CoreFunDecl _ args _))) -> do
+            body .= []
+            funArgs <- forM (hListToList tconFuncs) (\(Some1 (CoreFunDecl' f)) -> do 
+                tmp <- mkTmpVar (getFunType f) 
+                body <>= [StoreL tmp f]
+                return (Some1 tmp))
+            callFunWith "main" funArgs
+            body <>= [Halt]
+            funBody <- use body
+            pure (CoreFunDef startFunDecl funBody)
+
 tctToCoreLang :: TCT.TCT -> CoreMonad (Some2 CoreLang)
 tctToCoreLang (TCT.TCT varDecls funDecls) = do
     let funDecls' = concat funDecls
@@ -365,8 +372,11 @@ tctToCoreLang (TCT.TCT varDecls funDecls) = do
         liftA2Some (\x y -> Some1 (x +++ y)) magicFuncs . hListFromList
             <$> forM funDecls' (\(TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) _ _ funBody) -> do
                 vars .= Some1 coreGlobals
-                Some1 funDecl <- findFun id
+                Some1 funDecl <- findFunByName id
                 body .= []
                 funDeclToCoreInstr funDecl funBody)
 
-    return . Some2 $ CoreLang globalDecls funDefs
+    Some1 tconFuncs <- hListFromList <$> mkTConFuncs
+    startFunc <- mkStartFun $ hListTCMap (\(CoreFunDef decl _) -> decl) tconFuncs
+
+    return . Some2 $ CoreLang globalDecls (funDefs +++ tconFuncs +++ (startFunc :+: HNil))

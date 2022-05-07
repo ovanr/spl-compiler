@@ -1,5 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,6 +11,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 module SPL.Compiler.Common.TypeFunc where
+
+import Data.Constraint
+import Data.Proxy
 
 data HList (f :: k -> *) (xs :: [k]) where
     HNil :: HList f '[]
@@ -22,6 +28,25 @@ type family Snoc (xs :: [a]) (y :: a) :: [a] where
 type family Append (xs :: [a]) (ys :: [a]) :: [a] where
     Append '[] ys = ys
     Append (x ': xs) ys = x ': Append xs ys
+
+type family ConstrMap (f :: * -> Constraint) (xs :: [*]) :: Constraint where
+    ConstrMap f '[] = ()
+    ConstrMap f (x ': xs) = (f x :: Constraint, ConstrMap f xs) :: Constraint
+
+data Constrained (c :: * -> Constraint) (f :: * -> *) (a :: *) where
+    Constrained :: forall c f a. c a => f a -> Constrained c f a 
+    
+fromConstrained :: c a => Constrained c f a -> f a
+fromConstrained (Constrained fa) = fa
+
+class HListFromProxy as where
+    hListFromProxy :: Proxy as -> HList Proxy as
+
+instance HListFromProxy '[] where
+    hListFromProxy _ = HNil
+
+instance HListFromProxy xs => HListFromProxy (x ': xs) where
+    hListFromProxy _ = Proxy :+: hListFromProxy (Proxy @xs)
 
 data Some1 (f :: k -> *) where
     Some1 :: f a -> Some1 f
@@ -44,6 +69,10 @@ hListFromList (x:xs) =
     case (x, hListFromList xs) of
         (Some1 h, Some1 hs) -> Some1 (h :+: hs)
 
+hListTCMap :: (forall x. f x -> g x) -> HList f xs -> HList g xs
+hListTCMap f HNil = HNil
+hListTCMap f (x :+: xs) = f x :+: hListTCMap f xs
+
 hListMap :: (forall x. f x -> Some1 g) -> HList f xs -> Some1 (HList g)
 hListMap _ HNil = Some1 HNil
 hListMap f (x :+: xs) =
@@ -62,7 +91,7 @@ hListMapToList f = map (\(Some1 x) -> f x) . hListToList
 
 hListMapFromList :: (a -> Some1 g) -> [a] -> Some1 (HList g)
 hListMapFromList f [] = Some1 HNil
-hListMapFromList f (x:xs) = withSome1 (f x) $ \fx -> hListMapFromList f xs `bindSome` (Some1 . (:+:) fx) 
+hListMapFromList f (x:xs) = withSome1 (f x) $ \fx -> hListMapFromList f xs `bindSome` (Some1 . (:+:) fx)
 
 hListZip :: (forall x y. f x -> f y -> Some1 f) -> HList f xs -> HList f ys -> Some1 (HList f)
 hListZip _ HNil _ = Some1 HNil
@@ -70,6 +99,11 @@ hListZip _ _ HNil = Some1 HNil
 hListZip f (x :+: xs) (y :+: ys) =
     case (f x y, hListZip f xs ys ) of
         (Some1 fxy, Some1 fxsys) -> Some1 (fxy :+: fxsys)
+
+hListZip2 :: (forall x y. f x -> g y -> g x) -> (forall x. f x -> g x) -> HList f xs -> HList g ys -> HList g xs
+hListZip2 _ _ HNil _ = HNil
+hListZip2 _ g xs HNil = hListTCMap g xs
+hListZip2 f g (x :+: xs) (y :+: ys) = f x y :+: hListZip2 f g xs ys
 
 hListZipM1 :: Monad m => (forall x y. f x -> f y -> m (f x)) -> HList f xs -> HList f ys -> m (HList f xs)
 hListZipM1 _ HNil _ = pure HNil
