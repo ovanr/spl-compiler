@@ -1,19 +1,23 @@
 
 
+tuplify(x) {
+    return print((x,x));
+}
 
 g (x, y) {
     if (x >= y) {
+        print(3 ^ 3);
         return 5;
     }
     if (x == y) {
         return 3;
     }
-    print(x);
+    tuplify(y);
+    x.hd = x.hd ^ 3;
     return 7;
 }
 
 main () {
-    g (12, 32);
     g (12:[], 23:[]);
 }
 

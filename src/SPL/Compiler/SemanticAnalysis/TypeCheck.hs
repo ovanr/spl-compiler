@@ -314,13 +314,10 @@ typeCheckStmt gamma stmt@(WhileStmt loc cond bodyStmts) tau = do
     return (subst $* tcon1 <> tcon2, WhileStmt loc cond' bodyStmts', subst)
 
 typeCheckStmt gamma stmt@(AssignStmt loc field expr) tau = do
-    alpha1 <- freshVar (getLoc field) "fd"
-    (tcon1, field', fieldSubst) <- typeCheckFieldSelector gamma field alpha1
-    alpha2 <- freshVar (getLoc expr) "expr"
-    (tcon2, expr', exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr alpha2
-    let combSubst = exprSubst <> fieldSubst
-    aSubst <- unify (combSubst $* alpha1) (combSubst $* alpha2)
-    let subst = aSubst <> combSubst
+    alpha <- freshVar (getLoc field) "fd"
+    (tcon1, field', fieldSubst) <- typeCheckFieldSelector gamma field alpha
+    (tcon2, expr', exprSubst) <- typeCheckExpr (fieldSubst $* gamma) expr (fieldSubst $* alpha)
+    let subst = exprSubst <> fieldSubst
     return (subst $* tcon1 <> tcon2, AssignStmt loc field' expr', subst)
 
 typeCheckStmt gamma stmt@(ReturnStmt loc Nothing) tau = do

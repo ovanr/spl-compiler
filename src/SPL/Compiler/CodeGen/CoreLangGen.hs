@@ -19,6 +19,7 @@ import Control.Applicative
 
 import SPL.Compiler.CodeGen.CoreLang
 import SPL.Compiler.CodeGen.CoreLangGenLib
+import SPL.Compiler.CodeGen.CoreLangBuiltins
 import SPL.Compiler.CodeGen.CoreLangTConGen
 import SPL.Compiler.Common.TypeFunc
 import qualified SPL.Compiler.SemanticAnalysis.TCT as TCT
@@ -72,7 +73,7 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
         TCT.Mul -> handleSimpleOp CoreIntType e1 Mul e2
         TCT.Div -> handleSimpleOp CoreIntType e1 Div e2
         TCT.Mod -> handleSimpleOp CoreIntType e1 Mod e2
-        TCT.Pow -> lift (Left "Core functionality unimplemented")
+        TCT.Pow -> exprToCoreInstr $ mkPowCall loc e1 e2
         TCT.Equal -> handleOverloadedOp (T.isPrefixOf "'eq_con") e1 e2
         TCT.Less  -> handleOverloadedOp (T.isPrefixOf "'ord_con") e1 e2
         TCT.Greater  -> exprToCoreInstr $ greaterEqIsNotLess loc e1 e2
@@ -88,6 +89,14 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
             TCT.Op2Expr loc (TCT.Op2Expr loc e1 TCT.Equal e2) TCT.LogOr (TCT.Op2Expr loc e1 TCT.Less e2)
         greaterEqIsNotLess loc e1 e2 = TCT.OpExpr loc TCT.UnNeg (TCT.Op2Expr loc e1 TCT.Less e2)
         nEqIsNotEq loc e1 e2 = TCT.OpExpr loc TCT.UnNeg $ TCT.Op2Expr loc e1 TCT.Equal e2
+        mkPowCall loc e1 e2 = 
+            TCT.FunCallExpr $ 
+                TCT.TCTFunCall loc 
+                               (TCT.TCTIdentifier loc "'pow") 
+                               (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty) 
+                                                          (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty)
+                                                                                     (TCT.TCTIntType loc mempty)))
+                               [e1, e2]
         handleSimpleOp :: CoreType a ->
                           TCT.TCTExpr ->
                           (Var a -> Var a -> Var a -> CoreInstr) ->
@@ -164,12 +173,9 @@ funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ args) = do
     return (Some1 dst)
 
 funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ id) tau args) = do
-    argVars <- mapM exprToCoreInstr args
-    Some1 (CoreFunDecl' f) <- findFunByName id
     conVars <- mapM findConVar (S.toList $ TCT.getTypeCon tau)
-    argVars' <- castFunArgs (f ^. funArgs) (conVars ++ argVars)
-    dst <- mkTmpVar (f ^. funRetType)
-    body <>= [Call dst f argVars']
+    argVars <- mapM exprToCoreInstr args
+    Some1 dst <- callFunWith id (conVars ++ argVars)
     case tctTypeToCoreType (TCT.getReturnType tau) of
         Some1 concreteRetType -> Some1 <$> unsafeCast dst concreteRetType
 
@@ -182,12 +188,12 @@ fieldSelectorStmtToCoreInstr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier _ id) ta
         [] -> Some1 <$> getRef src
         _ -> mkFieldSelectorCall src funDecls
     case tctTypeToCoreType tau of
-        Some1 concreteRetType -> Some1 <$> unsafeCast dst concreteRetType
+        Some1 concreteRetType -> Some1 <$> unsafeCast dst (CorePtrType concreteRetType)
 
     where
         getFunNames :: [TCT.TCTField] -> [Identifier]
         getFunNames [] = []
-        getFunNames [x] = [T.pack (show x) <> "_assign"]
+        getFunNames [x] = ["'" <> T.pack (show x) <> "_assign"]
         getFunNames (x:xs) = T.pack (show x) : getFunNames xs
 
 
@@ -285,51 +291,10 @@ funDeclToCoreFunDecl (TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) args tau _) = do
 funDeclToCoreInstr :: CoreFunDecl' xs -> TCT.TCTFunBody -> CoreMonad (Some1 CoreFunDef)
 funDeclToCoreInstr decl@(CoreFunDecl' (CoreFunDecl _ args _)) (TCT.TCTFunBody _ varDecls stmts) = do
     vars %= \(Some1 varCtx) -> Some1 (args +++ varCtx)
-    mapM_ varDeclToCoreInstr varDecls
-    mapM_ stmtToCoreInstr stmts
-    funBody <- use body
+    funBody <- declareBodyAs $ do
+        mapM_ varDeclToCoreInstr varDecls
+        mapM_ stmtToCoreInstr stmts
     return . Some1 $ CoreFunDef decl funBody
-
-mkMagicFuncs :: Some1 (HList CoreFunDef)
-mkMagicFuncs = Some1 $ isEmpty :+: hd :+: tl :+: fst :+: snd :+: HNil
-    where
-        mkMagicFun :: Identifier -> HList Var xs -> CoreType r -> CoreFunDef (Snoc xs r)
-        mkMagicFun id args retType = CoreFunDef (CoreFunDecl' (CoreFunDecl id args retType)) [Halt]
-
-        isEmpty :: CoreFunDef '[Ptr [Unknown], Bool]
-        isEmpty = mkMagicFun "isEmpty" (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil) CoreBoolType
-
-        hd :: CoreFunDef '[Ptr [Unknown], Unknown]
-        hd = mkMagicFun "hd" (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil) (CoreUnknownType "a")
-
-        tl :: CoreFunDef '[Ptr [Unknown], Ptr [Unknown]]
-        tl = mkMagicFun "tl" (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil) (CoreListType (CoreUnknownType "a"))
-
-        fst :: CoreFunDef '[Ptr (Unknown, Unknown), Unknown]
-        fst = mkMagicFun "fst" (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil) (CoreUnknownType "a")
-
-        snd :: CoreFunDef '[Ptr (Unknown, Unknown), Unknown]
-        snd = mkMagicFun "snd" (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil) (CoreUnknownType "b")
-
-        hdAssign :: CoreFunDef '[Ptr [Unknown], Ptr Unknown]
-        hdAssign = mkMagicFun "hd_assign"
-                        (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil)
-                        (CorePtrType (CoreUnknownType "a"))
-
-        tlAssign :: CoreFunDef '[Ptr [Unknown], Ptr (Ptr [Unknown])]
-        tlAssign = mkMagicFun "tl_assign"
-                        (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil)
-                        (CorePtrType $ CoreListType (CoreUnknownType "a"))
-
-        fstAssign :: CoreFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        fstAssign = mkMagicFun "fst_assign"
-                        (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil)
-                        (CorePtrType (CoreUnknownType "a"))
-
-        sndAssign :: CoreFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        sndAssign = mkMagicFun "snd_assign"
-                        (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil)
-                        (CorePtrType (CoreUnknownType "b"))
 
 mkTConFuncs :: CoreMonad [Some1 CoreFunDef]
 mkTConFuncs = do
@@ -345,38 +310,40 @@ mkStartFun tconFuncs = do
     case mainFun of
         Nothing -> pure $ CoreFunDef startFunDecl [Halt]
         Just (Some1 (CoreFunDecl' main@(CoreFunDecl _ args _))) -> do
-            body .= []
-            funArgs <- forM (hListToList tconFuncs) (\(Some1 (CoreFunDecl' f)) -> do 
-                tmp <- mkTmpVar (getFunType f) 
-                body <>= [StoreL tmp f]
-                return (Some1 tmp))
-            callFunWith "main" funArgs
-            body <>= [Halt]
-            funBody <- use body
+            funBody <- declareBodyAs $ do
+                funArgs <- forM (hListToList tconFuncs) (\(Some1 (CoreFunDecl' f)) -> do 
+                    tmp <- mkTmpVar (getFunType f) 
+                    body <>= [StoreL tmp f]
+                    return (Some1 tmp))
+                callFunWith "main" funArgs
+                body <>= [Halt]
             pure (CoreFunDef startFunDecl funBody)
 
 tctToCoreLang :: TCT.TCT -> CoreMonad (Some2 CoreLang)
-tctToCoreLang (TCT.TCT varDecls funDecls) = do
-    let funDecls' = concat funDecls
-        magicFuncs = mkMagicFuncs
+tctToCoreLang (TCT.TCT varDecls userFunDecls) = do
+    let userFunDecls' = concat userFunDecls
 
-    funCtx <- hListFromList <$> mapM funDeclToCoreFunDecl funDecls'
+    userFunCtx <- hListFromList <$> mapM funDeclToCoreFunDecl userFunDecls'
+
+    Some1 builtinDefs <- mkBuiltins
 
     funcs .= liftA2Some (\x y -> Some1 (x +++ y))
-                funCtx
-                (withSome1 magicFuncs $ hListMap (Some1 . _funDecl))
+                userFunCtx
+                (hListMap (Some1 . _funDecl) builtinDefs)
 
     Some1 globalDecls <- hListFromList <$> mapM varDeclToCoreGlobal varDecls
     Some1 coreGlobals <- pure $ hListMap (\(CoreGlobal v _) -> Some1 v) globalDecls
-    Some1 funDefs <-
-        liftA2Some (\x y -> Some1 (x +++ y)) magicFuncs . hListFromList
-            <$> forM funDecls' (\(TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) _ _ funBody) -> do
+
+    Some1 userFunDefs <-
+        hListFromList <$> 
+            forM userFunDecls' (\(TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) _ _ funBody) -> do
                 vars .= Some1 coreGlobals
                 Some1 funDecl <- findFunByName id
-                body .= []
                 funDeclToCoreInstr funDecl funBody)
 
-    Some1 tconFuncs <- hListFromList <$> mkTConFuncs
-    startFunc <- mkStartFun $ hListTCMap (\(CoreFunDef decl _) -> decl) tconFuncs
+    Some1 tconFunDefs <- hListFromList <$> mkTConFuncs
 
-    return . Some2 $ CoreLang globalDecls (funDefs +++ tconFuncs +++ (startFunc :+: HNil))
+    startFuncDef <- mkStartFun $ hListTCMap (\(CoreFunDef decl _) -> decl) tconFunDefs
+
+    return . Some2 $ CoreLang globalDecls 
+                              (builtinDefs +++ tconFunDefs +++ userFunDefs +++ startFuncDef :+: HNil)

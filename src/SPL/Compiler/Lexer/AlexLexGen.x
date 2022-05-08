@@ -61,7 +61,7 @@ tokens :-
     -- to the function given and liftes the result to AlexAction
 
     -- symbols
-    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\-\(\)\[\]\/]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
+    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\^\-\(\)\[\]\/]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
 
     -- Bool

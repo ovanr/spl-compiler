@@ -120,9 +120,9 @@ instance CoreLangPrinter CoreInstr where
     showCL ident (StoreB dst b) =
         mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 b
     showCL ident (StoreV dst src) =
-        mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 src
+        mkIdent ident <> "StoreV " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (StoreA dst src) =
-        mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 src
+        mkIdent ident <> "StoreA " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (StoreL dst (CoreFunDecl label _ _)) =
         mkIdent ident <> "StoreL " <> showCL 0 dst <> " " <> label
     showCL ident (StoreVUnsafe dst src) =

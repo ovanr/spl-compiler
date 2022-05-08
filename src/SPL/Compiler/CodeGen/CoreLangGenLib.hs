@@ -257,7 +257,7 @@ findFunByName id = do
 
     where
         findFunByName' :: HList CoreFunDecl' xs -> Identifier -> CoreMonad (Some1 CoreFunDecl')
-        findFunByName' HNil _ = coreError
+        findFunByName' HNil _ = coreErrorWithDesc $ "Unable to find function: " <> id
         findFunByName' (CoreFunDecl' f :+: rest) id
             | f ^. funId == id = return $ Some1 (CoreFunDecl' f)
             | otherwise = findFunByName' rest id
@@ -331,3 +331,12 @@ findConVar tcon =
                     ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'eq_con" id) (const False)
                 TCT.TOrd _ -> findVarByPred $ \(Var id varT) ->
                     ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'ord_con" id) (const False)
+
+declareBodyAs :: CoreMonad () -> CoreMonad [CoreInstr]
+declareBodyAs st = do
+    body .= []
+    st
+    result <- use body
+    body .= []
+    return result
+

@@ -96,7 +96,7 @@ instance Types TCTFunBody where
 instance Types TCTStmt where
     s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
     s $* (WhileStmt loc e stmt) = WhileStmt loc (s $* e) (s $* stmt)
-    s $* (AssignStmt loc fd stmt) = AssignStmt loc fd (s $* stmt)
+    s $* (AssignStmt loc fd stmt) = AssignStmt loc (s $* fd) (s $* stmt)
     s $* (ReturnStmt loc me) = ReturnStmt loc (($*) s <$> me)
     s $* (FunCallStmt l f) = FunCallStmt l (s $* f)
     freeVars (IfElseStmt _ e s1 s2) = freeVars e <> freeVars s1 <> freeVars s2

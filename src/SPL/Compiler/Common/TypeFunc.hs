@@ -125,6 +125,8 @@ hListToList (x :+: xs) = Some1 x : hListToList xs
 HNil +++ ys = ys
 (x :+: xs) +++ ys = x :+: (xs +++ ys)
 
+infixr 2 +++
+
 hListLength :: Num a => HList f xs -> a
 hListLength HNil = 0
 hListLength (_ :+: xs) = 1 + hListLength xs

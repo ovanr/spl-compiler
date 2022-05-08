@@ -20,6 +20,7 @@ extra-source-files:
 library
   exposed-modules:
       SPL.Compiler.CodeGen.CoreLang
+      SPL.Compiler.CodeGen.CoreLangBuiltins
       SPL.Compiler.CodeGen.CoreLangGen
       SPL.Compiler.CodeGen.CoreLangGenLib
       SPL.Compiler.CodeGen.CoreLangPrinter

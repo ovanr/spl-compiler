@@ -244,8 +244,7 @@ _pExpr =
         , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
         , pChainr (pBinOp ":")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
-        , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
-        , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "%")
+        , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "^" <<|> pBinOp "%")
         , pChainr1 (pUnaryOp "!")
         , pChainr1 (pUnaryOp "-")
         ]

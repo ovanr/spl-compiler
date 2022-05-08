@@ -15,9 +15,11 @@ import SPL.Compiler.Common.TypeFunc
 
 class GenTConFun a where
     genEqCoreInstr :: Var a -> Var a -> CoreMonad (Var Bool)
+    genEqCoreInstr arg1 arg2 = genEqOrdCoreInstr genEqCoreInstr arg1 arg2
     genOrdCoreInstr :: Var a -> Var a -> CoreMonad (Var Bool)
-    genEqOrdCoreInstr ::
-        (forall a. GenTConFun a => Var a -> Var a -> CoreMonad (Var Bool)) -> Var a -> Var a -> CoreMonad (Var Bool)
+    genOrdCoreInstr arg1 arg2 = genEqOrdCoreInstr genOrdCoreInstr arg1 arg2
+    genEqOrdCoreInstr :: (forall a. GenTConFun a => Var a -> Var a -> CoreMonad (Var Bool)) -> 
+                         Var a -> Var a -> CoreMonad (Var Bool)
     genPrintCoreInstr :: Var a -> CoreMonad ()
 
 instance GenTConFun Unit where
@@ -105,8 +107,6 @@ instance GenTConFun Char where
 
 
 instance GenTConFun a => GenTConFun (Ptr [a]) where
-    genEqCoreInstr arg1 arg2 = genEqOrdCoreInstr genEqCoreInstr arg1 arg2
-    genOrdCoreInstr arg1 arg2 = genEqOrdCoreInstr genOrdCoreInstr arg1 arg2
     -- Given arguments: arg1 arg2
     -- while (True) {
     --     if (isEmpty(arg1) && isEmpty(arg2))
@@ -183,8 +183,6 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
     genPrintCoreInstr _ = coreError
 
 instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
-    genEqCoreInstr arg1 arg2 = genEqOrdCoreInstr genEqCoreInstr arg1 arg2
-    genOrdCoreInstr arg1 arg2 = genEqOrdCoreInstr genOrdCoreInstr arg1 arg2
     genEqOrdCoreInstr f arg1@(Var _ tupT@(CoreTupleType elemT1 elemT2)) arg2 = do
         returnFalse <- mkLabel "ReturnFalse"
         end <- mkLabel "End"
@@ -258,26 +256,26 @@ solveFunDeclConstraints (CoreFunDecl _ args _) = do
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
                     funDecl' = CoreFunDecl' (CoreFunDecl funName (arg1 :+: arg2 :+: HNil) CoreBoolType)
-                dst <- genEqCoreInstr arg1 arg2
-                body <>= [RetV dst]
-                funBody <- use body
+                funBody <- declareBodyAs $ do
+                    dst <- genEqCoreInstr arg1 arg2
+                    body <>= [RetV dst]
                 return . Some1 $ CoreFunDef funDecl' funBody
             ('\'':'o':'r':'d':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "ord_con"
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
                     funDecl' = CoreFunDecl' (CoreFunDecl funName (arg1 :+: arg2 :+: HNil) CoreBoolType)
-                dst <- genOrdCoreInstr arg1 arg2
-                body <>= [RetV dst]
-                funBody <- use body
+                funBody <- declareBodyAs $ do
+                    dst <- genOrdCoreInstr arg1 arg2
+                    body <>= [RetV dst]
                 return . Some1 $ CoreFunDef funDecl' funBody
             ('\'':'p':'r':'i':'n':'t':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "print_con"
                 let arg = Var "x" varT
                     funDecl' = CoreFunDecl' (CoreFunDecl funName (arg :+: HNil) CoreVoidType)
-                genPrintCoreInstr arg
-                dst <- mkTmpVar CoreVoidType
-                body <>= [RetV dst]
-                funBody <- use body
+                funBody <- declareBodyAs $ do
+                    genPrintCoreInstr arg
+                    dst <- mkTmpVar CoreVoidType
+                    body <>= [RetV dst]
                 return . Some1 $ CoreFunDef funDecl' funBody
             _ -> coreError
