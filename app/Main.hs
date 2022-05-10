@@ -36,6 +36,9 @@ optionsParser = Options
             long "coreDump" <>
             short 'c' <>
             help "Parse, typecheck, transform to CoreLang, then pretty print result")
+    <*> switch (
+            long "emitSSM" <>
+            help "Compile to SSM assembly")
     <*> option auto (
             long "verbosity" <>
             help "The level of verbosity" <>

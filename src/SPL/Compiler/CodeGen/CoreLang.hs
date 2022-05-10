@@ -77,7 +77,7 @@ data CoreFunDecl' xs where
     CoreFunDecl' :: CoreFunDecl as r -> CoreFunDecl' (Snoc as r)
 
 data CoreFunDecl as r = CoreFunDecl {
-        _funId :: Label,
+        _funId :: Identifier,
         _funArgs :: HList Var as,
         _funRetType :: CoreType r
     }
@@ -196,11 +196,11 @@ instance Show (CoreType a) where
     show CoreCharType = "c"
     show CoreVoidType = "v"
     show (CoreUnknownType var) = "?" 
-    show (CorePtrType a) = "&(" <> show a <> ")"
-    show (CoreListType a) = "&[" <> show a <> "]"
-    show (CoreTupleType a b) = "&(" <> show a <> "," <> show b <> ")"
+    show (CorePtrType a) = "*(" <> show a <> ")"
+    show (CoreListType a) = "*[" <> show a <> "]"
+    show (CoreTupleType a b) = "*(" <> show a <> "," <> show b <> ")"
     show (CoreFunType as r) = 
-        "&(" <> L.intercalate "->" (hListMapToList show as) <> "->" <> show r <> ")"
+        "*(" <> L.intercalate "->" (hListMapToList show as) <> "->" <> show r <> ")"
 
 makeLenses ''CoreFunDecl
 makeLenses ''CoreFunDef

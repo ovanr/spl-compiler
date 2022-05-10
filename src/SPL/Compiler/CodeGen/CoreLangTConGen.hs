@@ -251,7 +251,7 @@ solveFunDeclConstraints (CoreFunDecl _ args _) = do
         Constrained varT' <- toConstrained varT
         body .= []
         case T.unpack id of
-            ('\'':'e':'q':'_':'c':'o':'n':_) -> do
+            ('0':'e':'q':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "eq_con"
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
@@ -260,7 +260,7 @@ solveFunDeclConstraints (CoreFunDecl _ args _) = do
                     dst <- genEqCoreInstr arg1 arg2
                     body <>= [RetV dst]
                 return . Some1 $ CoreFunDef funDecl' funBody
-            ('\'':'o':'r':'d':'_':'c':'o':'n':_) -> do
+            ('0':'o':'r':'d':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "ord_con"
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
@@ -269,7 +269,7 @@ solveFunDeclConstraints (CoreFunDecl _ args _) = do
                     dst <- genOrdCoreInstr arg1 arg2
                     body <>= [RetV dst]
                 return . Some1 $ CoreFunDef funDecl' funBody
-            ('\'':'p':'r':'i':'n':'t':'_':'c':'o':'n':_) -> do
+            ('0':'p':'r':'i':'n':'t':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "print_con"
                 let arg = Var "x" varT
                     funDecl' = CoreFunDecl' (CoreFunDecl funName (arg :+: HNil) CoreVoidType)

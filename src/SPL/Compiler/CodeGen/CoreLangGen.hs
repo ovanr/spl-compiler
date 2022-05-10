@@ -74,8 +74,8 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
         TCT.Div -> handleSimpleOp CoreIntType e1 Div e2
         TCT.Mod -> handleSimpleOp CoreIntType e1 Mod e2
         TCT.Pow -> exprToCoreInstr $ mkPowCall loc e1 e2
-        TCT.Equal -> handleOverloadedOp (T.isPrefixOf "'eq_con") e1 e2
-        TCT.Less  -> handleOverloadedOp (T.isPrefixOf "'ord_con") e1 e2
+        TCT.Equal -> handleOverloadedOp (T.isPrefixOf "0eq_con") e1 e2
+        TCT.Less  -> handleOverloadedOp (T.isPrefixOf "0ord_con") e1 e2
         TCT.Greater  -> exprToCoreInstr $ greaterEqIsNotLess loc e1 e2
         TCT.LessEq  -> exprToCoreInstr $ lessEqIsEqOrLess loc e1 e2
         TCT.GreaterEq  -> exprToCoreInstr $ greaterEqIsNotLess loc e1 e2
@@ -92,7 +92,7 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
         mkPowCall loc e1 e2 = 
             TCT.FunCallExpr $ 
                 TCT.TCTFunCall loc 
-                               (TCT.TCTIdentifier loc "'pow") 
+                               (TCT.TCTIdentifier loc "0pow") 
                                (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty) 
                                                           (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty)
                                                                                      (TCT.TCTIntType loc mempty)))
@@ -167,7 +167,7 @@ funCallToCoreInstr :: TCT.TCTFunCall -> CoreMonad (Some1 Var)
 funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ args) = do
     [Some1 arg@(Var _ argT)] <- mapM exprToCoreInstr args
     let printType = CoreFunType (argT :+: HNil) CoreVoidType
-    conVar <- findVar (T.isPrefixOf "'print_con") printType
+    conVar <- findVar (T.isPrefixOf "0print_con") printType
     dst <- mkTmpVar CoreVoidType
     body <>= [CallV dst conVar (arg :+: HNil)]
     return (Some1 dst)
@@ -193,7 +193,7 @@ fieldSelectorStmtToCoreInstr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier _ id) ta
     where
         getFunNames :: [TCT.TCTField] -> [Identifier]
         getFunNames [] = []
-        getFunNames [x] = ["'" <> T.pack (show x) <> "_assign"]
+        getFunNames [x] = ["0" <> T.pack (show x) <> "_assign"]
         getFunNames (x:xs) = T.pack (show x) : getFunNames xs
 
 
@@ -305,7 +305,7 @@ mkTConFuncs = do
 
 mkStartFun :: HList CoreFunDecl' xs -> CoreMonad (CoreFunDef '[Unit])
 mkStartFun tconFuncs = do
-    let startFunDecl = CoreFunDecl' (CoreFunDecl "'start" HNil CoreVoidType)
+    let startFunDecl = CoreFunDecl' (CoreFunDecl "0start" HNil CoreVoidType)
     mainFun <- searchFunByName (== "main")
     case mainFun of
         Nothing -> pure $ CoreFunDef startFunDecl [Halt]

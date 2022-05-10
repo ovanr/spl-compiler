@@ -60,7 +60,7 @@ mkName :: Identifier -> CoreMonad Identifier
 mkName prefix = do
     c <- use varCounter
     varCounter += 1
-    return $ "'" <> prefix <> T.pack (show c)
+    return $ "0" <> prefix <> T.pack (show c)
 
 mkLabel :: Text -> CoreMonad Label
 mkLabel prefix = do
@@ -326,11 +326,11 @@ findConVar tcon =
         Some1 tconT ->
             case tcon of
                 TCT.TPrint _ -> findVarByPred $ \(Var id varT) ->
-                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'print_con" id) (const False)
+                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "0print_con" id) (const False)
                 TCT.TEq _ -> findVarByPred $ \(Var id varT) ->
-                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'eq_con" id) (const False)
+                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "0eq_con" id) (const False)
                 TCT.TOrd _ -> findVarByPred $ \(Var id varT) ->
-                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "'ord_con" id) (const False)
+                    ifCoreTypeEq tconT varT (\_ _ -> T.isPrefixOf "0ord_con" id) (const False)
 
 declareBodyAs :: CoreMonad () -> CoreMonad [CoreInstr]
 declareBodyAs st = do

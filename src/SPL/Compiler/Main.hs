@@ -35,6 +35,8 @@ import SPL.Compiler.CodeGen.CoreLangGen
 import SPL.Compiler.CodeGen.CoreLangGenLib
 import SPL.Compiler.CodeGen.CoreLangPrinter
 
+import SPL.Compiler.CodeGen.Backend.SSMGen
+
 data Options = Options {
     filePath :: FilePath,
     fileContents :: B.ByteString,
@@ -43,6 +45,7 @@ data Options = Options {
     typeCheckDump :: Bool,
     noStaticEvaluation :: Bool,
     coreLangDump :: Bool,
+    emitSSM :: Bool,
     verbosity :: Int
 }
 
@@ -63,7 +66,7 @@ printTypeCheckError errors =
 printCoreError = id
 
 compilerMain :: Options -> Either Text Text
-compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEvaluation coreLangDump v) = do
+compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEvaluation coreLangDump emitSSM v) = do
     tokens <- tokenize path content
     let source = T.lines . decodeUtf8 . B.toStrict $ content
     let state = ParserState 0 tokens path source
@@ -92,10 +95,14 @@ compilerMain (Options path content lexDump parserDump typeCheckDump noStaticEval
             if typeCheckDump then
                 Right . TCTPP.toCode 0 $ tct
             else do
+                let clState = CoreState (Some1 HNil) (Some1 HNil) [] 1 1
+                Some2 core <- evalStateT (tctToCoreLang tct) clState
                 if coreLangDump then do
-                    let clState = CoreState (Some1 HNil) (Some1 HNil) [] 1 1
-                    Some2 core <- evalStateT (tctToCoreLang tct) clState
                     Right $ showCL 0 core
                 else
-                    Left "Not implemented"
+                    if emitSSM then do
+                        ssm <- produceSSM core
+                        Right $ T.unlines ssm
+                    else
+                        Left "Not implemented"
 

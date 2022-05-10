@@ -22,7 +22,7 @@ mkPowFunc :: CoreMonad (CoreFunDef '[Int, Int, Int])
 mkPowFunc = do
         let arg1 = Var "x" CoreIntType
             arg2 = Var "y" CoreIntType
-            funDecl' = CoreFunDecl' (CoreFunDecl "'pow" (arg1 :+: arg2 :+: HNil) CoreIntType)
+            funDecl' = CoreFunDecl' (CoreFunDecl "0pow" (arg1 :+: arg2 :+: HNil) CoreIntType)
 
         funBody <- declareBodyAs $ do
             returnFalse <- mkLabel "ReturnFalse"
@@ -71,22 +71,22 @@ mkMagicFuncs = Some1 $ isEmpty :+: hd :+: tl :+: fst :+: snd :+: hdAssign
         snd = mkMagicFun "snd" (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil) (CoreUnknownType "b")
 
         hdAssign :: CoreFunDef '[Ptr [Unknown], Ptr Unknown]
-        hdAssign = mkMagicFun "'hd_assign"
+        hdAssign = mkMagicFun "0hd_assign"
                         (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil)
                         (CorePtrType (CoreUnknownType "a"))
 
         tlAssign :: CoreFunDef '[Ptr [Unknown], Ptr (Ptr [Unknown])]
-        tlAssign = mkMagicFun "'tl_assign"
+        tlAssign = mkMagicFun "0tl_assign"
                         (Var "x" (CoreListType (CoreUnknownType "a")) :+: HNil)
                         (CorePtrType $ CoreListType (CoreUnknownType "a"))
 
         fstAssign :: CoreFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        fstAssign = mkMagicFun "'fst_assign"
+        fstAssign = mkMagicFun "0fst_assign"
                         (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil)
                         (CorePtrType (CoreUnknownType "a"))
 
         sndAssign :: CoreFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        sndAssign = mkMagicFun "'snd_assign"
+        sndAssign = mkMagicFun "0snd_assign"
                         (Var "x" (CoreTupleType (CoreUnknownType "a") (CoreUnknownType "b")) :+: HNil)
                         (CorePtrType (CoreUnknownType "b"))
 
