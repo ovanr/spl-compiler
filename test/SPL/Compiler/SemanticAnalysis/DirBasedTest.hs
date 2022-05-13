@@ -9,6 +9,8 @@ module SPL.Compiler.SemanticAnalysis.DirBasedTest (htf_thisModulesTests) where
 import Test.Framework 
 import Data.Either
 import Control.Monad
+import Control.Monad.Trans.Except
+import Control.Monad.State
 import Data.Text.Encoding (encodeUtf8)
 import Data.ByteString.Lazy (fromStrict)
 import qualified Data.ByteString.Lazy as B
@@ -52,5 +54,5 @@ test_type_check_expected_failures = do
         print input_path
         input <- B.readFile input_path
         let options = Options input_path input False False True False False False 0
-        let checked_input = compilerMain options
+        checked_input <- (fmap fst) <$> runExceptT (runStateT compilerMain options)
         assertLeft checked_input

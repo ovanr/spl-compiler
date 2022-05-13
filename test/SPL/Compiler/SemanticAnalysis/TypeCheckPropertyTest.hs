@@ -8,6 +8,8 @@ module SPL.Compiler.SemanticAnalysis.TypeCheckPropertyTest (htf_thisModulesTests
 import Test.Framework 
 import Data.Either
 import Control.Monad
+import Control.Monad.State
+import Control.Monad.Trans.Except
 import Data.Text.Encoding (encodeUtf8)
 import Data.ByteString.Lazy (fromStrict)
 
@@ -75,9 +77,9 @@ test_type_check_property_check = do
         contents <- B.readFile fp
         let options = Options fp contents False False True False False False 0
         print fp
-        let pass1 = compilerMain options
+        pass1 <- (fmap fst) <$> runExceptT (runStateT compilerMain options)
         when (isLeft pass1) $ print $ "---> " <> fp
         when (isRight pass1) $ do
             let contentNew = fromStrict . encodeUtf8 . fromRight mempty $ pass1
-            let pass2 = compilerMain options{ fileContents = contentNew }
+            pass2 <- (fmap fst) <$> runExceptT (runStateT compilerMain options{ fileContents = contentNew })
             assertEqual pass1 pass2

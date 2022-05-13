@@ -7,7 +7,7 @@ import Data.Either.Extra (fromEither)
 import Options.Applicative hiding (Parser(..))
 import qualified Options.Applicative as OA (Parser(..))
 
-import SPL.Compiler.Main (Options(..), compilerMain)
+import SPL.Compiler.Main (Options(..), runCompilerMain)
 
 optionsParser :: OA.Parser Options
 optionsParser = Options
@@ -49,8 +49,7 @@ optionsParser = Options
 runner :: Options -> IO ()
 runner opt = do
     s <- B.readFile $ filePath opt
-    let result = compilerMain opt{ fileContents = s }
-    TIO.putStrLn . fromEither $ result
+    runCompilerMain opt{ fileContents = s }
 
 main :: IO ()
 main = execParser opts >>= runner

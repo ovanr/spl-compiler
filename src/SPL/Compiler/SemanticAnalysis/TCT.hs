@@ -9,12 +9,17 @@ module SPL.Compiler.SemanticAnalysis.TCT
      Scheme(..),
      Subst(..),
      TCMonad,
+     varDeclLoc, 
+     varDeclType,
+     varDeclId,
+     varDeclExpr,
      tcError,
      TypeCheckState(..),
      getTvCounter,
      getSubst,
      getEnv,
      getTcons,
+     getWarnings,
      getSourcePath,
      getSourceCode,
      strictTypeEq,
@@ -84,6 +89,7 @@ data TypeCheckState =
         _getSubst :: Subst,
         _getEnv :: TypeEnv,
         _getTcons :: [TCon],
+        _getWarnings :: [Text],
         _getSourcePath :: FilePath,
         _getSourceCode :: [Text]
     }
@@ -110,8 +116,12 @@ data TCTFunDecl =
         _funBody :: TCTFunBody
     } deriving (Eq, Show)
 
-data TCTVarDecl = TCTVarDecl EntityLoc TCTType TCTIdentifier TCTExpr
-    deriving (Eq, Show)
+data TCTVarDecl = TCTVarDecl {
+    _varDeclLoc :: EntityLoc,
+    _varDeclType :: TCTType,
+    _varDeclId :: TCTIdentifier,
+    _varDeclExpr :: TCTExpr
+} deriving (Eq, Show)
 
 data TCTIdentifier = TCTIdentifier { _idLoc :: EntityLoc, _idName :: Text }
     deriving (Eq, Show)
@@ -271,5 +281,6 @@ instance Monoid TypeEnv where
 
 makeLenses 'TypeCheckState
 makeLenses 'TCTIdentifier
+makeLenses 'TCTVarDecl
 makeLenses 'TCTFunDecl
 makeLenses 'TCTFunCall

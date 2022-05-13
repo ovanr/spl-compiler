@@ -36,7 +36,7 @@ failure types = (types, Nothing)
 executeUnifyTests :: [UnifyTest] -> IO ()
 executeUnifyTests tests =
     forM_ tests $ \((t1,t2), expected) -> do
-        let st = TypeCheckState 0 mempty mempty mempty mempty mempty
+        let st = TypeCheckState 0 mempty mempty mempty mempty mempty mempty
         let actual = (_getSubst.snd) <$> runStateT (unify t1 t2) st
         case expected of
             Just subst -> assertEqual (Right subst) (toTestForm (minimizeSubst <$> actual)) 

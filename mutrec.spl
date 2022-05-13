@@ -1,8 +1,9 @@
 
-
+var g = 5;
 
 odd(x) :: Int -> Bool {
-    print(x);
+    print(g);
+    g = g + 1;
     if (x == 1)
         return True;
     else
@@ -10,9 +11,14 @@ odd(x) :: Int -> Bool {
 }
 
 even(x) :: Int -> Bool {
+    print(x);
     if (x == 0)
         return True;
     else
         return odd(x-1);
+}
+
+main () {
+    even(6);
 }
 

@@ -45,7 +45,7 @@ instance CoreLangPrinter (HList CoreGlobal gs) where
     showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)
 
 instance CoreLangPrinter (CoreGlobal a) where
-    showCL ident (CoreGlobal _ init) = showCL ident init
+    showCL ident (CoreGlobal var) = "GLOBAL " <> showCL ident var
 
 instance CoreLangPrinter (HList CoreFunDecl' gs) where
     showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)

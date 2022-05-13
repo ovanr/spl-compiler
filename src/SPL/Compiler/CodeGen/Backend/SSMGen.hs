@@ -165,6 +165,16 @@ extractLocalVars (C.CoreFunDef _ instr) =
         extractLocalVars' offset ((C.Var id _) :+: xs) =
             SSMVar id (Address MP offset) Local : extractLocalVars' (offset + 1) xs
 
+handleGlobVarDef :: HList C.CoreGlobal gs -> SSMMonad ()
+handleGlobVarDef gs = handleGlobVarDef' 0 gs
+    where
+        handleGlobVarDef' :: Int -> HList C.CoreGlobal gs -> SSMMonad ()
+        handleGlobVarDef' n HNil = pure ()
+        handleGlobVarDef' offset ((C.CoreGlobal (C.Var id _)) :+: gs) = do
+            let var = SSMVar id (Address GP offset) Local
+            addVar var
+            handleGlobVarDef' (offset + 1) gs
+
 handleFunDef :: C.CoreFunDef as -> SSMMonad ()
 handleFunDef (C.CoreFunDef (C.CoreFunDecl' (C.CoreFunDecl "isEmpty" _ _)) _) = do
     newBlock "isEmpty"
@@ -253,8 +263,15 @@ handleFunDef def@(C.CoreFunDef (C.CoreFunDecl' decl@(C.CoreFunDecl label args _)
     mapM_ handleInstruction body
 
 handleCoreLang :: C.CoreLang gs fs -> SSMMonad ()
-handleCoreLang (C.CoreLang _ fs) = do
+handleCoreLang (C.CoreLang gs fs) = do
     newBlock "0entry"
+    loadRegToTopStack HP
+    saveTopStackToReg GP
+    handleGlobVarDef gs
+    loadConstantToTopStack (hListLength gs)
+    loadRegToTopStack HP
+    op0 "add"
+    saveTopStackToReg HP
     op1 "bra" "0start"
     forM_ (hListToList fs) (\(Some1 def) -> handleFunDef def)
 

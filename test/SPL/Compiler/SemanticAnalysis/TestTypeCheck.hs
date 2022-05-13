@@ -84,12 +84,12 @@ executeTCTests :: Show a => [TypeCheckTestEnv a] ->
                   IO ()
 executeTCTests tests evaluator =
     forM_ tests $ \((gamma, a, initialTyp), expected) -> do
-        let state = TypeCheckState 0 mempty mempty mempty mempty mempty
+        let state = TypeCheckState 0 mempty mempty mempty mempty mempty mempty
         let actual = runStateT (getEnv .= (initGamma <> gamma) >> evaluator a initialTyp) state
         case expected of
             Just (expectedTyp, expectedTCon) ->
                 case actual of
-                    Right ((_, actualTyp), TypeCheckState _ actualSubst _ actualTCon _ _)  -> do 
+                    Right ((_, actualTyp), TypeCheckState _ actualSubst _ actualTCon _ _ _)  -> do 
                         -- compare up types up to alpha eq
                         assertEqual expectedTyp (toTestForm (actualSubst $* actualTyp))
                         print(actualSubst)

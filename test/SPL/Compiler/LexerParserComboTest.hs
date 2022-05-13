@@ -7,6 +7,8 @@ module SPL.Compiler.LexerParserComboTest (htf_thisModulesTests) where
 
 import Test.Framework 
 import Data.Either
+import Control.Monad.Trans.Except
+import Control.Monad.State
 import Control.Monad
 import Data.Text.Encoding (encodeUtf8)
 import Data.ByteString.Lazy (fromStrict)
@@ -75,9 +77,9 @@ test_parser_property_check = do
         contents <- B.readFile fp
         let options = Options fp contents False True False False False False 0
         print fp
-        let pass1 = compilerMain options
+        pass1 <- (fmap fst) <$> runExceptT (runStateT compilerMain options)
         when (isLeft pass1) $ print $ "---> " <> fp
         when (isRight pass1) $ do
             let contentNew = fromStrict . encodeUtf8 . fromRight mempty $ pass1
-            let pass2 = compilerMain options{ fileContents = contentNew }
+            pass2 <- fmap fst <$> runExceptT (runStateT compilerMain options{ fileContents = contentNew })
             assertEqual pass1 pass2

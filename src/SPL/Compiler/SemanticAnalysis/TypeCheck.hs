@@ -65,6 +65,8 @@ freshVar loc prefix = do
     getTvCounter += 1
     return $ TCTVarType loc (prefix <> suffix)
 
+throwWarning :: Text -> TCMonad ()
+throwWarning warn = getWarnings <>= [warn]
 
 (<=*) :: TCTType -> Scheme -> TCMonad ()
 (<=*) typ scheme = do
@@ -255,7 +257,7 @@ typeCheckVar id@(TCTIdentifier l idName) declType tau = do
     case value of
         Just (scope, sch) -> do
             (instScheme, tcons, _) <- instantiate sch
-            getTcons <>= tcons
+            getTcons <>= if getLoc tcons == mempty then setLoc l tcons else tcons
             unify instScheme tau
             return id
         Nothing -> variableNotFoundErr id declType
@@ -441,8 +443,8 @@ typeCheckFunDecls funcs = do
         funNames = funcs ^.. traversed.funId.idName
 
         replaceTconsS :: [TCon] -> [TCTStmt] -> [TCTStmt]
-        replaceTconsS tc stmts = 
-            flip map stmts $ 
+        replaceTconsS tc stmts =
+            flip map stmts $
             \case
                 IfElseStmt l e s1 s2 -> IfElseStmt l (replaceTconsE tc e) (replaceTconsS tc s1) (replaceTconsS tc s2)
                 WhileStmt l e s -> WhileStmt l (replaceTconsE tc e) (replaceTconsS tc s)
@@ -458,10 +460,10 @@ typeCheckFunDecls funcs = do
         replaceTconsE _ e = e
 
         replaceTconsFC :: [TCon] -> TCTFunCall -> TCTFunCall
-        replaceTconsFC tc fc 
+        replaceTconsFC tc fc
             | (fc ^. funCallId.idName) `L.elem` funNames = fc & funCallTcons .~ tc
             | otherwise = fc
- 
+
 typeCheckFunBody :: TCTFunBody -> TCTType -> TCMonad TCTFunBody
 typeCheckFunBody (TCTFunBody loc varDecls stmts) tau = do
     varDecls' <- mapM typeCheckLocalVarDecl varDecls
@@ -494,7 +496,30 @@ typeCheckTCT (TCT varDecls funDecls) = do
     -- be invalid
 
     subst <- use getSubst
-    return $ TCT (subst $* varDecls') (subst $* funDecls')
+    let tct' = TCT (subst $* varDecls') (subst $* funDecls')
 
--- sanityCheck :: TCT -> TCMonad ()
--- sanityCheck tct = _
+    sanityCheck tct'
+    pure tct'
+
+sanityCheck :: TCT -> TCMonad ()
+sanityCheck (TCT varDecls funDecls) = do
+    forM_ varDecls $ \varDecl -> do
+        let t = varDecl ^. varDeclType
+            ftv = freeVars t
+        unless (S.null ftv) $
+            definition (
+                "Ambigous type variables " <>
+                "[" <> T.intercalate ", " (S.toList ftv) <> "] " <>
+                "found in type " <> T.pack (show t) <> ":") t
+            >>= tcError
+
+    if isJust main then do
+        let (Just main') = main
+
+        forM_ (main' ^. funTcons) $ \tcon ->
+            unless (S.null (freeVars tcon)) $
+                tconError tcon >>= tcError
+    else
+        throwWarning "No 'main' function found. Program will not execute"
+    where
+        main = L.find (\f -> f ^. funId.idName == "main") . concat $ funDecls

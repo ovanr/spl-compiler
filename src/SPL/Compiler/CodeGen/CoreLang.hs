@@ -71,7 +71,7 @@ data Unknown
 
 data CoreLang gs fs = CoreLang (HList CoreGlobal gs) (HList CoreFunDef fs)
 
-data CoreGlobal a = CoreGlobal (Var a) [CoreInstr]
+newtype CoreGlobal a = CoreGlobal (Var a)
 
 data CoreFunDecl' xs where
     CoreFunDecl' :: CoreFunDecl as r -> CoreFunDecl' (Snoc as r)

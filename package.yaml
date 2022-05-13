@@ -28,6 +28,7 @@ dependencies:
 - text
 - constraints
 - mtl
+- transformers
 - random
 - MonadRandom
 - HTF

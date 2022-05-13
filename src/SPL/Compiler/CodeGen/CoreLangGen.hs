@@ -247,9 +247,8 @@ varDeclToCoreGlobal (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
             let dst = Var id ct
             Some1 src <- exprToCoreInstr e
             whenVarTEq dst src $ \dst' src' -> do
-                body <>= [Declare dst', StoreV dst' src']
-                coreInstr <- use body
-                pure . Some1 $ CoreGlobal dst' coreInstr
+                body <>= [StoreV dst' src']
+                pure . Some1 $ CoreGlobal dst'
 
 varDeclToCoreInstr :: TCT.TCTVarDecl -> CoreMonad (Some1 Var)
 varDeclToCoreInstr (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
@@ -305,14 +304,15 @@ mkTConFuncs = do
         Nothing -> pure []
         Just (Some1 (CoreFunDecl' mainFun')) -> solveFunDeclConstraints mainFun'
 
-mkStartFun :: HList CoreFunDecl' xs -> CoreMonad (CoreFunDef '[Unit])
-mkStartFun tconFuncs = do
+mkStartFun :: [CoreInstr] -> HList CoreFunDecl' xs -> CoreMonad (CoreFunDef '[Unit])
+mkStartFun globalVarInitInstr tconFuncs = do
     let startFunDecl = CoreFunDecl' (CoreFunDecl "0start" HNil CoreVoidType)
     mainFun <- searchFunByName (== "main")
     case mainFun of
-        Nothing -> pure $ CoreFunDef startFunDecl [Halt]
+        Nothing -> pure $ CoreFunDef startFunDecl (globalVarInitInstr ++ [Halt])
         Just (Some1 (CoreFunDecl' main@(CoreFunDecl _ args _))) -> do
             funBody <- declareBodyAs $ do
+                body <>= globalVarInitInstr
                 funArgs <- forM (hListToList tconFuncs) (\(Some1 (CoreFunDecl' f)) -> do 
                     tmp <- mkTmpVar (getFunType f) 
                     body <>= [StoreL tmp f]
@@ -334,7 +334,10 @@ tctToCoreLang (TCT.TCT varDecls userFunDecls) = do
                 (hListMap (Some1 . _funDecl) builtinDefs)
 
     Some1 globalDecls <- hListFromList <$> mapM varDeclToCoreGlobal varDecls
-    Some1 coreGlobals <- pure $ hListMap (\(CoreGlobal v _) -> Some1 v) globalDecls
+    globVarInitBody <- use body
+    body .= []
+
+    Some1 coreGlobals <- pure $ hListMap (\(CoreGlobal v) -> Some1 v) globalDecls
 
     Some1 userFunDefs <-
         hListFromList <$> 
@@ -345,7 +348,7 @@ tctToCoreLang (TCT.TCT varDecls userFunDecls) = do
 
     Some1 tconFunDefs <- hListFromList <$> mkTConFuncs
 
-    startFuncDef <- mkStartFun $ hListTCMap (\(CoreFunDef decl _) -> decl) tconFunDefs
+    startFuncDef <- mkStartFun globVarInitBody $ hListTCMap (\(CoreFunDef decl _) -> decl) tconFunDefs
 
     return . Some2 $ CoreLang globalDecls 
                               (builtinDefs +++ tconFunDefs +++ userFunDefs +++ startFuncDef :+: HNil)

@@ -18,9 +18,9 @@ definition err elem = do
     con <- gets getSource 
 
     let lineNum = fst $ getStartLoc elem
-        someLine = con ^? ix (lineNum - 1)
-        startCol = snd $ getStartLoc elem
-        endCol = snd $ getEndLoc elem
+        someLine = con ^? ix (fromIntegral $ lineNum - 1)
+        startCol = fromIntegral $ snd $ getStartLoc elem
+        endCol = fromIntegral $ snd $ getEndLoc elem
         header = T.pack fp <> ":" <> T.pack (show lineNum) <> ":" <>
                  T.pack (show startCol) <> ": " <> err
 
