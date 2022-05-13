@@ -20,8 +20,6 @@ import SPL.Compiler.SemanticAnalysis.TCT
 import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import Data.List (intercalate)
 import Data.Text (Text)
-import Data.Set (Set)
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 mkIdent :: Int -> Text
@@ -43,23 +41,20 @@ instance PrettyPrint TCTVarDecl where
         mkIdent n <> toCode n t <> " " <> toCode n id <> " = " <> toCode n expr <> ";"
 
 instance PrettyPrint TCTFunDecl where
-    toCode n (TCTFunDecl _ id args t body) =
+    toCode n (TCTFunDecl _ id args t tcons body) =
         toCode n id <> " (" <> T.intercalate "," (map (toCode n) args) <> ") :: "
-                    <> toCodeFunType n t <> " " <> toCode (n + 1) body
+                    <> toCodeTcons tcons <> toCodeType t <> " " <> toCode (n + 1) body
         where
-            toCodeFunType :: Int -> TCTType -> Text
-            toCodeFunType n t =
-                let tcon = getTypeCon t
-                in if S.null tcon then
-                    maybeArrow <> toCode n t
-                else
-                    "/* " <> toCode n tcon <> "*/ " <> maybeArrow <> toCode n t
-            needsArrow TCTFunType{} = False
-            needsArrow _ = True
-            maybeArrow = if needsArrow t then "-> " else ""
+            toCodeTcons :: [TCon] -> Text
+            toCodeTcons [] = ""
+            toCodeTcons tcons = "/* " <> toCode n tcons <> "*/ "
+            
+            toCodeType :: TCTType -> Text
+            toCodeType t@TCTFunType{} = toCode 0 t
+            toCodeType t = "-> " <> toCode 0 t
 
-instance PrettyPrint (Set TCon) where
-    toCode n xs = "(" <> toCodeCon (S.toList xs) <> ") "
+instance PrettyPrint [TCon] where
+    toCode n xs = "(" <> toCodeCon xs <> ") "
         where
             toCodeCon = T.intercalate ", " . map (T.pack . show) 
 
@@ -101,7 +96,7 @@ instance PrettyPrint TCTStmt where
     toCode n (ReturnStmt _ (Just expr)) = mkIdent n <> "return " <> toCode n expr <> ";"
 
 instance PrettyPrint TCTFunCall where
-    toCode n (TCTFunCall _ id _ args) = toCode n id <> "(" <> T.intercalate "," (map (toCode n) args) <> ")"
+    toCode n (TCTFunCall _ id _ _ args) = toCode n id <> "(" <> T.intercalate "," (map (toCode n) args) <> ")"
 
 instance PrettyPrint OpUnary where
     toCode _ UnNeg = " ! "
@@ -132,14 +127,14 @@ instance PrettyPrint TCTFunBody where
         "}"
 
 instance PrettyPrint TCTType where
-    toCode n (TCTTupleType _ _ lType rType) = "(" <> toCode n lType <> "," <> toCode n rType <> ")"
-    toCode n (TCTListType _ _ t) = "[" <> toCode n t <> "]"
-    toCode n (TCTVarType _ _ id) = id
-    toCode n (TCTIntType _ _) = "Int"
-    toCode n (TCTBoolType _ _) = "Bool"
-    toCode n (TCTCharType _ _) = "Char"
-    toCode n (TCTVoidType _ _) = "Void"
-    toCode n (TCTFunType _ _ t1 t2) = toCode n t1 <> " " <>
+    toCode n (TCTTupleType _ lType rType) = "(" <> toCode n lType <> "," <> toCode n rType <> ")"
+    toCode n (TCTListType _ t) = "[" <> toCode n t <> "]"
+    toCode n (TCTVarType _ id) = id
+    toCode n (TCTIntType _) = "Int"
+    toCode n (TCTBoolType _) = "Bool"
+    toCode n (TCTCharType _) = "Char"
+    toCode n (TCTVoidType _) = "Void"
+    toCode n (TCTFunType _ t1 t2) = toCode n t1 <> " " <>
         case t2 of
             TCTFunType{} -> toCode n t2
             _ -> "-> " <> toCode n t2

@@ -36,10 +36,10 @@ failure types = (types, Nothing)
 executeUnifyTests :: [UnifyTest] -> IO ()
 executeUnifyTests tests =
     forM_ tests $ \((t1,t2), expected) -> do
-        let st = TypeCheckState 0 mempty mempty
-        let actual = fst <$> runStateT (unify t1 t2) st
+        let st = TypeCheckState 0 mempty mempty mempty mempty mempty
+        let actual = (_getSubst.snd) <$> runStateT (unify t1 t2) st
         case expected of
-            Just subst -> assertEqual (Right subst) (toTestForm actual) 
+            Just subst -> assertEqual (Right subst) (toTestForm (minimizeSubst <$> actual)) 
             Nothing -> print actual >> void (assertLeft actual)
 
 executeSubstTests :: [UnifyTest] -> IO ()
@@ -117,6 +117,6 @@ test_unify_9 = do
             executeSubstTests [test]
 
 
-prop_substitutionLaw = 
-    withQCArgs (\a -> a{maxSuccess = 1000}) 
+prop_substitution_law = 
+    withQCArgs (\a -> a{maxSuccess = 1000, chatty = True}) 
         (\s2 s1 t -> (s2 <> s1 $* (t :: TCTType)) == (s2 $* s1 $* t))

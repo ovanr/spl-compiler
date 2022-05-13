@@ -11,9 +11,26 @@ module SPL.Compiler.SemanticAnalysis.TCT
      TCMonad,
      tcError,
      TypeCheckState(..),
-     tvCounter,
-     sourcePath,
-     sourceCode,
+     getTvCounter,
+     getSubst,
+     getEnv,
+     getTcons,
+     getSourcePath,
+     getSourceCode,
+     strictTypeEq,
+     idLoc,
+     idName,
+     funDeclLoc,
+     funId,
+     funArgs,
+     funType,
+     funTcons,
+     funBody,
+     funCallLoc,
+     funCallId,
+     funCallType,
+     funCallTcons,
+     funCallArgs,
      DeclType(..),
      Scope(..),
      TCTFunDecl(..),
@@ -51,66 +68,70 @@ import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..))
 type Error = [Text]
 type TypeVar = Text
 
-data Scope = Local Text | Arg | Global deriving (Show, Eq, Ord)
+data Scope = Local | Arg | Global deriving (Show, Eq, Ord)
+
+data DeclType = Var | Fun | Both deriving (Eq, Ord)
+
+newtype Subst = Subst { unSubst :: Map TypeVar TCTType } deriving (Eq, Show)
+
+data Scheme = Scheme (Set TypeVar) [TCon] TCTType
+
+newtype TypeEnv = TypeEnv (Map (Text,DeclType) (Scope, Scheme)) deriving (Show)
 
 data TypeCheckState =
     TypeCheckState {
-        _tvCounter :: Integer,
-        _sourcePath :: FilePath,
-        _sourceCode :: [Text]
+        _getTvCounter :: Integer,
+        _getSubst :: Subst,
+        _getEnv :: TypeEnv,
+        _getTcons :: [TCon],
+        _getSourcePath :: FilePath,
+        _getSourceCode :: [Text]
     }
+    deriving (Show)
 
 instance ContainsSource TypeCheckState where
-    getFilePath = _sourcePath
-    getSource = _sourceCode
+    getFilePath = _getSourcePath
+    getSource = _getSourceCode
 
 type TCMonad a = StateT TypeCheckState (Either Error) a
 
 tcError :: Error -> TCMonad a
 tcError = lift . Left
 
-makeLenses 'TypeCheckState
-
 data TCT = TCT [TCTVarDecl] [[TCTFunDecl]] deriving (Eq)
 
 data TCTFunDecl =
-    TCTFunDecl
-        EntityLoc
-        TCTIdentifier
-        [TCTIdentifier]
-        TCTType
-        TCTFunBody
-    deriving (Eq, Show)
+    TCTFunDecl {
+        _funDeclLoc :: EntityLoc,
+        _funId :: TCTIdentifier,
+        _funArgs :: [TCTIdentifier],
+        _funType :: TCTType,
+        _funTcons :: [TCon],
+        _funBody :: TCTFunBody
+    } deriving (Eq, Show)
 
 data TCTVarDecl = TCTVarDecl EntityLoc TCTType TCTIdentifier TCTExpr
     deriving (Eq, Show)
 
-data TCTIdentifier = TCTIdentifier EntityLoc Text
+data TCTIdentifier = TCTIdentifier { _idLoc :: EntityLoc, _idName :: Text }
     deriving (Eq, Show)
 
 data TCTFunBody = TCTFunBody EntityLoc [TCTVarDecl] [TCTStmt]
     deriving (Eq, Show)
 
-data TCTFunCall = TCTFunCall EntityLoc TCTIdentifier TCTType [TCTExpr]
-    deriving (Eq, Show)
+data TCTFunCall = 
+    TCTFunCall { 
+        _funCallLoc :: EntityLoc,
+        _funCallId :: TCTIdentifier,
+        _funCallType :: TCTType,
+        _funCallTcons :: [TCon],
+        _funCallArgs :: [TCTExpr]
+    } deriving (Eq, Show)
 
 data TCTFieldSelector = TCTFieldSelector EntityLoc TCTIdentifier TCTType [TCTField]
     deriving (Eq, Show)
 
 data TCTField = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc
-
-instance Show TCTField where
-    show (Hd _) = "hd"
-    show (Tl _) = "tl"
-    show (Fst _) = "fst"
-    show (Snd _) = "snd"
-
-instance Eq TCTField where
-    (Hd _) == (Hd _) = True
-    (Tl _) == (Tl _) = True
-    (Fst _) == (Fst _) = True
-    (Snd _) == (Snd _) = True
-    _ == _ = False
 
 data TCTStmt =
         IfElseStmt EntityLoc TCTExpr [TCTStmt] [TCTStmt]
@@ -132,44 +153,20 @@ data TCTExpr =
     |   TupExpr EntityLoc TCTExpr TCTExpr
     deriving (Eq, Show)
 
+data TCTType =
+        TCTIntType EntityLoc
+    |   TCTBoolType EntityLoc 
+    |   TCTCharType EntityLoc 
+    |   TCTVoidType EntityLoc 
+    |   TCTVarType EntityLoc TypeVar
+    |   TCTTupleType EntityLoc TCTType TCTType
+    |   TCTListType EntityLoc TCTType
+    |   TCTFunType EntityLoc TCTType TCTType
+    
 data TCon =
         TEq TCTType
     |   TOrd TCTType
     |   TPrint TCTType
-
-data TCTType =
-        TCTIntType EntityLoc (Set TCon)
-    |   TCTBoolType EntityLoc (Set TCon)
-    |   TCTCharType EntityLoc (Set TCon)
-    |   TCTVoidType EntityLoc (Set TCon)
-    |   TCTVarType EntityLoc (Set TCon) TypeVar
-    |   TCTTupleType EntityLoc (Set TCon) TCTType TCTType
-    |   TCTListType EntityLoc (Set TCon) TCTType
-    |   TCTFunType EntityLoc (Set TCon) TCTType TCTType
-
-newtype Subst = Subst (Map TypeVar TCTType) deriving (Eq, Show)
-data Scheme = Scheme (Set TypeVar) TCTType
-data DeclType = Var | Fun | Both deriving (Eq, Ord)
-instance Show DeclType where
-    show Var = "Variable"
-    show Fun = "Function"
-    show Both = "Variable or Function"
-
-newtype TypeEnv = TypeEnv (Map (Text,DeclType) (Scope, Scheme)) deriving (Show)
-
-instance Show Scheme where
-    show (Scheme tv t) =
-        "forall " <> show (T.intercalate " " $ S.elems tv) <> ". " <> show t
-
-instance Semigroup TypeEnv where
-    (TypeEnv e1) <> (TypeEnv e2) = TypeEnv $ M.union e2 e1
-
-instance Monoid TypeEnv where
-    mempty = TypeEnv mempty
-    mappend = (<>)
-
-instance Eq TCTType where
-    (==) = alphaEq
 
 alphaEq :: TCTType -> TCTType -> Bool
 alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
@@ -177,11 +174,11 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
         alphaEq' :: TCTType ->
                     TCTType ->
                     State [(TypeVar, TypeVar)] Bool
-        alphaEq' (TCTIntType _ _) (TCTIntType _ _) = return True
-        alphaEq' (TCTBoolType _ _) (TCTBoolType _ _) = return True
-        alphaEq' (TCTCharType _ _) (TCTCharType _ _) = return True
-        alphaEq' (TCTVoidType _ _) (TCTVoidType _ _) = return True
-        alphaEq' (TCTVarType _ _ a) (TCTVarType _ _ b) = do
+        alphaEq' (TCTIntType _) (TCTIntType _) = return True
+        alphaEq' (TCTBoolType _) (TCTBoolType _) = return True
+        alphaEq' (TCTCharType _) (TCTCharType _) = return True
+        alphaEq' (TCTVoidType _) (TCTVoidType _) = return True
+        alphaEq' (TCTVarType _ a) (TCTVarType _ b) = do
             pairs <- get
             if (a,b) `elem` pairs then
                 return True
@@ -192,26 +189,87 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
                 else
                     return False
 
-        alphaEq' (TCTListType _ _ a) (TCTListType _ _ b) = a `alphaEq'` b
-        alphaEq' (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = do
+        alphaEq' (TCTListType _ a) (TCTListType _ b) = a `alphaEq'` b
+        alphaEq' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
-        alphaEq' (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
+        alphaEq' (TCTFunType _ a1 b1) (TCTFunType _ a2 b2) = do
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
         alphaEq' _ _ = return False
 
+strictTypeEq :: TCTType -> TCTType -> Bool
+strictTypeEq TCTIntType{} TCTIntType{} = True
+strictTypeEq TCTBoolType{} TCTBoolType{} = True
+strictTypeEq TCTCharType{}  TCTCharType{} = True
+strictTypeEq TCTVoidType{} TCTVoidType{} = True
+strictTypeEq (TCTVarType _ a) (TCTVarType _ b) = a == b 
+strictTypeEq (TCTListType _ a) (TCTListType _ b) = a `strictTypeEq` b
+strictTypeEq (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = 
+    a1 `strictTypeEq` a2 && b1 `strictTypeEq` b2
+strictTypeEq (TCTFunType _ a1 b1) (TCTFunType _ a2 b2) =
+    a1 `strictTypeEq` a2 && b1 `strictTypeEq` b2
+strictTypeEq _ _ = False
+
+instance Eq TCTType where
+    (==) = alphaEq
+
+instance Eq TCon where
+    (TEq t1) == (TEq t2) = t1 `strictTypeEq` t2
+    (TOrd t1) == (TOrd t2) = t1 `strictTypeEq` t2
+    (TPrint t1) == (TPrint t2) = t1 `strictTypeEq` t2
+    _ == _ = False
+
+instance Eq TCTField where
+    (Hd _) == (Hd _) = True
+    (Tl _) == (Tl _) = True
+    (Fst _) == (Fst _) = True
+    (Snd _) == (Snd _) = True
+    _ == _ = False
+
 instance Show TCTType where
-    show (TCTIntType _ _) = "Int"
-    show (TCTBoolType _ _) = "Bool"
-    show (TCTCharType _ _) = "Char"
-    show (TCTVoidType _ _) = "Void"
-    show (TCTVarType _ _ a) = T.unpack a
-    show (TCTListType _ _ a) = "[" <> show a <> "]"
-    show (TCTTupleType _ _ a b) = "(" <> show a <> "," <> show b <> ")"
-    show (TCTFunType _ _ a b) =
+    show (TCTIntType _) = "Int"
+    show (TCTBoolType _) = "Bool"
+    show (TCTCharType _) = "Char"
+    show (TCTVoidType _) = "Void"
+    show (TCTVarType _ a) = T.unpack a
+    show (TCTListType _ a) = "[" <> show a <> "]"
+    show (TCTTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
+    show (TCTFunType _ a b) =
         case a of
             TCTFunType {} -> "(" <> show a <> ")" <> " -> " <> show b
             _ -> show a <> " -> " <> show b
+
+instance Show TCon where
+    show (TEq t) = "Equality " <> show t  
+    show (TOrd t) = "Ordered " <> show t  
+    show (TPrint t) = "Printable " <> show t  
+
+instance Show DeclType where
+    show Var = "Variable"
+    show Fun = "Function"
+    show Both = "Variable or Function"
+
+instance Show Scheme where
+    show (Scheme tv _ t) =
+        "forall " <> show (T.intercalate " " $ S.elems tv) <> ". " <> show t
+
+instance Show TCTField where
+    show (Hd _) = "hd"
+    show (Tl _) = "tl"
+    show (Fst _) = "fst"
+    show (Snd _) = "snd"
+
+instance Semigroup TypeEnv where
+    (TypeEnv e1) <> (TypeEnv e2) = TypeEnv $ M.union e2 e1
+
+instance Monoid TypeEnv where
+    mempty = TypeEnv mempty
+    mappend = (<>)
+
+makeLenses 'TypeCheckState
+makeLenses 'TCTIdentifier
+makeLenses 'TCTFunDecl
+makeLenses 'TCTFunCall

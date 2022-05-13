@@ -165,6 +165,9 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
         end <- mkLabel "End"
 
         tmp1 <- mkTmpVar CoreBoolType
+        tmp2 <- mkTmpVar CoreCharType
+
+        body <>= [StoreC tmp2 '[', PrintC tmp2]
         body <>= [SetLabel whileStart]
 
         Some1 isEmpty@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 arg]
@@ -177,9 +180,15 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
         genPrintCoreInstr hd'
 
         Some1 tl <- callFunWith "tl" [Some1 arg]
+
+        Some1 isEmpty@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 tl]
+        body <>= [BrTrue isEmpty end]
+        body <>= [StoreC tmp2 ' ', PrintC tmp2]
+
         tl' <- unsafeCast tl listT
         body <>= [StoreV arg tl', BrAlways whileStart]
         body <>= [SetLabel end]
+        body <>= [StoreC tmp2 ']', PrintC tmp2]
     genPrintCoreInstr _ = coreError
 
 instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
@@ -224,7 +233,7 @@ instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
         body <>= [StoreC tmp ',', PrintC tmp]
 
         Some1 snd <- callFunWith "snd" [Some1 arg]
-        snd' <- unsafeCast snd elemT1
+        snd' <- unsafeCast snd elemT2
         genPrintCoreInstr snd'
 
         body <>= [StoreC tmp ')', PrintC tmp]

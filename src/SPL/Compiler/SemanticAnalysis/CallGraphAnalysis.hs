@@ -7,7 +7,6 @@ import Data.Graph
 import Data.Maybe
 import Data.Text (Text)
 import Data.Map (Map)
-import Data.Set (Set)
 import qualified Data.Map as M
 
 import SPL.Compiler.SemanticAnalysis.TCT
@@ -21,7 +20,7 @@ tctToCallGraph :: TCT -> CallGraph
 tctToCallGraph (TCT _ funDecls) = concatMap (concatMap tctFunToCallGraph) funDecls
 
 tctFunToCallGraph :: TCTFunDecl -> CallGraph
-tctFunToCallGraph f@(TCTFunDecl _ (TCTIdentifier _ id) _ _ (TCTFunBody _ vars stmts)) =
+tctFunToCallGraph f@(TCTFunDecl _ (TCTIdentifier _ id) _ _ _ (TCTFunBody _ vars stmts)) =
     [(f, id, concatMap funCallInVarDecl vars <> concatMap funCallInStmt stmts)]
 
 funCallInVarDecl :: TCTVarDecl -> [FunName]
@@ -43,7 +42,7 @@ funCallInExpr (TupExpr _ e1 e2) = funCallInExpr e1 <> funCallInExpr e2
 funCallInExpr _ = []
 
 funCallInFunCall :: TCTFunCall -> [FunName]
-funCallInFunCall (TCTFunCall _ (TCTIdentifier _ id) _ args) = id : concatMap funCallInExpr args
+funCallInFunCall (TCTFunCall _ (TCTIdentifier _ id) _ _ args) = id : concatMap funCallInExpr args
 
 callGraph2Tct :: TCT -> CallGraph -> TCT
 callGraph2Tct prevTct@(TCT varDecls funDecls) g =
@@ -59,5 +58,3 @@ callGraph2Tct prevTct@(TCT varDecls funDecls) g =
 
 reorderTct :: TCT -> TCT
 reorderTct tct = callGraph2Tct tct $ tctToCallGraph tct
-
-

@@ -8,13 +8,12 @@ import SPL.Compiler.Common.Error (definition)
 import SPL.Compiler.SemanticAnalysis.TCT
 import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
-
 returnPathCheck :: TCT -> TCMonad ()
 returnPathCheck (TCT _ funDecls) =
     mapM_ (mapM_ returnPathCheck') funDecls
 
 returnPathCheck' :: TCTFunDecl -> TCMonad ()
-returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ stmts)) = do
+returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t _ (TCTFunBody _ _ stmts)) = do
     if returnsVoid t || guaranteedReturn' stmts then
         return ()
     else do
@@ -22,8 +21,8 @@ returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t (TCTFunBody _ _ st
         tcError returnTrace
     where
         returnsVoid :: TCTType -> Bool
-        returnsVoid (TCTVoidType _ _) = True
-        returnsVoid (TCTFunType _ _ _ t) = returnsVoid t
+        returnsVoid (TCTVoidType _) = True
+        returnsVoid (TCTFunType _ _ t) = returnsVoid t
         returnsVoid _ = False
 
         guaranteedReturn :: TCTStmt -> Bool

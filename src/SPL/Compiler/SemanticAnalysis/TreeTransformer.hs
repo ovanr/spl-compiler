@@ -25,7 +25,7 @@ ast2tctVarDecl (AST.ASTVarDecl loc t id expr) =
 
 ast2tctFunDecl :: AST.ASTFunDecl -> TCTFunDecl
 ast2tctFunDecl (AST.ASTFunDecl loc id args t body) =
-    TCTFunDecl loc (ast2tctId id) (map ast2tctId args) (ast2tctType t) (ast2tctFunBody body)
+    TCTFunDecl loc (ast2tctId id) (map ast2tctId args) (ast2tctType t) [] (ast2tctFunBody body)
 
 ast2tctFunBody :: AST.ASTFunBody -> TCTFunBody
 ast2tctFunBody (AST.ASTFunBody loc varDecls stmts) =
@@ -48,7 +48,7 @@ ast2tctStmt (AST.ReturnStmt loc (Just expr)) = ReturnStmt loc (Just (ast2tctExpr
 
 ast2tctFunCall :: AST.ASTFunCall -> TCTFunCall
 ast2tctFunCall (AST.ASTFunCall loc id exprs) =
-    TCTFunCall loc (ast2tctId id) (unknownType loc) (map ast2tctExpr exprs)
+    TCTFunCall loc (ast2tctId id) (unknownType loc) [] (map ast2tctExpr exprs)
 
 ast2tctFldSlct :: AST.ASTFieldSelector -> TCTFieldSelector
 ast2tctFldSlct (AST.ASTFieldSelector loc id fields) =
@@ -74,7 +74,7 @@ ast2tctExpr (AST.Op2Expr loc e1 op e2) = Op2Expr loc (ast2tctExpr e1) op (ast2tc
 ast2tctExpr (AST.EmptyListExpr loc) = EmptyListExpr loc (unknownType loc)
 ast2tctExpr (AST.TupExpr loc e1 e2) = TupExpr loc (ast2tctExpr e1) (ast2tctExpr e2)
 
-unknownType loc = TCTVarType loc mempty mempty
+unknownType loc = TCTVarType loc mempty
 
 ast2tctType :: AST.ASTType -> TCTType
 ast2tctType (AST.ASTUnknownType loc) = unknownType loc
@@ -83,11 +83,11 @@ ast2tctType (AST.ASTFunType loc ts) = typeFold loc $ map ast2tctType ts
         typeFold :: EntityLoc -> [TCTType] -> TCTType
         typeFold loc [] = error "internal failure: transformation from AST tree type to TCT tree type failed"
         typeFold loc [t] = t
-        typeFold loc (t:ts) = TCTFunType loc mempty t (typeFold loc ts)
-ast2tctType (AST.ASTTupleType loc tl tr) = TCTTupleType loc mempty (ast2tctType tl) (ast2tctType tr)
-ast2tctType (AST.ASTListType loc t) = TCTListType loc  mempty(ast2tctType t)
-ast2tctType (AST.ASTVarType loc t) = TCTVarType loc mempty t
-ast2tctType (AST.ASTIntType loc) = TCTIntType loc mempty
-ast2tctType (AST.ASTBoolType loc) = TCTBoolType loc mempty
-ast2tctType (AST.ASTCharType loc) = TCTCharType loc mempty
-ast2tctType (AST.ASTVoidType loc) = TCTVoidType loc mempty
+        typeFold loc (t:ts) = TCTFunType loc t (typeFold loc ts)
+ast2tctType (AST.ASTTupleType loc tl tr) = TCTTupleType loc (ast2tctType tl) (ast2tctType tr)
+ast2tctType (AST.ASTListType loc t) = TCTListType loc (ast2tctType t)
+ast2tctType (AST.ASTVarType loc t) = TCTVarType loc t
+ast2tctType (AST.ASTIntType loc) = TCTIntType loc 
+ast2tctType (AST.ASTBoolType loc) = TCTBoolType loc 
+ast2tctType (AST.ASTCharType loc) = TCTCharType loc 
+ast2tctType (AST.ASTVoidType loc) = TCTVoidType loc 

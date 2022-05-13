@@ -27,7 +27,7 @@ duplicateDefError id@(TCTIdentifier _ idName) = do
 
 detectDuplicateFunctionNames :: SomeErrorStateMonad s m => TCT -> m ()
 detectDuplicateFunctionNames (TCT _ funDecls) = do
-    let funDecls' = map (\f@(TCTFunDecl _ (TCTIdentifier _ idName) _ _ _) -> (idName, f)) (concat funDecls)
+    let funDecls' = map (\f@(TCTFunDecl _ (TCTIdentifier _ idName) _ _ _ _) -> (idName, f)) (concat funDecls)
         duplicateFuncs = funDecls' \\ L.nubBy (\(i1,_) (i2,_) -> i1 == i2) funDecls'
 
-    mapM_ (\(_, TCTFunDecl _ id _ _ _) -> duplicateDefError id) duplicateFuncs
+    mapM_ (\(_, TCTFunDecl _ id _ _ _ _) -> duplicateDefError id) duplicateFuncs

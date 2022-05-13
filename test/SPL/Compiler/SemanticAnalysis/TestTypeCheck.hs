@@ -7,6 +7,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 {-# HLINT ignore "Redundant bracket" #-}
+{-# HLINT ignore "Use tuple-section" #-}
 
 module SPL.Compiler.SemanticAnalysis.TestTypeCheck (htf_thisModulesTests) where
 
@@ -17,6 +18,7 @@ import Data.Tuple
 import Data.Bifunctor
 import Data.Text (Text)
 import Data.Set (Set)
+import Control.Lens
 import Control.Monad.State
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -29,12 +31,13 @@ import SPL.Compiler.SemanticAnalysis.TypeCheck.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.TypeCheck
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
 import SPL.Compiler.SemanticAnalysis.TypeProperty
+import Data.Functor (($>))
 
 type TypeCheckTest a = ((a, TCTType), Maybe (TCTType, [TCon])) 
 type TypeCheckTestEnv a = ((TypeEnv, a, TCTType), Maybe (TCTType, [TCon]))
 
 forall :: [Text] -> TCTType -> Scheme
-forall vars = Scheme (S.fromList vars)
+forall vars = Scheme (S.fromList vars) []
 
 -- Shorthand operators to create a type check tests
 
@@ -48,10 +51,10 @@ a ~\= t = ((a, t), Nothing)
 
 infixl 2 .::
 (.::) :: TCTFunDecl -> (TCTType, [TCon]) -> TypeCheckTest TCTFunDecl
-f@(TCTFunDecl _ _ _ tau _) .:: (typ,tcon) = ((f, tau), Just (typ, tcon))
+f@(TCTFunDecl _ _ _ tau _ _) .:: (typ,tcon) = ((f, tau), Just (typ, tcon))
 
 failure :: TCTFunDecl -> TypeCheckTest TCTFunDecl
-failure f@(TCTFunDecl _ _ _ tau _) = ((f, tau), Nothing)
+failure f@(TCTFunDecl _ _ _ tau _ _) = ((f, tau), Nothing)
 
 infixl 2 =:: 
 (=::) :: (Text, TCTType, [TCon]) -> TCTExpr -> TypeCheckTest TCTVarDecl
@@ -77,22 +80,24 @@ fst3 :: (a,b,c) -> a
 fst3 (x,_,_) = x
 
 executeTCTests :: Show a => [TypeCheckTestEnv a] ->
-                  (TypeEnv -> a -> TCTType -> TCMonad (Set TCon, a, Subst, TCTType)) ->
+                  (a -> TCTType -> TCMonad (a, TCTType)) ->
                   IO ()
 executeTCTests tests evaluator =
     forM_ tests $ \((gamma, a, initialTyp), expected) -> do
-        let state = TypeCheckState 0 mempty mempty
-        let actual = fst <$> runStateT (evaluator (initGamma <> gamma) a initialTyp) state
+        let state = TypeCheckState 0 mempty mempty mempty mempty mempty
+        let actual = runStateT (getEnv .= (initGamma <> gamma) >> evaluator a initialTyp) state
         case expected of
             Just (expectedTyp, expectedTCon) ->
                 case actual of
-                    Right (actualTCon, _, actualSubst, actualTyp) -> do 
+                    Right ((_, actualTyp), TypeCheckState _ actualSubst _ actualTCon _ _)  -> do 
                         -- compare up types up to alpha eq
                         assertEqual expectedTyp (toTestForm (actualSubst $* actualTyp))
-
+                        print(actualSubst)
+                        print(actualSubst $* expectedTCon)
+                        print(actualSubst $* actualTCon)
                         -- compare type constraints via strict eq
                         let renameSubst = matchVars expectedTyp (actualSubst $* actualTyp)
-                        mapM_ (\con -> assertElem con $ S.toList (actualSubst $* actualTCon)) 
+                        mapM_ (\con -> assertElem con $ (actualSubst $* actualTCon)) 
                               (renameSubst <> actualSubst $* expectedTCon)
 
                     Left err -> assertFailure $ "expected substitution but got failure: " <> show err
@@ -100,13 +105,13 @@ executeTCTests tests evaluator =
             Nothing -> print actual >> void (assertLeft actual)
 
 matchVars :: TCTType -> TCTType -> Subst
-matchVars (TCTVarType _ _ a) v = Subst $ M.singleton a v
-matchVars (TCTListType _ _ t1) (TCTListType _ _ t2) = matchVars t1 t2
-matchVars (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
-matchVars (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
+matchVars (TCTVarType _ a) v = Subst $ M.singleton a v
+matchVars (TCTListType _ t1) (TCTListType _ t2) = matchVars t1 t2
+matchVars (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
+matchVars (TCTFunType _ a1 b1) (TCTFunType _ a2 b2) = matchVars b1 b2 <> matchVars a1 a2 
 matchVars _ _ = mempty
 
-typeCheckFieldSelector' e a t = (\(a, b@(TCTFieldSelector _ _ t' _), c) -> (a, b, c, t')) <$> typeCheckFieldSelector e a t
+typeCheckFieldSelector' a t = (\(b@(TCTFieldSelector _ _ t' _)) -> (b, t')) <$> typeCheckFieldSelector a t
 
 test_type_check_field_selector_1 = do
             -- x :: [Int] |- x.hd : Int = 
@@ -137,7 +142,8 @@ test_type_check_field_selector_5 = do
             let test = [("x", Var, forall ["a"] (typ @(TVar "a", [(TVar "a", Int)])))] |=
                         (fd "x" [Snd def, Hd def, Fst def], typ @(TVar "sigma")) ~= (typ @(TVar "a"), [])
             executeTCTests [test] typeCheckFieldSelector'
-typeCheckExpr' e a t = (\(a, b, c) -> (a, b, c, t)) <$> typeCheckExpr e a t
+
+typeCheckExpr' a t = (\a -> (a,t)) <$> typeCheckExpr a t
 
 test_type_check_expr_1 = do
             -- 5 :: σ = σ |-> Int
@@ -288,7 +294,7 @@ test_type_check_expr_25 = do
             executeTCTests [test] typeCheckExpr'
 
 
-typeCheckVarDecl' e a _ = (\(a, v@(TCTVarDecl _ t _ _), c) -> (a, v, c, t)) <$> typeCheckVarDecl e a
+typeCheckVarDecl' a _ = (\v@(TCTVarDecl _ t _ _) -> (v, t)) <$> typeCheckVarDecl a
 
 test_type_check_var_decl_1 = do
                 -- Int x = 5
@@ -353,7 +359,7 @@ test_type_check_var_decl_12 = do
                 let test = [] |= ("x", typ @(TVar "a")) =\: iexpr 5 
                 executeTCTests [test] typeCheckVarDecl'
 
-typeCheckStmt' e a t = (\(a, s, c) -> (a, s, c, t)) <$> typeCheckStmt e a t
+typeCheckStmt' a t = (\s -> (s, t)) <$> typeCheckStmt a t
 
 test_type_check_stmt_1 = do
                 -- if True { return False } else { return True } :: Bool
@@ -451,7 +457,7 @@ test_type_check_stmt_16 = do
 
 
 
-typeCheckFunDecl' e v _ = (\([x@(TCTFunDecl _ _ _ t _)],y) -> (getTypeCon t, x, y, t)) <$> typeCheckFunDecls e [v]
+typeCheckFunDecl' v _ = typeCheckFunDecls [v] >>= \([x@(TCTFunDecl _ _ _ t tcons _)]) -> (getTcons .= tcons) $> (x, t) 
 
 test_type_check_fun_decl_1 = do
                 -- id (x) :: b -> b { return x; } :: a -> a

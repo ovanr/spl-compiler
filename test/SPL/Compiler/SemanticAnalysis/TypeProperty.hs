@@ -5,6 +5,7 @@ module SPL.Compiler.SemanticAnalysis.TypeProperty where
 import Test.Framework
 import Data.Default
 import Control.Applicative (liftA2)
+import qualified Data.Map as M
 import Data.Text (Text)
 
 import SPL.Compiler.SemanticAnalysis.Testable
@@ -24,16 +25,16 @@ instance Arbitrary TCTType where
         ]
 
        where
-            intGen = return (TCTIntType def mempty)
-            boolGen = return (TCTBoolType def mempty)
-            charGen = return (TCTCharType def mempty)
-            varGen = oneof $ return . TCTVarType def mempty <$> ["a", "b", "c", "d"]
-            tupleGen = liftA2 (TCTTupleType def mempty) arbitrary arbitrary
-            funGen = liftA2 (TCTFunType def mempty) arbitrary arbitrary
-            listGen = TCTListType def mempty <$> arbitrary
+            intGen = return (TCTIntType def)
+            boolGen = return (TCTBoolType def)
+            charGen = return (TCTCharType def)
+            varGen = oneof $ return . TCTVarType def <$> ["a", "b", "c", "d"]
+            tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
+            funGen = liftA2 (TCTFunType def) arbitrary arbitrary
+            listGen = TCTListType def <$> arbitrary
 
 instance Arbitrary Text where
-    arbitrary =  oneof $ return <$> ["a", "b", "c", "d"]
+    arbitrary = oneof $ return <$> ["a1", "b1", "c1", "d1"]
 
 instance Arbitrary Subst where
     arbitrary = Subst <$> arbitrary

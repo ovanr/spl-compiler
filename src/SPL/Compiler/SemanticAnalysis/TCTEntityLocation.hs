@@ -8,8 +8,8 @@ instance Locatable TCTIdentifier where
     getLoc (TCTIdentifier l _) = l
 
 instance Locatable TCTFunCall where
-    setLoc l (TCTFunCall _ f t xs) = TCTFunCall l f t xs
-    getLoc (TCTFunCall l _ _ _) = l
+    setLoc l (TCTFunCall _ f t tcons xs) = TCTFunCall l f t tcons xs
+    getLoc (TCTFunCall l _ _ _ _) = l
 
 instance Locatable TCTField where
     setLoc l (Hd _) = Hd l
@@ -26,8 +26,8 @@ instance Locatable TCTVarDecl where
     getLoc (TCTVarDecl l _ _ _) = l
 
 instance Locatable TCTFunDecl where
-    setLoc l (TCTFunDecl _ id args t body) = TCTFunDecl l id args t body
-    getLoc (TCTFunDecl l _ _ _ _) = l
+    setLoc l (TCTFunDecl _ id args t tcons body) = TCTFunDecl l id args t tcons body
+    getLoc (TCTFunDecl l _ _ _ _ _) = l
 
 instance Locatable TCTFieldSelector where
     setLoc l (TCTFieldSelector _ f t x) = TCTFieldSelector l f t x
@@ -66,22 +66,22 @@ instance Locatable TCTStmt where
     getLoc (ReturnStmt l _) = l
     
 instance Locatable TCTType where
-    setLoc l (TCTFunType _ c a b) = TCTFunType l c a b
-    setLoc l (TCTTupleType _ c a b) = TCTTupleType l c a b
-    setLoc l (TCTListType _ c x) = TCTListType l c x
-    setLoc l (TCTVarType _ c x) = TCTVarType l c x
-    setLoc l (TCTIntType _ c) = TCTIntType l c
-    setLoc l (TCTBoolType _ c) = TCTBoolType l c
-    setLoc l (TCTCharType _ c) = TCTCharType l c
-    setLoc l (TCTVoidType _ c) = TCTVoidType l c
-    getLoc (TCTFunType l _ _ _) = l
-    getLoc (TCTTupleType l _ _ _) = l
-    getLoc (TCTListType l _ _) = l
-    getLoc (TCTVarType l _ _) = l
-    getLoc (TCTIntType l _) = l
-    getLoc (TCTBoolType l _) = l
-    getLoc (TCTCharType l _) = l
-    getLoc (TCTVoidType l _) = l
+    setLoc l (TCTFunType _ a b) = TCTFunType l a b
+    setLoc l (TCTTupleType _ a b) = TCTTupleType l a b
+    setLoc l (TCTListType _ x) = TCTListType l x
+    setLoc l (TCTVarType _ x) = TCTVarType l x
+    setLoc l (TCTIntType _) = TCTIntType l
+    setLoc l (TCTBoolType _) = TCTBoolType l
+    setLoc l (TCTCharType _) = TCTCharType l
+    setLoc l (TCTVoidType _) = TCTVoidType l 
+    getLoc (TCTFunType l _ _) = l
+    getLoc (TCTTupleType l _ _) = l
+    getLoc (TCTListType l _) = l
+    getLoc (TCTVarType l _) = l
+    getLoc (TCTIntType l) = l
+    getLoc (TCTBoolType l) = l
+    getLoc (TCTCharType l) = l
+    getLoc (TCTVoidType l) = l
 
 instance Locatable TCon where
     setLoc l (TEq t) = TEq $ setLoc l t

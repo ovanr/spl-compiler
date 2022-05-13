@@ -18,7 +18,7 @@
 /* } */
 
 main () {
-    f (12:[], 23:[]);
+    f (12:[], 12:[]);
 }
 
 goo () :: -> Void {
@@ -29,7 +29,8 @@ goo () :: -> Void {
 f (x,y) :: a a -> Bool {
     while (True) {
         if (x == y) 
-            print(x);
+            print("equal");
+        print(x);
         return False;
     }
 }

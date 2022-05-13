@@ -52,7 +52,7 @@ exprToCoreInstr (TCT.OpExpr _ op e) = do
     pure someVar1
 
 exprToCoreInstr (TCT.EmptyListExpr _ t) = do
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 t@(CoreListType elemT) -> do
             tmp <- mkTmpVar t
             body <>= [MkNilList tmp]
@@ -93,9 +93,10 @@ exprToCoreInstr e@(TCT.Op2Expr loc e1 op e2) = do
             TCT.FunCallExpr $ 
                 TCT.TCTFunCall loc 
                                (TCT.TCTIdentifier loc "0pow") 
-                               (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty) 
-                                                          (TCT.TCTFunType loc mempty (TCT.TCTIntType loc mempty)
-                                                                                     (TCT.TCTIntType loc mempty)))
+                               (TCT.TCTFunType loc (TCT.TCTIntType loc) 
+                                                   (TCT.TCTFunType loc (TCT.TCTIntType loc)
+                                                                       (TCT.TCTIntType loc)))
+                               []
                                [e1, e2]
         handleSimpleOp :: CoreType a ->
                           TCT.TCTExpr ->
@@ -142,7 +143,7 @@ exprToCoreInstr (TCT.FieldSelectExpr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier 
     funDecl <- mapM (findFunByName . tctFieldToId) fds
     Some1 dst@(Var _ dstT) <- mkFieldSelectorCall src funDecl
     if hasUnknownType dstT then
-        case tctTypeToCoreType tau of
+        case tctTypeToCoreType tau [] of
             Some1 concreteRetType -> Some1 <$> unsafeCast dst concreteRetType
     else
         pure $ Some1 dst
@@ -164,7 +165,7 @@ mkFieldSelectorCall src (Some1 (CoreFunDecl' f): fs) = do
         _ -> coreError
 
 funCallToCoreInstr :: TCT.TCTFunCall -> CoreMonad (Some1 Var)
-funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ args) = do
+funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ _ args) = do
     [Some1 arg@(Var _ argT)] <- mapM exprToCoreInstr args
     let printType = CoreFunType (argT :+: HNil) CoreVoidType
     conVar <- findVar (T.isPrefixOf "0print_con") printType
@@ -172,11 +173,12 @@ funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ "print") _ args) = do
     body <>= [CallV dst conVar (arg :+: HNil)]
     return (Some1 dst)
 
-funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ id) tau args) = do
-    conVars <- mapM findConVar (S.toList $ TCT.getTypeCon tau)
+funCallToCoreInstr (TCT.TCTFunCall _ (TCT.TCTIdentifier _ id) tau tcons args) = do
+    conVars <- mapM findConVar tcons
     argVars <- mapM exprToCoreInstr args
+
     Some1 dst <- callFunWith id (conVars ++ argVars)
-    case tctTypeToCoreType (TCT.getReturnType tau) of
+    case tctTypeToCoreType (TCT.getReturnType tau) [] of
         Some1 concreteRetType -> Some1 <$> unsafeCast dst concreteRetType
 
 fieldSelectorStmtToCoreInstr :: TCT.TCTFieldSelector ->
@@ -187,7 +189,7 @@ fieldSelectorStmtToCoreInstr (TCT.TCTFieldSelector _ (TCT.TCTIdentifier _ id) ta
     Some1 dst <- case funDecls of
         [] -> Some1 <$> getRef src
         _ -> mkFieldSelectorCall src funDecls
-    case tctTypeToCoreType tau of
+    case tctTypeToCoreType tau [] of
         Some1 concreteRetType -> Some1 <$> unsafeCast dst (CorePtrType concreteRetType)
 
     where
@@ -240,7 +242,7 @@ stmtToCoreInstr (TCT.ReturnStmt _ ma) = do
 
 varDeclToCoreGlobal :: TCT.TCTVarDecl -> CoreMonad (Some1 CoreGlobal)
 varDeclToCoreGlobal (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 ct -> do
             let dst = Var id ct
             Some1 src <- exprToCoreInstr e
@@ -251,7 +253,7 @@ varDeclToCoreGlobal (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
 
 varDeclToCoreInstr :: TCT.TCTVarDecl -> CoreMonad (Some1 Var)
 varDeclToCoreInstr (TCT.TCTVarDecl _ t (TCT.TCTIdentifier _ id) e) =
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 ct -> do
             let dst = Var id ct
             Some1 src <- exprToCoreInstr e
@@ -275,16 +277,16 @@ mkTConArgs (tcon:xs) = do
 
 mkFunArgs :: [TCT.TCTIdentifier] -> TCT.TCTType -> Some1 (HList Var)
 mkFunArgs [] retType = Some1 HNil
-mkFunArgs ((TCT.TCTIdentifier _ id):xs) (TCT.TCTFunType _ _ ta tb) = do
-    case (tctTypeToCoreType ta, mkFunArgs xs tb) of
+mkFunArgs ((TCT.TCTIdentifier _ id):xs) (TCT.TCTFunType _ ta tb) = do
+    case (tctTypeToCoreType ta [], mkFunArgs xs tb) of
         (Some1 cta, Some1 vars) -> Some1 (Var id cta :+: vars)
 mkFunArgs _ _ = pureCoreError
 
 funDeclToCoreFunDecl :: TCT.TCTFunDecl -> CoreMonad (Some1 CoreFunDecl')
-funDeclToCoreFunDecl (TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) args tau _) = do
-    Some1 conVars <- mkTConArgs (S.toList $ TCT.getTypeCon tau)
+funDeclToCoreFunDecl (TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) args tau tcons _) = do
+    Some1 conVars <- mkTConArgs tcons
 
-    case (mkFunArgs args tau, tctTypeToCoreType (TCT.getReturnType tau)) of
+    case (mkFunArgs args tau, tctTypeToCoreType (TCT.getReturnType tau) []) of
         (Some1 argVars, Some1 retType) -> do
             return . Some1 . CoreFunDecl' $ CoreFunDecl id (conVars +++ argVars) retType
 
@@ -336,7 +338,7 @@ tctToCoreLang (TCT.TCT varDecls userFunDecls) = do
 
     Some1 userFunDefs <-
         hListFromList <$> 
-            forM userFunDecls' (\(TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) _ _ funBody) -> do
+            forM userFunDecls' (\(TCT.TCTFunDecl _ (TCT.TCTIdentifier _ id) _ _ tcons funBody) -> do
                 vars .= Some1 coreGlobals
                 Some1 funDecl <- findFunByName id
                 funDeclToCoreInstr funDecl funBody)
@@ -347,3 +349,8 @@ tctToCoreLang (TCT.TCT varDecls userFunDecls) = do
 
     return . Some2 $ CoreLang globalDecls 
                               (builtinDefs +++ tconFunDefs +++ userFunDefs +++ startFuncDef :+: HNil)
+
+performCoreLangGen :: TCT.TCT -> Either Text (Some2 CoreLang)
+performCoreLangGen tct = do
+    let clState = CoreState (Some1 HNil) (Some1 HNil) [] 1 1
+    evalStateT (tctToCoreLang tct) clState

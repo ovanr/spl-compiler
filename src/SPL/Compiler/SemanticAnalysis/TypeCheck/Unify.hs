@@ -2,24 +2,36 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify where
+module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify (
+    Types(..),
+    addSubst,
+    generalise,
+    occurs,
+    occursError,
+    liftToScheme,
+    typeMismatchError,
+    minimizeSubst,
+    unify
+    ) where
 
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Bifunctor (second)
 import Control.Monad
-import Control.Lens ((^?), ix)
+import Control.Lens ((^?), ix, (%~), (<>~), (^.), (.~), use)
 import Control.Monad.State
 import System.Random
+import Data.Function ((&))
 import qualified Data.Text as T
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
 import SPL.Compiler.SemanticAnalysis.TCT
-import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+import {-# SOURCE #-} SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
 
 class Types a where
@@ -28,29 +40,43 @@ class Types a where
 
 infixr 1 $*
 
+addSubst :: TypeVar -> TCTType -> TCMonad ()
+addSubst tv t = modify $
+    \st -> let newSubst = Subst . M.insert tv t . unSubst $ st ^. getSubst
+            in st & getSubst .~ newSubst
+                  & getEnv %~ (newSubst $*)
+                  & getTcons %~ (L.nub . (newSubst $*))
+
 instance Semigroup Subst where
-    -- `(s1 <> s2) t` means 
-    -- first apply `s2` to `t` and then apply `s1` on result
-    -- Note that composition of substitutions is not commutative 
-    s1@(Subst s1') <> (Subst s2') = Subst ( (($*) s1 <$> s2') `M.union` s1')
+    -- Subst stores the substitutions in a lazy manner
+    -- (i.e. need to traverse the substitutions to get the final type)
+    -- Example subst: s = [ b |-> a, a |-> Int ]
+    -- then s $* b == Int,
+    -- so first b == a, a == Int
+    -- 
+    (Subst s1') <> (Subst s2') = Subst (s1' `M.union` s2')
 
 instance Monoid Subst where
     mempty = Subst mempty
     mappend = (<>)
 
+minimizeSubst :: Subst -> Subst
+minimizeSubst s@(Subst s') = Subst $ (s $*) <$> s'
+
 instance Types TCTType where
-    s $* (TCTIntType e c) = TCTIntType e (s $* c)
-    s $* (TCTCharType e c) = TCTCharType e (s $* c)
-    s $* (TCTBoolType e c) = TCTBoolType e (s $* c)
-    s $* (TCTVoidType e c) = TCTVoidType e (s $* c)
-    s@(Subst s') $* v@(TCTVarType l c a) = updateTCon (s $* c) $ setLoc l (M.findWithDefault v a s')
-    s $* (TCTListType e c a) = TCTListType e (s $* c) (s $* a)
-    s $* (TCTTupleType e c a b) = TCTTupleType e (s $* c) (s $* a) (s $* b)
-    s $* (TCTFunType d e a b) = TCTFunType d (s $* e) (s $* a) (s $* b)
-    freeVars v@(TCTVarType l _ a) = S.singleton a
-    freeVars (TCTListType _ _ a) = freeVars a
-    freeVars (TCTTupleType _ _ a b) = freeVars a <> freeVars b
-    freeVars (TCTFunType _ _ a b) = freeVars a <> freeVars b
+    s $* (TCTIntType l) = TCTIntType l
+    s $* (TCTCharType l) = TCTCharType l
+    s $* (TCTBoolType l) = TCTBoolType l
+    s $* (TCTVoidType l) = TCTVoidType l
+    s@(Subst s') $* v@(TCTVarType l a) =
+        if M.member a s' then s $* setLoc l (M.findWithDefault v a s') else v
+    s $* (TCTListType l a) = TCTListType l (s $* a)
+    s $* (TCTTupleType l a b) = TCTTupleType l (s $* a) (s $* b)
+    s $* (TCTFunType l a b) = TCTFunType l (s $* a) (s $* b)
+    freeVars v@(TCTVarType _ a) = S.singleton a
+    freeVars (TCTListType _ a) = freeVars a
+    freeVars (TCTTupleType _ a b) = freeVars a <> freeVars b
+    freeVars (TCTFunType _ a b) = freeVars a <> freeVars b
     freeVars _ = mempty
 
 instance Types TCon where
@@ -70,8 +96,9 @@ instance (Types a, Ord a) => Types (Set a) where
     freeVars xs = foldMap freeVars xs
 
 instance Types Scheme where
-    (Subst s) $* (Scheme tv t) = Scheme tv $ Subst (foldr M.delete s tv) $* t
-    freeVars (Scheme tv t) = freeVars t `S.difference` tv
+    (Subst s) $* (Scheme tv tcons t) =
+        let s' = Subst (foldr M.delete s tv) in Scheme tv (s' $* tcons) (s' $* t)
+    freeVars (Scheme tv _ t) = freeVars t `S.difference` tv
 
 instance Types TypeEnv where
     s $* (TypeEnv env) = TypeEnv $ second (s $*) <$> env
@@ -86,12 +113,12 @@ instance Types TCTVarDecl where
     freeVars (TCTVarDecl _ t _ _) = freeVars t
 
 instance Types TCTFunDecl where
-    s $* (TCTFunDecl loc id args t body) = TCTFunDecl loc id args (s $* t) (s $* body)
-    freeVars (TCTFunDecl loc id args t body) = freeVars t
+    s $* (TCTFunDecl loc id args t tcons body) = TCTFunDecl loc id args (s $* t) (s $* tcons) (s $* body)
+    freeVars (TCTFunDecl _ _ _ t _ _) = freeVars t
 
 instance Types TCTFunBody where
     s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) (map (s $*) stmts)
-    freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl
+    freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl <> freeVars stmts
 
 instance Types TCTStmt where
     s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
@@ -118,22 +145,26 @@ instance Types TCTExpr where
     freeVars (OpExpr l op e) = freeVars e
     freeVars (Op2Expr l e1 op e2) = freeVars e1 <> freeVars e2
     freeVars (TupExpr l e1 e2) = freeVars e1 <> freeVars e2
-    freeVars (EmptyListExpr l t) = freeVars t 
-    freeVars e = mempty
+    freeVars (EmptyListExpr l t) = freeVars t
+    freeVars _ = mempty
 
 instance Types TCTFunCall where
-    s $* (TCTFunCall l id t args) = TCTFunCall l id (s $* t) (s $* args)
-    freeVars (TCTFunCall _ _ t args) = freeVars t <> freeVars args
+    s $* (TCTFunCall l id t tcons args) = TCTFunCall l id (s $* t) (s $* tcons) (s $* args)
+    freeVars (TCTFunCall _ _ t _ args) = freeVars t <> freeVars args
 
 instance Types TCTFieldSelector where
     s $* (TCTFieldSelector l id t fds) = TCTFieldSelector l id (s $* t) fds
     freeVars (TCTFieldSelector _ _ t _) = freeVars t
 
-generalise :: TypeEnv -> TCTType -> Scheme
-generalise env t = Scheme (freeVars t `S.difference` freeVars env) t
+generalise :: TCTType -> [TCon] -> TCMonad Scheme
+generalise t tcon = do
+    subst <- use getSubst
+    env <- use getEnv
+    let t' = subst $* t
+    pure $ Scheme (freeVars t' `S.difference` freeVars env) (subst $* tcon) t'
 
 -- liftToScheme lifts a type to a scheme that has no quantified variables
-liftToScheme :: TCTType -> Scheme
+liftToScheme :: [TCon] -> TCTType -> Scheme
 liftToScheme = Scheme mempty
 
 typeMismatchError :: TCTType -> TCTType -> TCMonad a
@@ -165,41 +196,40 @@ occursError var t = do
         <> T.pack (show t)
         ] <> typeLocTrace
 
-unify :: TCTType -> TCTType -> TCMonad Subst
-unify t1 t2 = unify' t1 t2
+unify :: TCTType -> TCTType -> TCMonad ()
+unify expT actT = use getSubst >>= (\s -> unify' (s $* expT) (s $* actT))
     where
-        unify' :: TCTType -> TCTType -> TCMonad Subst
-        unify' TCTIntType{} TCTIntType{} = return mempty
-        unify' TCTCharType{} TCTCharType{} = return mempty
-        unify' TCTBoolType{} TCTBoolType{} = return mempty
-        unify' TCTVoidType{} TCTVoidType{} = return mempty
+        unify' TCTIntType{} TCTIntType{} = return ()
+        unify' TCTCharType{} TCTCharType{} = return ()
+        unify' TCTBoolType{} TCTBoolType{} = return ()
+        unify' TCTVoidType{} TCTVoidType{} = return ()
 
-        unify' v1@(TCTVarType _ _ a) v2@(TCTVarType _ _ b)
-            | a == b = return mempty
-            | otherwise = return . Subst $ M.singleton a v2
+        unify' v1@(TCTVarType _ a) v2@(TCTVarType _ b)
+            | a == b = return ()
+            | otherwise = addSubst a v2
 
-        unify' v@(TCTVarType _ _ a) t = do
+        unify' v@(TCTVarType _ a) t = do
             if not $ occurs a t then
-                return . Subst $ M.singleton a t
+                addSubst a t
             else
                 occursError a t
 
-        unify' t v@(TCTVarType _ _ a) = do
+        unify' t v@(TCTVarType _ a) = do
             if not $ occurs a t then
-                return . Subst $ M.singleton a t
+                addSubst a t
             else
                 occursError a t
 
-        unify' (TCTListType _ _ a) (TCTListType _ _ b) = unify' a b
+        unify' (TCTListType _ a) (TCTListType _ b) = unify' a b
 
-        unify' (TCTTupleType _ _ a1 b1) (TCTTupleType _ _ a2 b2) = do
-            subst1 <- unify' a1 a2
-            subst2 <- unify' (subst1 $* b1) (subst1 $* b2)
-            return $ subst2 <> subst1
+        unify' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+            unify' a1 a2
+            subst <- use getSubst
+            unify' (subst $* b1) (subst $* b2)
 
-        unify' (TCTFunType _ _ a1 b1) (TCTFunType _ _ a2 b2) = do
-            subst1 <- unify a1 a2
-            subst2 <- unify (subst1 $* b1) (subst1 $* b2)
-            return $ subst2 <> subst1
+        unify' (TCTFunType _ a1 b1) (TCTFunType _ a2 b2) = do
+            unify' a1 a2
+            subst <- use getSubst
+            unify' (subst $* b1) (subst $* b2)
 
         unify' t1 t2 = typeMismatchError t1 t2

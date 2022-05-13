@@ -193,36 +193,38 @@ ifFunTypeEq :: forall as1 r1 as2 r2 c.
 ifFunTypeEq decl expT f g = fromRight g
     (whenFunTEq decl expT (Right . f) :: Either () c)
 
-tctTypeToCoreType :: TCT.TCTType -> Some1 CoreType
-tctTypeToCoreType TCT.TCTIntType{} = Some1 CoreIntType
-tctTypeToCoreType TCT.TCTBoolType{} = Some1 CoreBoolType
-tctTypeToCoreType TCT.TCTCharType{} = Some1 CoreCharType
-tctTypeToCoreType TCT.TCTVoidType{} = Some1 CoreVoidType
-tctTypeToCoreType (TCT.TCTVarType _ _ tvar) = Some1 (CoreUnknownType tvar)
-tctTypeToCoreType (TCT.TCTTupleType _ _ ta tb) =
-    case (tctTypeToCoreType ta, tctTypeToCoreType tb) of
+tctTypeToCoreType :: TCT.TCTType -> [TCT.TCon] -> Some1 CoreType
+tctTypeToCoreType TCT.TCTIntType{} _ = Some1 CoreIntType
+tctTypeToCoreType TCT.TCTBoolType{} _ = Some1 CoreBoolType
+tctTypeToCoreType TCT.TCTCharType{} _ = Some1 CoreCharType
+tctTypeToCoreType TCT.TCTVoidType{} _ = Some1 CoreVoidType
+tctTypeToCoreType (TCT.TCTVarType _ tvar) _ = Some1 (CoreUnknownType tvar)
+tctTypeToCoreType (TCT.TCTTupleType _ ta tb) _ =
+    case (tctTypeToCoreType ta [], tctTypeToCoreType tb []) of
         (Some1 ta', Some1 tb') -> Some1 (CoreTupleType ta' tb')
-tctTypeToCoreType (TCT.TCTListType _ _ ta) =
-    case tctTypeToCoreType ta of
+tctTypeToCoreType (TCT.TCTListType _ ta) _ =
+    case tctTypeToCoreType ta [] of
         Some1 ta' -> Some1 (CoreListType ta')
-tctTypeToCoreType t@(TCT.TCTFunType _ tcon _ _) =
+tctTypeToCoreType t@TCT.TCTFunType{} tcons  =
     let (args, return) = TCT.decomposeFunType t
-    in case (hListMapFromList tctTConToCoreType (S.toList tcon),
-             hListFromList $ map tctTypeToCoreType args,
-             tctTypeToCoreType return) of
+    in case (hListMapFromList tctTConToCoreType tcons,
+             hListFromList $ map (`tctTypeToCoreType` []) args,
+             tctTypeToCoreType return []) of
         (Some1 tcon', Some1 ta', Some1 tb') -> Some1 (CoreFunType (tcon' +++ ta') tb')
 
 tctTConToCoreType :: TCT.TCon -> Some1 CoreType
 tctTConToCoreType (TCT.TPrint t) =
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 t' -> Some1 $ CoreFunType (t' :+: HNil) CoreVoidType
 tctTConToCoreType (TCT.TEq t) =
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 t' -> Some1 $ CoreFunType (t' :+: t' :+: HNil) CoreBoolType
 tctTConToCoreType (TCT.TOrd t) =
-    case tctTypeToCoreType t of
+    case tctTypeToCoreType t [] of
         Some1 t' -> Some1 $ CoreFunType (t' :+: t' :+: HNil) CoreBoolType
 
+showVarList' :: [Some1 Var] -> String
+showVarList' = concatMap (\(Some1 v) -> show v <> " ")
 castFunArg :: Var a -> Var b -> CoreMonad (Var a)
 castFunArg arg@(Var _ argT) concreteArg = do
     if hasUnknownType argT then do
@@ -235,6 +237,7 @@ castFunArg arg@(Var _ argT) concreteArg = do
 castFunArgs :: HList Var xs -> [Some1 Var] -> CoreMonad (HList Var xs)
 castFunArgs HNil [] = pure HNil
 castFunArgs (arg :+: args) (Some1 concreteArg:concreteArgs) = do
+
     concreteArg' <- castFunArg arg concreteArg
     concreteArgs' <- castFunArgs args concreteArgs
     return (concreteArg' :+: concreteArgs')
@@ -242,12 +245,15 @@ castFunArgs hs ys = coreErrorWithDesc . T.pack $
     "Mismatched number of function arguments: " <>
     show (hListLength hs) <> " /= " <> show (length ys)
 
+showVarList :: [Some1 Var] -> String
+showVarList = concatMap (\(Some1 v) -> show v <> " ")
+
 callFunWith :: Identifier -> [Some1 Var] -> CoreMonad (Some1 Var)
 callFunWith funName args = do
     Some1 (CoreFunDecl' fun) <- findFunByName funName
     args' <- castFunArgs (fun ^. funArgs) args
     dst <- mkTmpVar (fun ^. funRetType)
-    body <>= [ Call dst fun args' ] 
+    body <>= [ Call dst fun args' ]
     return (Some1 dst)
 
 findFunByName :: Identifier -> CoreMonad (Some1 CoreFunDecl')
@@ -279,7 +285,7 @@ findFun pred reqT@CoreFunType{} = do
             | otherwise = findFun' rest
 findFun _ _ = coreError
 
-searchFunByName :: (Identifier -> Bool) -> CoreMonad (Maybe (Some1 CoreFunDecl')) 
+searchFunByName :: (Identifier -> Bool) -> CoreMonad (Maybe (Some1 CoreFunDecl'))
 searchFunByName pred = do
     Some1 funDecls <- use funcs
     pure $ searchByName funDecls
@@ -291,7 +297,7 @@ searchFunByName pred = do
             | pred (f ^. funId) = Just $ Some1 (CoreFunDecl' f)
             | otherwise = searchByName rest
 
-    
+
 findVarByName :: Identifier -> CoreMonad (Some1 Var)
 findVarByName id = findVarByPred (\(Var varId _) -> varId == id)
 

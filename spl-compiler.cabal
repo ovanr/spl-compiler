@@ -20,6 +20,7 @@ extra-source-files:
 library
   exposed-modules:
       SPL.Compiler.CodeGen.Backend.SSMGen
+      SPL.Compiler.CodeGen.Backend.SSMGenLib
       SPL.Compiler.CodeGen.CoreLang
       SPL.Compiler.CodeGen.CoreLangBuiltins
       SPL.Compiler.CodeGen.CoreLangGen
@@ -28,6 +29,7 @@ library
       SPL.Compiler.CodeGen.CoreLangTConGen
       SPL.Compiler.Common.EntityLocation
       SPL.Compiler.Common.Error
+      SPL.Compiler.Common.Misc
       SPL.Compiler.Common.TypeFunc
       SPL.Compiler.Lexer.AlexLexGen
       SPL.Compiler.Main
@@ -36,11 +38,13 @@ library
       SPL.Compiler.Parser.ASTParser
       SPL.Compiler.Parser.ASTPrettyPrint
       SPL.Compiler.Parser.ASTPrinter
+      SPL.Compiler.Parser.ASTRunner
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis
       SPL.Compiler.SemanticAnalysis.CallGraphAnalysis
       SPL.Compiler.SemanticAnalysis.ConstantGlobalVar
       SPL.Compiler.SemanticAnalysis.ReturnPathCheck
+      SPL.Compiler.SemanticAnalysis.SemanticAnalysis
       SPL.Compiler.SemanticAnalysis.StaticEvaluation
       SPL.Compiler.SemanticAnalysis.TCT
       SPL.Compiler.SemanticAnalysis.TCTEntityLocation

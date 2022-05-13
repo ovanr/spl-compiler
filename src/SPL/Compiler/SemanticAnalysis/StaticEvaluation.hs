@@ -15,8 +15,8 @@ optimizeVarDecl :: TCTVarDecl -> TCTVarDecl
 optimizeVarDecl (TCTVarDecl l t id e) = TCTVarDecl l t id (optimizeExpr e)
 
 optimizeFunDecl :: TCTFunDecl -> TCTFunDecl
-optimizeFunDecl (TCTFunDecl l id args t (TCTFunBody lb vars stmts)) =
-    TCTFunDecl l id args t $ 
+optimizeFunDecl (TCTFunDecl l id args t tcons (TCTFunBody lb vars stmts)) =
+    TCTFunDecl l id args t tcons $ 
         TCTFunBody lb 
             (map optimizeVarDecl vars) 
             (elimUnreachableStmt $ concatMap optimizeStmt stmts)
@@ -82,7 +82,7 @@ optimizeExpr (FunCallExpr f) = FunCallExpr (optimizeFunCall f)
 optimizeExpr e = e
 
 optimizeFunCall :: TCTFunCall -> TCTFunCall
-optimizeFunCall (TCTFunCall l name t args) = TCTFunCall l name t (map optimizeExpr args)
+optimizeFunCall (TCTFunCall l name t tcons args) = TCTFunCall l name t tcons (map optimizeExpr args)
 
 evaluateI :: EntityLoc -> Integer -> OpBin -> Integer -> TCTExpr
 evaluateI l i1 op i2 =
