@@ -4,38 +4,33 @@
 
 Make sure you have stack installed and run:
 
-1. `stack build`
-2. `stack install alex`
-
-## Running the lexer generator manually (done automatically with `stack build`)
-
-1. `cd src/SPL/Compiler/Lexer`
-2. `alex AlexLexGen.x`
-
-You should now see the generated `AlexLex.hs` file.
+1. `stack install alex`
+2. `stack build`
 
 ## Running the compiler
 
-Currently only Lexing and Parsing phases have been implemented
-thus only the special flags `-l` (lexer dump) and `-p` (parser dump)
-provide useful output
+### Options
+```
+SPL-compiler
 
-### Lexer dump
+Usage: spl-compiler --file SRC [-l|--lexerDump] [-p|--parserDump]
+                    [-t|--typeCheckerDump] [--noStaticEvaluation]
+                    [-c|--coreDump] [--emitSSM] [--verbosity INT]
+  Compiler for the SPL Language
 
-Return the result of the Lexer and exit
-- `stack run -- spl-compiler -l --file SPL_FILE`
-
-### Parser dump
-
-Parse the source file and print the parsed result as actual code
-
-- `stack run -- spl-compiler -p --file SPL_FILE`
-
-### Semantic Analysis dump
-
-Parse, type-check and optimize source file and finally print the result
-
-- `stack run -- spl-compiler -t --file SPL_FILE`
+Available options:
+  --file SRC               Input file for compiling
+  -l,--lexerDump           Only lex file and print the result
+  -p,--parserDump          Only parse file and pretty print the result
+  -t,--typeCheckerDump     Parse and typecheck, then pretty print the result
+  --noStaticEvaluation     Do not staticly evaluate expressions and eliminate
+                           dead code
+  -c,--coreDump            Parse, typecheck, transform to CoreLang, then pretty
+                           print result
+  --emitSSM                Compile to SSM assembly
+  --verbosity INT          The level of verbosity (default: 0)
+  -h,--help                Show this help text
+```
 
 ## Running the tests
 
