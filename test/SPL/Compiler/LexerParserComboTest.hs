@@ -75,7 +75,7 @@ sourceFiles = [
 test_parser_property_check = do
     forM_ sourceFiles $ \fp -> do
         contents <- B.readFile fp
-        let options = Options fp contents False True False False False False 0
+        let options = Options fp "-" contents False True False False False False 0
         print fp
         pass1 <- (fmap fst) <$> runExceptT (runStateT compilerMain options)
         when (isLeft pass1) $ print $ "---> " <> fp
