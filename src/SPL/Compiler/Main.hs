@@ -36,11 +36,12 @@ import SPL.Compiler.CodeGen.Backend.SSMGen
 
 data Options = Options {
     filePath :: FilePath,
+    outPath :: FilePath,
     fileContents :: B.ByteString,
     lexerDump :: Bool,
     parserDump :: Bool,
     typeCheckDump :: Bool,
-    noStaticEvaluation :: Bool,
+    noOptimization :: Bool,
     irLangDump :: Bool,
     emitSSM :: Bool,
     verbosity :: Int
@@ -51,7 +52,11 @@ runCompilerMain options = do
     res <- fmap fst <$> runExceptT (runStateT compilerMain options)
     case res of
         Left err -> TIO.hPutStrLn stderr err
-        Right prog -> TIO.hPutStrLn stdout prog
+        Right prog ->
+            if outPath options == "-" then
+                TIO.hPutStrLn stdout prog
+            else
+                TIO.writeFile (outPath options) prog
 
 liftEither = lift . ExceptT . pure
 
@@ -62,7 +67,7 @@ compilerMain = do
     lexerDump' <- gets lexerDump
     parserDump' <- gets parserDump
     typeCheckDump' <- gets typeCheckDump
-    noStaticEvaluation' <- gets noStaticEvaluation
+    noOptimization' <- gets noOptimization
     irLangDump' <- gets irLangDump
     emitSSM' <- gets emitSSM
 
@@ -75,7 +80,7 @@ compilerMain = do
         if parserDump' then
             pure . ASTPP.toCode 0 $ ast
         else do
-            tct <- lift $ performSemanticAnalysis noStaticEvaluation' ast path' source
+            tct <- lift $ performSemanticAnalysis noOptimization' ast path' source
             if typeCheckDump' then
                 liftEither . Right . TCTPP.toCode 0 $ tct
             else do

@@ -14,8 +14,8 @@ Make sure you have stack installed and run:
 SPL-compiler
 
 Usage: spl-compiler --file SRC [-l|--lexerDump] [-p|--parserDump]
-                    [-t|--typeCheckerDump] [--noStaticEvaluation]
-                    [-c|--coreDump] [--emitSSM] [--verbosity INT]
+                    [-t|--typeCheckerDump] [--noStaticEvaluation] [-i|--irDump]
+                    [--emitSSM] [--verbosity INT]
   Compiler for the SPL Language
 
 Available options:
@@ -25,8 +25,8 @@ Available options:
   -t,--typeCheckerDump     Parse and typecheck, then pretty print the result
   --noStaticEvaluation     Do not staticly evaluate expressions and eliminate
                            dead code
-  -c,--coreDump            Parse, typecheck, transform to CoreLang, then pretty
-                           print result
+  -i,--irDump              Parse, typecheck, transform to intermediate language,
+                           then pretty print result
   --emitSSM                Compile to SSM assembly
   --verbosity INT          The level of verbosity (default: 0)
   -h,--help                Show this help text

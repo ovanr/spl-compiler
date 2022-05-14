@@ -42,10 +42,10 @@ library
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis
       SPL.Compiler.SemanticAnalysis.CallGraphAnalysis
+      SPL.Compiler.SemanticAnalysis.ConstantFold
       SPL.Compiler.SemanticAnalysis.ConstantGlobalVar
       SPL.Compiler.SemanticAnalysis.ReturnPathCheck
       SPL.Compiler.SemanticAnalysis.SemanticAnalysis
-      SPL.Compiler.SemanticAnalysis.StaticEvaluation
       SPL.Compiler.SemanticAnalysis.TCT
       SPL.Compiler.SemanticAnalysis.TCTEntityLocation
       SPL.Compiler.SemanticAnalysis.TCTPrettyPrint

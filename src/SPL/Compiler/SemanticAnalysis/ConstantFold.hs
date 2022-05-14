@@ -1,13 +1,13 @@
 
-module SPL.Compiler.SemanticAnalysis.StaticEvaluation (
-    staticlyEvaluate
+module SPL.Compiler.SemanticAnalysis.ConstantFold (
+    constantFold
     ) where
 
 import SPL.Compiler.SemanticAnalysis.TCT
 import qualified Data.List as L
 
-staticlyEvaluate :: TCT -> TCT
-staticlyEvaluate (TCT varDecls funDecls) = 
+constantFold :: TCT -> TCT
+constantFold (TCT varDecls funDecls) = 
     TCT (map optimizeVarDecl varDecls)
         (map (map optimizeFunDecl) funDecls)
 

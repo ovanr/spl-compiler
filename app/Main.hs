@@ -11,10 +11,15 @@ import SPL.Compiler.Main (Options(..), runCompilerMain)
 
 optionsParser :: OA.Parser Options
 optionsParser = Options
-    <$> strOption (
-            long "file" <> 
-            metavar "SRC" <> 
+    <$> argument str (
+            metavar "FILENAME" <> 
             help "Input file for compiling")
+    <*> strOption (
+            short 'o' <> 
+            long "output" <> 
+            metavar "FILENAME" <> 
+            value "-" <>
+            help "Output file for writing result")
     <*> pure mempty
     <*> switch (
             long "lexerDump" <>
@@ -29,9 +34,9 @@ optionsParser = Options
             short 't' <>
             help "Parse and typecheck, then pretty print the result")
     <*> switch (
-            long "noStaticEvaluation" <>
+            long "noOptimization" <>
             showDefault <>
-            help "Do not staticly evaluate expressions and eliminate dead code")
+            help "Do not perform constant folding and dead code elimination")
     <*> switch (
             long "irDump" <>
             short 'i' <>

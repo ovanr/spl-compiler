@@ -18,7 +18,7 @@ import SPL.Compiler.SemanticAnalysis.ConstantGlobalVar (globalVarConstantCheck)
 import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderTct)
 import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckTCT)
 import SPL.Compiler.SemanticAnalysis.ReturnPathCheck (returnPathCheck)
-import SPL.Compiler.SemanticAnalysis.StaticEvaluation (staticlyEvaluate) 
+import SPL.Compiler.SemanticAnalysis.ConstantFold (constantFold) 
 import Data.Functor (($>))
 
 printTypeCheckError :: [Text] -> Text
@@ -34,13 +34,13 @@ printTypeCheckWarnings warnings =
     in TIO.hPutStrLn stderr lines
 
 performSemanticAnalysis :: Bool -> AST -> FilePath -> [Text] -> (ExceptT Text IO) TCT
-performSemanticAnalysis noStaticEvaluation ast path source = do
+performSemanticAnalysis noOptimization ast path source = do
     let tcState = TypeCheckState 0 mempty mempty mempty mempty path source
     let initTCT = reorderTct . ast2tct $ ast
     let typeCheck = detectDuplicateFunctionNames initTCT >> 
                     globalVarConstantCheck initTCT >> 
                     typeCheckTCT initTCT  >>=
-                    (if noStaticEvaluation then pure else pure . staticlyEvaluate) >>= 
+                    (if noOptimization then pure else pure . constantFold) >>= 
                     (\r -> returnPathCheck r $> r)
     case runStateT typeCheck tcState of
         Left err -> ExceptT . pure . Left . printTypeCheckError $ err
