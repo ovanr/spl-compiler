@@ -2,65 +2,65 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
-module SPL.Compiler.CodeGen.CoreLangTConGen where
+module SPL.Compiler.CodeGen.IRLangTConGen where
 
 import qualified Data.Text as T
 import Control.Lens
 import Control.Monad
 import GHC.Stack
 
-import SPL.Compiler.CodeGen.CoreLang
-import SPL.Compiler.CodeGen.CoreLangGenLib
+import SPL.Compiler.CodeGen.IRLang
+import SPL.Compiler.CodeGen.IRLangGenLib
 import SPL.Compiler.Common.TypeFunc
 
 class GenTConFun a where
-    genEqCoreInstr :: Var a -> Var a -> CoreMonad (Var Bool)
-    genEqCoreInstr arg1 arg2 = genEqOrdCoreInstr genEqCoreInstr arg1 arg2
-    genOrdCoreInstr :: Var a -> Var a -> CoreMonad (Var Bool)
-    genOrdCoreInstr arg1 arg2 = genEqOrdCoreInstr genOrdCoreInstr arg1 arg2
-    genEqOrdCoreInstr :: (forall a. GenTConFun a => Var a -> Var a -> CoreMonad (Var Bool)) -> 
-                         Var a -> Var a -> CoreMonad (Var Bool)
-    genPrintCoreInstr :: Var a -> CoreMonad ()
+    genEqIRInstr :: Var a -> Var a -> IRMonad (Var Bool)
+    genEqIRInstr arg1 arg2 = genEqOrdIRInstr genEqIRInstr arg1 arg2
+    genOrdIRInstr :: Var a -> Var a -> IRMonad (Var Bool)
+    genOrdIRInstr arg1 arg2 = genEqOrdIRInstr genOrdIRInstr arg1 arg2
+    genEqOrdIRInstr :: (forall a. GenTConFun a => Var a -> Var a -> IRMonad (Var Bool)) -> 
+                         Var a -> Var a -> IRMonad (Var Bool)
+    genPrintIRInstr :: Var a -> IRMonad ()
 
 instance GenTConFun Unit where
-    genEqCoreInstr arg1 arg2 = do
-        dst <- mkTmpVar CoreBoolType
+    genEqIRInstr arg1 arg2 = do
+        dst <- mkTmpVar IRBoolType
         body <>= [StoreB dst True]
         return dst
-    genOrdCoreInstr = genEqCoreInstr
-    genEqOrdCoreInstr f = f
-    genPrintCoreInstr _ = do
-        tmp <- mkTmpVar CoreCharType
+    genOrdIRInstr = genEqIRInstr
+    genEqOrdIRInstr f = f
+    genPrintIRInstr _ = do
+        tmp <- mkTmpVar IRCharType
         body <>= [StoreC tmp 'V', PrintC tmp]
 
 instance GenTConFun Int where
-    genEqCoreInstr arg1 arg2 = do
-        dst <- mkTmpVar CoreBoolType
+    genEqIRInstr arg1 arg2 = do
+        dst <- mkTmpVar IRBoolType
         body <>= [Eq dst arg1 arg2]
         return dst
-    genOrdCoreInstr arg1 arg2 = do
-        dst <- mkTmpVar CoreBoolType
+    genOrdIRInstr arg1 arg2 = do
+        dst <- mkTmpVar IRBoolType
         body <>= [Lt dst arg1 arg2]
         return dst
-    genEqOrdCoreInstr f = f
-    genPrintCoreInstr arg1 =
+    genEqOrdIRInstr f = f
+    genPrintIRInstr arg1 =
         body <>= [PrintI arg1]
 
 instance GenTConFun Bool where
-    genEqCoreInstr arg1 arg2 = do
-        src1 <- mkTmpVar CoreIntType
-        src2 <- mkTmpVar CoreIntType
-        dst  <- mkTmpVar CoreBoolType
+    genEqIRInstr arg1 arg2 = do
+        src1 <- mkTmpVar IRIntType
+        src2 <- mkTmpVar IRIntType
+        dst  <- mkTmpVar IRBoolType
         body <>= [StoreVUnsafe src1 arg1,
                   StoreVUnsafe src2 arg2,
                   Eq dst src1 src2]
         return dst
-    genOrdCoreInstr = genEqCoreInstr
-    genEqOrdCoreInstr f = f
-    genPrintCoreInstr arg1 = do
+    genOrdIRInstr = genEqIRInstr
+    genEqOrdIRInstr f = f
+    genPrintIRInstr arg1 = do
         printFalse <- mkLabel "PrintFalse"
         end <- mkLabel "End"
-        tmp <- mkTmpVar CoreCharType
+        tmp <- mkTmpVar IRCharType
         body <>= [BrFalse arg1 printFalse]
         body <>= [StoreC tmp 'T',
                   PrintC tmp,
@@ -85,24 +85,24 @@ instance GenTConFun Bool where
         body <>= [SetLabel end]
 
 instance GenTConFun Char where
-    genEqCoreInstr arg1 arg2 = do
-        src1 <- mkTmpVar CoreIntType
-        src2 <- mkTmpVar CoreIntType
-        dst  <- mkTmpVar CoreBoolType
+    genEqIRInstr arg1 arg2 = do
+        src1 <- mkTmpVar IRIntType
+        src2 <- mkTmpVar IRIntType
+        dst  <- mkTmpVar IRBoolType
         body <>= [StoreVUnsafe src1 arg1,
                   StoreVUnsafe src2 arg2,
                   Eq dst src1 src2]
         return dst
-    genOrdCoreInstr arg1 arg2 = do
-        src1 <- mkTmpVar CoreIntType
-        src2 <- mkTmpVar CoreIntType
-        dst  <- mkTmpVar CoreBoolType
+    genOrdIRInstr arg1 arg2 = do
+        src1 <- mkTmpVar IRIntType
+        src2 <- mkTmpVar IRIntType
+        dst  <- mkTmpVar IRBoolType
         body <>= [StoreVUnsafe src1 arg1,
                   StoreVUnsafe src2 arg2,
                   Lt dst src1 src2]
         return dst
-    genEqOrdCoreInstr _ _ _ = coreError
-    genPrintCoreInstr arg1 =
+    genEqOrdIRInstr _ _ _ = coreError
+    genPrintIRInstr arg1 =
         body <>= [PrintC arg1]
 
 
@@ -123,19 +123,19 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
     --     arg1 = tl(arg1);
     --     arg2 = tl(arg2);
     -- }
-    genEqOrdCoreInstr f arg1@(Var _ listT@(CoreListType elemT)) arg2 = do
+    genEqOrdIRInstr f arg1@(Var _ listT@(IRListType elemT)) arg2 = do
         returnFalse <- mkLabel "ReturnFalse"
         end <- mkLabel "End"
         whileStart <- mkLabel "WhileStart"
 
-        result <- mkTmpVar CoreBoolType
+        result <- mkTmpVar IRBoolType
         body <>= [StoreB result True]
-        tmp1 <- mkTmpVar CoreBoolType
-        tmp2 <- mkTmpVar CoreBoolType
+        tmp1 <- mkTmpVar IRBoolType
+        tmp2 <- mkTmpVar IRBoolType
         body <>= [SetLabel whileStart]
 
-        Some1 isEmpty1@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 arg1]
-        Some1 isEmpty2@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 arg2]
+        Some1 isEmpty1@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg1]
+        Some1 isEmpty2@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg2]
 
         body <>= [And tmp1 isEmpty1 isEmpty2, BrTrue tmp1 end]
         body <>= [Not tmp2 isEmpty1, And tmp1 tmp2 isEmpty2, BrTrue tmp1 returnFalse]
@@ -159,29 +159,29 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
         body <>= [SetLabel end]
 
         return result
-    genEqOrdCoreInstr _ _ _ = coreError
-    genPrintCoreInstr arg@(Var _ listT@(CoreListType elemT)) = do
+    genEqOrdIRInstr _ _ _ = coreError
+    genPrintIRInstr arg@(Var _ listT@(IRListType elemT)) = do
         whileStart <- mkLabel "WhileStart"
         end <- mkLabel "End"
 
-        tmp1 <- mkTmpVar CoreBoolType
-        tmp2 <- mkTmpVar CoreCharType
+        tmp1 <- mkTmpVar IRBoolType
+        tmp2 <- mkTmpVar IRCharType
 
         body <>= [StoreC tmp2 '[', PrintC tmp2]
         body <>= [SetLabel whileStart]
 
-        Some1 isEmpty@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 arg]
+        Some1 isEmpty@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg]
 
         body <>= [BrTrue isEmpty end]
 
         Some1 hd <- callFunWith "hd" [Some1 arg]
         hd' <- unsafeCast hd elemT
 
-        genPrintCoreInstr hd'
+        genPrintIRInstr hd'
 
         Some1 tl <- callFunWith "tl" [Some1 arg]
 
-        Some1 isEmpty@(Var _ CoreBoolType) <- callFunWith "isEmpty" [Some1 tl]
+        Some1 isEmpty@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 tl]
         body <>= [BrTrue isEmpty end]
         body <>= [StoreC tmp2 ' ', PrintC tmp2]
 
@@ -189,14 +189,14 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
         body <>= [StoreV arg tl', BrAlways whileStart]
         body <>= [SetLabel end]
         body <>= [StoreC tmp2 ']', PrintC tmp2]
-    genPrintCoreInstr _ = coreError
+    genPrintIRInstr _ = coreError
 
 instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
-    genEqOrdCoreInstr f arg1@(Var _ tupT@(CoreTupleType elemT1 elemT2)) arg2 = do
+    genEqOrdIRInstr f arg1@(Var _ tupT@(IRTupleType elemT1 elemT2)) arg2 = do
         returnFalse <- mkLabel "ReturnFalse"
         end <- mkLabel "End"
 
-        result <- mkTmpVar CoreBoolType
+        result <- mkTmpVar IRBoolType
         body <>= [StoreB result True]
 
         Some1 fst1 <- callFunWith "fst" [Some1 arg1]
@@ -212,7 +212,7 @@ instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
         Some1 snd2 <- callFunWith "snd" [Some1 arg2]
         snd2' <- unsafeCast snd2 elemT2
 
-        sndEqual <- genEqCoreInstr snd1' snd2'
+        sndEqual <- genEqIRInstr snd1' snd2'
         body <>= [BrFalse sndEqual returnFalse]
         body <>= [BrAlways end]
 
@@ -220,43 +220,43 @@ instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
         body <>= [SetLabel end]
 
         return result
-    genEqOrdCoreInstr _ _ _ = coreError
-    genPrintCoreInstr arg@(Var _ (CoreTupleType elemT1 elemT2)) = do
-        tmp <- mkTmpVar CoreCharType
+    genEqOrdIRInstr _ _ _ = coreError
+    genPrintIRInstr arg@(Var _ (IRTupleType elemT1 elemT2)) = do
+        tmp <- mkTmpVar IRCharType
 
         body <>= [StoreC tmp '(', PrintC tmp]
 
         Some1 fst <- callFunWith "fst" [Some1 arg]
         fst' <- unsafeCast fst elemT1
-        genPrintCoreInstr fst'
+        genPrintIRInstr fst'
 
         body <>= [StoreC tmp ',', PrintC tmp]
 
         Some1 snd <- callFunWith "snd" [Some1 arg]
         snd' <- unsafeCast snd elemT2
-        genPrintCoreInstr snd'
+        genPrintIRInstr snd'
 
         body <>= [StoreC tmp ')', PrintC tmp]
-    genPrintCoreInstr _ = coreError
+    genPrintIRInstr _ = coreError
 
-toConstrained :: (MonadFail m, HasCallStack) => CoreType a -> m (Constrained GenTConFun CoreType a)
-toConstrained CoreIntType = pure (Constrained CoreIntType)
-toConstrained CoreBoolType = pure (Constrained CoreBoolType)
-toConstrained CoreCharType = pure (Constrained CoreCharType)
-toConstrained CoreVoidType = pure (Constrained CoreVoidType)
-toConstrained (CoreListType elemT) = do
+toConstrained :: (MonadFail m, HasCallStack) => IRType a -> m (Constrained GenTConFun IRType a)
+toConstrained IRIntType = pure (Constrained IRIntType)
+toConstrained IRBoolType = pure (Constrained IRBoolType)
+toConstrained IRCharType = pure (Constrained IRCharType)
+toConstrained IRVoidType = pure (Constrained IRVoidType)
+toConstrained (IRListType elemT) = do
     Constrained elemT' <- toConstrained elemT
-    pure . Constrained $ CoreListType elemT'
-toConstrained (CoreTupleType elemT1 elemT2) = do
+    pure . Constrained $ IRListType elemT'
+toConstrained (IRTupleType elemT1 elemT2) = do
     Constrained elemT1' <- toConstrained elemT1
     Constrained elemT2' <- toConstrained elemT2
-    pure . Constrained $ CoreTupleType elemT1' elemT2'
+    pure . Constrained $ IRTupleType elemT1' elemT2'
 toConstrained t = fail $
     "Cannot generate overloaded constraint for this type: " <> show t
 
-solveFunDeclConstraints :: CoreFunDecl xs r -> CoreMonad [Some1 CoreFunDef]
-solveFunDeclConstraints (CoreFunDecl _ args _) = do
-    forM (hListToList args) $ \(Some1 (Var id (CoreFunType (varT :+: _) _))) -> do
+solveFunDeclConstraints :: IRFunDecl xs r -> IRMonad [Some1 IRFunDef]
+solveFunDeclConstraints (IRFunDecl _ args _) = do
+    forM (hListToList args) $ \(Some1 (Var id (IRFunType (varT :+: _) _))) -> do
         Constrained varT' <- toConstrained varT
         body .= []
         case T.unpack id of
@@ -264,27 +264,27 @@ solveFunDeclConstraints (CoreFunDecl _ args _) = do
                 funName <- mkLabel "eq_con"
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
-                    funDecl' = CoreFunDecl' (CoreFunDecl funName (arg1 :+: arg2 :+: HNil) CoreBoolType)
+                    funDecl' = IRFunDecl' (IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType)
                 funBody <- declareBodyAs $ do
-                    dst <- genEqCoreInstr arg1 arg2
+                    dst <- genEqIRInstr arg1 arg2
                     body <>= [RetV dst]
-                return . Some1 $ CoreFunDef funDecl' funBody
+                return . Some1 $ IRFunDef funDecl' funBody
             ('0':'o':'r':'d':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "ord_con"
                 let arg1 = Var "x" varT
                     arg2 = Var "y" varT
-                    funDecl' = CoreFunDecl' (CoreFunDecl funName (arg1 :+: arg2 :+: HNil) CoreBoolType)
+                    funDecl' = IRFunDecl' (IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType)
                 funBody <- declareBodyAs $ do
-                    dst <- genOrdCoreInstr arg1 arg2
+                    dst <- genOrdIRInstr arg1 arg2
                     body <>= [RetV dst]
-                return . Some1 $ CoreFunDef funDecl' funBody
+                return . Some1 $ IRFunDef funDecl' funBody
             ('0':'p':'r':'i':'n':'t':'_':'c':'o':'n':_) -> do
                 funName <- mkLabel "print_con"
                 let arg = Var "x" varT
-                    funDecl' = CoreFunDecl' (CoreFunDecl funName (arg :+: HNil) CoreVoidType)
+                    funDecl' = IRFunDecl' (IRFunDecl funName (arg :+: HNil) IRVoidType)
                 funBody <- declareBodyAs $ do
-                    genPrintCoreInstr arg
-                    dst <- mkTmpVar CoreVoidType
+                    genPrintIRInstr arg
+                    dst <- mkTmpVar IRVoidType
                     body <>= [RetV dst]
-                return . Some1 $ CoreFunDef funDecl' funBody
+                return . Some1 $ IRFunDef funDecl' funBody
             _ -> coreError

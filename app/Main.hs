@@ -33,9 +33,9 @@ optionsParser = Options
             showDefault <>
             help "Do not staticly evaluate expressions and eliminate dead code")
     <*> switch (
-            long "coreDump" <>
-            short 'c' <>
-            help "Parse, typecheck, transform to CoreLang, then pretty print result")
+            long "irDump" <>
+            short 'i' <>
+            help "Parse, typecheck, transform to intermediate language, then pretty print result")
     <*> switch (
             long "emitSSM" <>
             help "Compile to SSM assembly")

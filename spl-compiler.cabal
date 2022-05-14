@@ -21,12 +21,12 @@ library
   exposed-modules:
       SPL.Compiler.CodeGen.Backend.SSMGen
       SPL.Compiler.CodeGen.Backend.SSMGenLib
-      SPL.Compiler.CodeGen.CoreLang
-      SPL.Compiler.CodeGen.CoreLangBuiltins
-      SPL.Compiler.CodeGen.CoreLangGen
-      SPL.Compiler.CodeGen.CoreLangGenLib
-      SPL.Compiler.CodeGen.CoreLangPrinter
-      SPL.Compiler.CodeGen.CoreLangTConGen
+      SPL.Compiler.CodeGen.IRLang
+      SPL.Compiler.CodeGen.IRLangBuiltins
+      SPL.Compiler.CodeGen.IRLangGen
+      SPL.Compiler.CodeGen.IRLangGenLib
+      SPL.Compiler.CodeGen.IRLangPrinter
+      SPL.Compiler.CodeGen.IRLangTConGen
       SPL.Compiler.Common.EntityLocation
       SPL.Compiler.Common.Error
       SPL.Compiler.Common.Misc
@@ -109,7 +109,7 @@ test-suite spl-compiler-test
   main-is: Spec.hs
   other-modules:
       SPL.Compiler.CodeGen.Testable
-      SPL.Compiler.CodeGen.TestCoreLangGen
+      SPL.Compiler.CodeGen.TestIRLangGen
       SPL.Compiler.Common.Testable
       SPL.Compiler.Lexer.Test
       SPL.Compiler.LexerParserComboTest

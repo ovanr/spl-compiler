@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 module SPL.Compiler.CodeGen.Backend.SSMGenLib where
 
@@ -16,8 +15,8 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import Control.Monad.State
 
-import qualified SPL.Compiler.CodeGen.CoreLang as C
-import SPL.Compiler.CodeGen.CoreLang (type (-->))
+import qualified SPL.Compiler.CodeGen.IRLang as IR
+import SPL.Compiler.CodeGen.IRLang (type (-->))
 import SPL.Compiler.Common.TypeFunc
 
 data Register = SP | MP | HP | RR | GP deriving Show
@@ -102,16 +101,16 @@ annotate (SSMVar id (Address reg offset) varType) = do
         color = if varType == Arg then "red" else "blue"
     write [T.unwords ["annote", reg', loc, loc, color, "\"" <> id <> "\""]]
 
-loadVarToTopStack :: C.Var a -> SSMMonad ()
-loadVarToTopStack (C.Var id _) = do
+loadVarToTopStack :: IR.Var a -> SSMMonad ()
+loadVarToTopStack (IR.Var id _) = do
     var <- getVar id
     annotate var 
     case var ^. varAddress of
         Address MP offset -> write ["ldl " <> T.pack (show offset)]
         Address reg offset -> loadRegToTopStack reg >> write ["lda " <> T.pack (show offset)]
 
-saveTopStackToVar :: C.Var a -> SSMMonad ()
-saveTopStackToVar (C.Var id _) = do
+saveTopStackToVar :: IR.Var a -> SSMMonad ()
+saveTopStackToVar (IR.Var id _) = do
     var <- getVar id
     annotate var 
     case var ^. varAddress of

@@ -27,10 +27,10 @@ import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
 import qualified SPL.Compiler.SemanticAnalysis.TCTPrettyPrint as TCTPP (PrettyPrint(..))
 import SPL.Compiler.SemanticAnalysis.SemanticAnalysis
 
-import SPL.Compiler.CodeGen.CoreLang
-import SPL.Compiler.CodeGen.CoreLangGen
-import SPL.Compiler.CodeGen.CoreLangGenLib
-import SPL.Compiler.CodeGen.CoreLangPrinter
+import SPL.Compiler.CodeGen.IRLang
+import SPL.Compiler.CodeGen.IRLangGen
+import SPL.Compiler.CodeGen.IRLangGenLib
+import SPL.Compiler.CodeGen.IRLangPrinter
 
 import SPL.Compiler.CodeGen.Backend.SSMGen
 
@@ -41,7 +41,7 @@ data Options = Options {
     parserDump :: Bool,
     typeCheckDump :: Bool,
     noStaticEvaluation :: Bool,
-    coreLangDump :: Bool,
+    irLangDump :: Bool,
     emitSSM :: Bool,
     verbosity :: Int
 }
@@ -63,7 +63,7 @@ compilerMain = do
     parserDump' <- gets parserDump
     typeCheckDump' <- gets typeCheckDump
     noStaticEvaluation' <- gets noStaticEvaluation
-    coreLangDump' <- gets coreLangDump
+    irLangDump' <- gets irLangDump
     emitSSM' <- gets emitSSM
 
     tokens <- liftEither $ tokenize path' content'
@@ -79,8 +79,8 @@ compilerMain = do
             if typeCheckDump' then
                 liftEither . Right . TCTPP.toCode 0 $ tct
             else do
-                Some2 core <- liftEither $ performCoreLangGen tct
-                if coreLangDump' then
+                Some2 core <- liftEither $ performIRLangGen tct
+                if irLangDump' then
                     liftEither . Right $ showCL 0 core
                 else do
                     if emitSSM' then do

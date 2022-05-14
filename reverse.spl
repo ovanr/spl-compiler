@@ -1,0 +1,20 @@
+
+
+concat (xs, ys) :: [a] [a] -> [a] {
+    if (isEmpty(xs))
+        return ys;
+
+    return hd(xs) : (concat(tl(xs), ys));
+}
+
+
+reverse (xs) :: [a] -> [a] {
+    if (isEmpty(xs)) 
+        return xs;
+    else
+        return concat(reverse(tl(xs)), hd(xs):[]);
+}
+
+main() {
+    print(reverse("hello"));
+}
