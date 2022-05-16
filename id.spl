@@ -1,12 +1,10 @@
 
 
 
-id (x) :: a -> Void {
-    return;
+id (x) :: a -> a {
+    return x;
 }
 
-f (pred, y) :: Bool Int -> Void {
-    while (pred) {
-        id(y);
-    }
+main() {
+    id(5);
 }
