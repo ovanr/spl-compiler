@@ -1,0 +1,10 @@
+
+
+
+hdd (xs) :: [a] -> a {
+    return xs.hd;
+}
+
+hdInt (xs) :: [Int] -> Int {
+    return xs.hd;
+}

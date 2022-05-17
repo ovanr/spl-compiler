@@ -50,24 +50,22 @@ import Data.Proxy
 
 import SPL.Compiler.Common.TypeFunc
 
-data Var a = Var {
-    _varIdentifier :: Identifier,
-    _varType :: IRType a
-}
-
-instance Show (Var a) where
-    show (Var id t) = T.unpack id <> "%" <> show t
-    
 type Identifier = Text
 type Label = Text
 type Unit = ()
 type Dst a = Var a
-type Src a = Var a
-type Src1 a = Var a
-type Src2 a = Var a
+type Src a = Value a
+type Src1 a = Value a
+type Src2 a = Value a
 data Ptr a
 data (-->) (a :: [*]) r
 data Unknown
+
+data Var a = Var {
+    _varIdentifier :: Identifier,
+    _varType :: IRType a
+}
+data Value a = IRVar (Var a) | IRLit (IRConstant a)
 
 data IRLang gs fs = IRLang (HList IRGlobal gs) (HList IRFunDef fs)
 
@@ -111,14 +109,12 @@ data IRInstr where
     BrTrue :: Var Bool -> Label -> IRInstr
     BrFalse :: Var Bool -> Label -> IRInstr
     BrAlways :: Label -> IRInstr
-    Call :: Dst r -> IRFunDecl as r -> HList Var as -> IRInstr
-    CallV :: Dst r -> Src (Ptr (as --> r)) -> HList Var as -> IRInstr
+    Call :: Dst r -> Value (Ptr (as --> r)) -> HList Var as -> IRInstr
     StoreI :: Dst Int -> Int -> IRInstr
     StoreC :: Dst Char -> Char -> IRInstr
     StoreB :: Dst Bool -> Bool -> IRInstr
     StoreV :: Dst a -> Src a -> IRInstr
     StoreA :: Dst (Ptr a) -> Src a -> IRInstr
-    StoreL :: Dst (Ptr (as --> r)) -> IRFunDecl as r -> IRInstr
     StoreVUnsafe :: Dst b -> Src a -> IRInstr
     LoadA :: Dst a -> Src (Ptr a) -> IRInstr
     Ref :: Dst (Ptr a) -> Src a -> IRInstr
@@ -140,6 +136,12 @@ data IRType a where
     IRListType :: IRType a -> IRType (Ptr [a])
     IRFunType :: HList IRType as -> IRType r -> IRType (Ptr (as --> r))
     IRTupleType :: IRType a -> IRType b -> IRType (Ptr (a, b))
+
+data IRConstant a where
+    IRInt :: Int -> IRConstant Int
+    IRBool :: Bool -> IRConstant Bool 
+    IRChar :: Char -> IRConstant Char 
+    IRFun :: IRFunDecl as r -> IRConstant (Ptr (as --> r)) 
 
 class FromHaskellType a where
     fromHaskellType :: Proxy a -> IRType a
@@ -176,10 +178,6 @@ instance (ConstrMap FromHaskellType xs, HListFromProxy xs, FromHaskellType r) =>
 
 toIRType :: forall a. FromHaskellType a => IRType a
 toIRType = fromHaskellType (Proxy @a)
-
-type IRTCon a = IRType (Ptr ('[a, a] --> Bool))
-type IRTOrd a = IRType (Ptr ('[a, a] --> Bool))
-type IRTPrint a = IRType (Ptr ('[a] --> Unit))
     
 hasUnknownType :: IRType a -> Bool
 hasUnknownType (IRUnknownType _) = True
@@ -189,6 +187,9 @@ hasUnknownType (IRTupleType cta ctb) = hasUnknownType cta || hasUnknownType ctb
 hasUnknownType (IRFunType cta ctb) =
     hListFoldl (\acc t -> acc || hasUnknownType t) False cta || hasUnknownType ctb
 hasUnknownType _ = False
+
+instance Show (Var a) where
+    show (Var id t) = T.unpack id <> "%" <> show t
 
 instance Show (IRType a) where
     show IRIntType = "i"
