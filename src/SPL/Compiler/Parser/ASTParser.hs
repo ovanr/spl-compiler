@@ -254,11 +254,11 @@ _pExpr =
                    <<|> pIntExpr
                    <<|> pBoolExpr
                    <<|> pFunCallExpr
-                   <<|> pEmptyListExpr
+                   <<|> pListExpr
                    <<|> pCharExpr
                    <<|> pStringExpr
                    <<|> pFieldSelectExpr
-                   <<|> pError (mkError "Unknown expression encountered here")
+                   <<|> pErrorMax (mkError "Unknown expression encountered here")
 
 pUnaryOp :: String -> SPLParser (ASTExpr -> ASTExpr)
 pUnaryOp "!" = pReplaceError (mkError "Expected unary operator '!' here") (pIsSymbol '!')
@@ -297,7 +297,7 @@ pTupExprOrParens =
             <$> pIsSymbol '('
             <*> _pExpr
             <*> pMaybe (pIsSymbol ',' *> (pWrapErrors (\_ -> (<>) ["Tuple Constructor"]) _pExpr))
-            <*> pIsSymbol ')'
+            <*> (pIsSymbol ')' <<|> pErrorMax (mkError "Expected ')' here"))
 
     where
         toASTExpr lParens expr1 (Just expr2) rParens = TupExpr (lParens |-| rParens) expr1 expr2
@@ -323,8 +323,8 @@ pStringExpr = satisfyAs (\case
                             t@(MkToken _ (StringToken str)) -> Just $ toConsCharExpr (getLoc t) str
                             _ -> Nothing)
     where
-        toConsCharExpr loc str = foldr (\c acc -> Op2Expr loc (CharExpr loc c) Cons acc) 
-                                       (EmptyListExpr loc) 
+        toConsCharExpr loc str = foldr (\c acc -> Op2Expr loc (CharExpr loc c) Cons acc)
+                                       (EmptyListExpr loc)
                                        (T.unpack str)
 pBoolExpr :: SPLParser ASTExpr
 pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$>
@@ -352,6 +352,12 @@ pFieldSelect =
         mkFieldSelector id [] = ASTFieldSelector (id |-| id) id []
         mkFieldSelector id fs = ASTFieldSelector (id |-| last fs) id fs
 
-pEmptyListExpr :: SPLParser ASTExpr
-pEmptyListExpr = liftA2 (\t1 t2 -> EmptyListExpr (t1 |-| t2))
-                            (pIsSymbol '[') (pIsSymbol ']')
+pListExpr :: SPLParser ASTExpr
+pListExpr =
+    toASTExpr <$> pIsSymbol '['
+              <*> pList _pExpr (pIsSymbol ',') 
+              <*> pIsSymbol ']'
+    where
+        toASTExpr lParens [] rParens = EmptyListExpr (lParens |-| rParens)
+        toASTExpr lParens exprs rParens =
+            foldr (\e acc -> Op2Expr (getLoc e) e Cons acc) (EmptyListExpr $ getLoc rParens) exprs

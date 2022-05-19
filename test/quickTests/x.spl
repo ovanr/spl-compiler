@@ -1,7 +1,7 @@
 
 main() {
-    var x = ((1,2), (3,4));
-    x.snd.snd = 0;
+    var x = ((1,2), (3 * 8,[4,3,4,5]));
+    x.snd.snd = [];
     print(x);
     return;
 }

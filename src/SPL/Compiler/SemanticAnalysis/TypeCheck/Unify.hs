@@ -109,7 +109,7 @@ instance Types TCT where
     freeVars (TCT varDecls funDecls) = freeVars varDecls <> foldMap (foldMap freeVars) funDecls
 
 instance Types TCTVarDecl where
-    s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id expr
+    s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id (s $* expr)
     freeVars (TCTVarDecl _ t _ _) = freeVars t
 
 instance Types TCTFunDecl where
@@ -123,7 +123,7 @@ instance Types TCTFunBody where
 instance Types TCTStmt where
     s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
     s $* (WhileStmt loc e stmt) = WhileStmt loc (s $* e) (s $* stmt)
-    s $* (AssignStmt loc fd stmt) = AssignStmt loc (s $* fd) (s $* stmt)
+    s $* (AssignStmt loc fd e) = AssignStmt loc (s $* fd) (s $* e)
     s $* (ReturnStmt loc me) = ReturnStmt loc (($*) s <$> me)
     s $* (FunCallStmt l f) = FunCallStmt l (s $* f)
     freeVars (IfElseStmt _ e s1 s2) = freeVars e <> freeVars s1 <> freeVars s2

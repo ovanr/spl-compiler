@@ -28,7 +28,7 @@ data ParserState s = ParserState {
 } deriving (Eq, Show)
 
 instance ContainsSource (ParserState s) where
-    getFilePath = sourcePath 
+    getFilePath = sourcePath
     getSource = sourceCode
 
 -- The Error data type holds the depth (how many tokens have been parsed)
@@ -137,11 +137,15 @@ pMaybe p = (Just <$> p) <<|> pure Nothing
 -- Parse 0 or more elements 
 pList :: Parser s e a -> Parser s e b -> Parser s e [a]
 pList pElement pDelimiter =
-    (many' (pElement <* pDelimiter) <++> (pure <$> pElement)) <<|> pure []
+    ((pure <$> pElement) <++> many' (pDelimiter *> pElement)) <<|> pure []
 
 -- Parser that simply throws an error 
 pError :: (ParserState s -> e) -> Parser s e a
 pError err = Parser $ \s@(ParserState cnt _ fp con) -> [Left (Error cnt (err s))]
+
+-- Parser that simply throws an error 
+pErrorMax :: (ParserState s -> e) -> Parser s e a
+pErrorMax err = Parser $ \s@(ParserState cnt _ fp con) -> [Left (Error (cnt + 2) (err s))]
 
 -- Modify errors produced by the parser `p` using the function `err`
 pWrapErrors :: (ParserState s -> e -> e) -> Parser s e a -> Parser s e a
@@ -174,7 +178,7 @@ pChainl2 op pc p = foldl' (&) <$> p <*> many' (flip <$> op <*> pc)
 -- p (`op` p)* => (p `op` (p `op` (p `op` p)))
 pChainr :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
 pChainr op p = (\a ma -> maybe a ($ a) ma) <$> p <*> pMaybe (flip <$> op <*> pChainr op p)
-            
+
 -- Parse sentences of the following format in a right associative way: 
 -- op* p => op (op (op p))
 pChainr1 :: Parser s e (a -> a) -> Parser s e a -> Parser s e a

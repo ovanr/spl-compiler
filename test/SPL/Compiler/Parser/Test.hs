@@ -92,7 +92,7 @@ test_parse_fargs_3 = do
     executeMultipleTests pFargs [test]
 
 test_parse_fargs_4 = do
-    let test = [IdentifierToken "a", SymbolToken ','] --> []
+    let test = [IdentifierToken "a", SymbolToken ','] --> [ASTIdentifier def "a"]
     executeMultipleTests pFargs [test]
 
 test_parse_fargs_5 = do
