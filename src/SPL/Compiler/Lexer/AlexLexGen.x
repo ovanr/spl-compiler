@@ -34,14 +34,13 @@ tokens :-
     -- e.g. if we see */ then we enter the mlc state
     -- and only rules that start with mlc are taken into account
     -- otherwise we are at the default 0 state
-    <mlc> "*/"                           { \c l -> decMLCDepth >> getMLCDepth >>= (\d -> if d == 0 then begin 0 c l else alexMonadScan) }
-    -- <mlc> (. # \*)+                      { skip } */
+    <mlc> "*/"                           { begin 0 }
+    <mlc> (. # \*)+                      { skip }
     <mlc> .                              { skip }
     <mlc> \n                             { skip }
-    <mlc> "/*"                           { \c l -> incMLCDepth >> skip c l }
 
     
-    <0> "/*"                             { \c l -> startMLCDepth >> begin mlc c l }
+    <0> "/*"                             { begin mlc }
     <0> $white+                          { skip }
     <0> "//".*                           { skip }
 
@@ -84,24 +83,6 @@ tokens :-
 {
 
 -- token :: (AlexInput -> Int64 -> token) -> AlexAction token
-
-getAlexUserState :: Alex AlexUserState
-getAlexUserState = Alex $ \s@(AlexState _ _ _ _ _ u) -> Right (s,u)
-
-setAlexUserState :: AlexUserState -> Alex ()
-setAlexUserState u = Alex $ \s@(AlexState a b c d e _) -> Right (AlexState a b c d e u, ())
-
-getMLCDepth :: Alex Int
-getMLCDepth = getAlexUserState >>= (\(AlexUserState _ _ depth) -> pure depth)
-
-startMLCDepth :: Alex ()
-startMLCDepth = getAlexUserState >>= (\(AlexUserState a b depth) -> setAlexUserState (AlexUserState a b 1))
-
-incMLCDepth :: Alex ()
-incMLCDepth = getAlexUserState >>= (\(AlexUserState a b depth) -> setAlexUserState (AlexUserState a b (depth + 1)))
-
-decMLCDepth :: Alex ()
-decMLCDepth = getAlexUserState >>= (\(AlexUserState a b depth) -> setAlexUserState (AlexUserState a b (depth - 1)))
 
 -- produce Token with position
 produceToken :: (AlexInput -> Int64 -> SPLToken) -> AlexInput -> Int64 -> Token
@@ -191,8 +172,7 @@ getAllResults = do
 -- are used to give us nicer error messages
 data AlexUserState = AlexUserState { 
     filePath :: FilePath, 
-    contents :: B.ByteString, 
-    multiLineCommentDepth :: Int
+    contents :: B.ByteString 
 }
 
 -- Parse a single token.
@@ -230,12 +210,12 @@ alexMonadScan' = do
 -- Getter for the filepath from the user state 
 alexGetFilePath :: Alex FilePath
 alexGetFilePath = 
-    Alex $ \s@(AlexState _ _ _ _ _ (AlexUserState fp _ _)) -> Right (s, fp)
+    Alex $ \s@(AlexState _ _ _ _ _ (AlexUserState fp _)) -> Right (s, fp)
 
 --   Getter for the file content from the user state 
 alexGetContent :: Alex B.ByteString
 alexGetContent = 
-    Alex $ \s@(AlexState _ _ _ _ _ (AlexUserState _ c _)) -> Right (s, c)
+    Alex $ \s@(AlexState _ _ _ _ _ (AlexUserState _ c)) -> Right (s, c)
 
 -- Needed by the generated runAlex function.
 -- Note that we don't use that function thus it can be left undefined
@@ -255,7 +235,7 @@ tokenize fp input =
             alex_pos  = alexStartPos, 
             alex_inp  = input, 
             alex_chr  = '\n', 
-            alex_ust = AlexUserState fp input 0, 
+            alex_ust = AlexUserState fp input, 
             alex_scd = 0 
         } 
 
