@@ -2,4 +2,6 @@
 main() {
     var x = ((1,2), (3,4));
     x.snd.snd = 0;
+    print(x);
+    return;
 }

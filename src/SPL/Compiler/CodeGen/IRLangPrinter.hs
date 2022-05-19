@@ -32,9 +32,23 @@ instance IRLangPrinter (IRType a) where
     showCL _ t = T.pack (show t)
 
 instance IRLangPrinter (Var a) where
-    showCL _ (Var id t) = id <> "%" <> showCL 0 t
+    showCL _ (Var id t _) = id <> "%" <> showCL 0 t
+
+instance IRLangPrinter (Value a) where
+    showCL _ (IRVar v) = showCL 0 v
+    showCL _ (IRLit l) = showCL 0 l
+
+instance IRLangPrinter (IRConstant a) where
+    showCL _ IRVoid  = "()"
+    showCL _ (IRInt i) = T.pack (show i)
+    showCL _ (IRBool b) = T.pack (show b)
+    showCL _ (IRChar c) = "'" <> T.singleton c <> "'"
+    showCL _ (IRFun (IRFunDecl label _ _)) = label
 
 instance IRLangPrinter (HList Var xs) where
+    showCL _ = T.intercalate " " . hListMapToList (showCL 0)
+
+instance IRLangPrinter (HList Value xs) where
     showCL _ = T.intercalate " " . hListMapToList (showCL 0)
 
 instance IRLangPrinter (IRLang gs fs) where 
@@ -83,6 +97,8 @@ instance IRLangPrinter IRInstr where
         mkIdent ident <> "And " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (Or dst src1 src2) =
         mkIdent ident <> "Or " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
+    showCL ident (Xor dst src1 src2) =
+        mkIdent ident <> "Xor " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (Not dst src) =
         mkIdent ident <> "Not " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (Neg dst src) =
@@ -97,8 +113,10 @@ instance IRLangPrinter IRInstr where
         mkIdent ident <> "Gt " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (Ge dst src1 src2) =
         mkIdent ident <> "Ge " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
-    showCL ident (Declare var) =
-        mkIdent ident <> "Declare " <> showCL 0 var
+    showCL ident (DeclareV var) =
+        mkIdent ident <> "DeclareV " <> showCL 0 var
+    showCL ident (DeclareTmp var) =
+        mkIdent ident <> "DeclareTmp " <> showCL 0 var
     showCL ident (SetLabel label) =
         showCL (ident - 1) label <> ":"
     showCL ident (BrTrue var label) =
@@ -107,26 +125,15 @@ instance IRLangPrinter IRInstr where
         mkIdent ident <> "BrFalse " <> showCL 0 var <> " " <> showCL 0 label
     showCL ident (BrAlways label) =
         mkIdent ident <> "BrAlways " <> showCL 0 label
-    showCL ident (Call dst (IRFunDecl label _ _) args) =
+    showCL ident (Call dst src args) =
         mkIdent ident <> "Call " <> showCL 0 dst <> " " <>
-            showCL 0 label <> " " <> showCL 0 args
-    showCL ident (CallV dst src args) =
-        mkIdent ident <> "CallV " <> showCL 0 dst <> " " <>
             showCL 0 src <> " " <> showCL 0 args
-    showCL ident (StoreI dst i) =
-        mkIdent ident <> "StoreI " <> showCL 0 dst <> " " <> showCL 0 i
-    showCL ident (StoreC dst c) =
-        mkIdent ident <> "StoreC " <> showCL 0 dst <> " " <> showCL 0 c
-    showCL ident (StoreB dst b) =
-        mkIdent ident <> "StoreB " <> showCL 0 dst <> " " <> showCL 0 b
     showCL ident (StoreV dst src) =
         mkIdent ident <> "StoreV " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (StoreA dst src) =
         mkIdent ident <> "StoreA " <> showCL 0 dst <> " " <> showCL 0 src
-    showCL ident (StoreL dst (IRFunDecl label _ _)) =
-        mkIdent ident <> "StoreL " <> showCL 0 dst <> " " <> label
-    showCL ident (StoreVUnsafe dst src) =
-        mkIdent ident <> "StoreVUnsafe " <> showCL 0 dst <> " " <> showCL 0 src
+    showCL ident (Cast dst src) =
+        mkIdent ident <> "Cast " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (LoadA dst src) =
         mkIdent ident <> "LoadA " <> showCL 0 dst <> " " <> showCL 0 src
     showCL ident (Ref dst src) =
@@ -137,8 +144,8 @@ instance IRLangPrinter IRInstr where
         mkIdent ident <> "ConsList " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
     showCL ident (MkTup dst src1 src2) =
         mkIdent ident <> "MkTup " <> showCL 0 dst <> " " <> showCL 0 src1 <> " " <> showCL 0 src2
-    showCL ident (RetV src) =
-        mkIdent ident <> "RetV " <> showCL 0 src
+    showCL ident (Ret src) =
+        mkIdent ident <> "Ret " <> showCL 0 src
     showCL ident Halt =
         mkIdent ident <> "Halt"
     showCL ident (PrintI i) =

@@ -1,242 +1,307 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
 module SPL.Compiler.CodeGen.IRLangTConGen where
 
 import qualified Data.Text as T
+import qualified Data.List as L
 import Control.Lens
 import Control.Monad
+import Data.Proxy
 import GHC.Stack
 
 import SPL.Compiler.CodeGen.IRLang
 import SPL.Compiler.CodeGen.IRLangGenLib
 import SPL.Compiler.Common.TypeFunc
+import Data.Bifunctor (first)
 
 class GenTConFun a where
-    genEqIRInstr :: Var a -> Var a -> IRMonad (Var Bool)
-    genEqIRInstr arg1 arg2 = genEqOrdIRInstr genEqIRInstr arg1 arg2
-    genOrdIRInstr :: Var a -> Var a -> IRMonad (Var Bool)
-    genOrdIRInstr arg1 arg2 = genEqOrdIRInstr genOrdIRInstr arg1 arg2
-    genEqOrdIRInstr :: (forall a. GenTConFun a => Var a -> Var a -> IRMonad (Var Bool)) -> 
-                         Var a -> Var a -> IRMonad (Var Bool)
-    genPrintIRInstr :: Var a -> IRMonad ()
+    genEqIRInstr    :: IRType a -> IRMonad (IRFunDef '[a, a, Bool], [Some1 IRFunDecl'])
+    genOrdIRInstr   :: IRType a -> IRMonad (IRFunDef '[a, a, Bool], [Some1 IRFunDecl'])
+    genPrintIRInstr :: IRType a -> IRMonad (IRFunDef '[a, Unit],    [Some1 IRFunDecl'])
+
+printString :: String -> [IRInstr]
+printString = map (PrintC . IRLit . IRChar)
+
+mkEqOrdFunDecl :: Identifier -> IRType a -> IRFunDecl '[a, a] Bool
+mkEqOrdFunDecl funName elemT =
+    let arg1 = Var "x" elemT Declared
+        arg2 = Var "y" elemT Declared
+    in IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType
+
+mkEqFunDecl :: IRType a -> IRFunDecl '[a, a] Bool
+mkEqFunDecl elemT = mkEqOrdFunDecl (mkEqFunName elemT) elemT
+
+mkOrdFunDecl :: IRType a -> IRFunDecl '[a, a] Bool
+mkOrdFunDecl elemT = mkEqOrdFunDecl (mkOrdFunName elemT) elemT
+
+mkPrintFunDecl :: IRType a -> IRFunDecl '[a] Unit
+mkPrintFunDecl elemT =
+    let arg1 = Var "x" elemT Declared
+        arg2 = Var "y" elemT Declared
+    in IRFunDecl (mkPrintFunName elemT) (arg1 :+: HNil) IRVoidType
+
+mkEqFunName :: IRType a -> Identifier
+mkEqFunName t = "0eq_tcon_" <> textifyType t
+
+mkOrdFunName :: IRType a -> Identifier
+mkOrdFunName t = "0ord_tcon_" <> textifyType t
+
+mkPrintFunName :: IRType a -> Identifier
+mkPrintFunName t = "0print_tcon_" <> textifyType t
+
+textifyType :: IRType a -> Identifier
+textifyType IRIntType = "int"
+textifyType IRBoolType = "bool"
+textifyType IRCharType = "char"
+textifyType IRVoidType = "void"
+textifyType (IRUnknownType txt) = "unknown"
+textifyType (IRPtrType t) = "ptr_" <> textifyType t
+textifyType (IRListType t) = "list_" <> textifyType t
+textifyType (IRFunType hl r) =
+    "fun_" <> T.intercalate "_" (hListMapToList textifyType hl) <> "_" <> textifyType r
+textifyType (IRTupleType a b) = "tup_" <> textifyType a <> "_" <> textifyType b
 
 instance GenTConFun Unit where
-    genEqIRInstr arg1 arg2 = do
-        dst <- mkTmpVar IRBoolType
-        body <>= [StoreB dst True]
-        return dst
-    genOrdIRInstr = genEqIRInstr
-    genEqOrdIRInstr f = f
-    genPrintIRInstr _ = do
-        tmp <- mkTmpVar IRCharType
-        body <>= [StoreC tmp 'V', PrintC tmp]
+    genEqIRInstr t =
+        let funDecl = mkEqFunDecl t
+        in return (IRFunDef (IRFunDecl' funDecl) [Ret (IRLit $ IRBool True)], [])
+
+    genOrdIRInstr t =
+        let funDecl = mkOrdFunDecl t
+        in return (IRFunDef (IRFunDecl' funDecl) [Ret (IRLit $ IRBool True)], [])
+
+    genPrintIRInstr t =
+        let funDecl = mkPrintFunDecl t
+        in return (IRFunDef (IRFunDecl' funDecl) (printString "Void" ++ [Ret (IRLit IRVoid)]), [])
 
 instance GenTConFun Int where
-    genEqIRInstr arg1 arg2 = do
-        dst <- mkTmpVar IRBoolType
-        body <>= [Eq dst arg1 arg2]
-        return dst
-    genOrdIRInstr arg1 arg2 = do
-        dst <- mkTmpVar IRBoolType
-        body <>= [Lt dst arg1 arg2]
-        return dst
-    genEqOrdIRInstr f = f
-    genPrintIRInstr arg1 =
-        body <>= [PrintI arg1]
+    genEqIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkEqFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp <- mkTmpVar IRBoolType
+            body <>= [Eq tmp (IRVar arg1) (IRVar arg2), Ret (IRVar tmp)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
+
+    genOrdIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkOrdFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp <- mkTmpVar IRBoolType
+            body <>= [Lt tmp (IRVar arg1) (IRVar arg2), Ret (IRVar tmp)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
+
+    genPrintIRInstr t =
+        let funDecl@(IRFunDecl _ (arg1 :+: HNil) _) = mkPrintFunDecl t
+        in return (IRFunDef (IRFunDecl' funDecl) [PrintI (IRVar arg1), Ret (IRLit IRVoid)], [])
 
 instance GenTConFun Bool where
-    genEqIRInstr arg1 arg2 = do
-        src1 <- mkTmpVar IRIntType
-        src2 <- mkTmpVar IRIntType
-        dst  <- mkTmpVar IRBoolType
-        body <>= [StoreVUnsafe src1 arg1,
-                  StoreVUnsafe src2 arg2,
-                  Eq dst src1 src2]
-        return dst
-    genOrdIRInstr = genEqIRInstr
-    genEqOrdIRInstr f = f
-    genPrintIRInstr arg1 = do
-        printFalse <- mkLabel "PrintFalse"
-        end <- mkLabel "End"
-        tmp <- mkTmpVar IRCharType
-        body <>= [BrFalse arg1 printFalse]
-        body <>= [StoreC tmp 'T',
-                  PrintC tmp,
-                  StoreC tmp 'r',
-                  PrintC tmp,
-                  StoreC tmp 'u',
-                  PrintC tmp,
-                  StoreC tmp 'e',
-                  PrintC tmp,
-                  BrAlways end]
-        body <>= [SetLabel printFalse]
-        body <>= [StoreC tmp 'F',
-                  PrintC tmp,
-                  StoreC tmp 'a',
-                  PrintC tmp,
-                  StoreC tmp 'l',
-                  PrintC tmp,
-                  StoreC tmp 's',
-                  PrintC tmp,
-                  StoreC tmp 'e',
-                  PrintC tmp]
-        body <>= [SetLabel end]
+    genEqIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkEqFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp1 <- mkTmpVar IRBoolType
+            tmp2 <- mkTmpVar IRBoolType
+            body <>= [Xor tmp1 (IRVar arg1) (IRVar arg2), Not tmp2 (IRVar tmp1)]
+            body <>= [Ret (IRVar tmp2)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
+
+    genOrdIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkEqFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp1 <- mkTmpVar IRBoolType
+            tmp2 <- mkTmpVar IRBoolType
+            body <>= [Not tmp1 (IRVar arg1), And tmp2 (IRVar tmp1) (IRVar arg2)]
+            body <>= [Ret (IRVar tmp2)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
+
+    genPrintIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: HNil) _) = mkPrintFunDecl t
+        funBody <- declareBodyAs $ do
+            printFalse <- mkLabel "PrintFalse"
+            end <- mkLabel "End"
+            body <>= [BrFalse (IRVar arg1) printFalse]
+            body <>= printString "True"
+            body <>= [BrAlways end]
+            body <>= [SetLabel printFalse]
+            body <>= printString "False"
+            body <>= [SetLabel end]
+            body <>= [Ret (IRLit IRVoid)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
 
 instance GenTConFun Char where
-    genEqIRInstr arg1 arg2 = do
-        src1 <- mkTmpVar IRIntType
-        src2 <- mkTmpVar IRIntType
-        dst  <- mkTmpVar IRBoolType
-        body <>= [StoreVUnsafe src1 arg1,
-                  StoreVUnsafe src2 arg2,
-                  Eq dst src1 src2]
-        return dst
-    genOrdIRInstr arg1 arg2 = do
-        src1 <- mkTmpVar IRIntType
-        src2 <- mkTmpVar IRIntType
-        dst  <- mkTmpVar IRBoolType
-        body <>= [StoreVUnsafe src1 arg1,
-                  StoreVUnsafe src2 arg2,
-                  Lt dst src1 src2]
-        return dst
-    genEqOrdIRInstr _ _ _ = coreError
-    genPrintIRInstr arg1 =
-        body <>= [PrintC arg1]
+    genEqIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkEqFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp1 <- mkTmpVar IRIntType
+            tmp2 <- mkTmpVar IRIntType
+            res <- mkTmpVar IRBoolType
+            body <>= [Cast tmp1 (IRVar arg1),
+                      Cast tmp2 (IRVar arg2),
+                      Eq res (IRVar tmp1) (IRVar tmp2),
+                      Ret (IRVar res)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
 
+    genOrdIRInstr t = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = mkEqFunDecl t
+        funBody <- declareBodyAs $ do
+            tmp1 <- mkTmpVar IRIntType
+            tmp2 <- mkTmpVar IRIntType
+            res <- mkTmpVar IRBoolType
+            body <>= [Cast tmp1 (IRVar arg1),
+                      Cast tmp2 (IRVar arg2),
+                      Lt res (IRVar tmp1) (IRVar tmp2),
+                      Ret (IRVar tmp2)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [])
+
+    genPrintIRInstr t =
+        let funDecl@(IRFunDecl _ (arg1 :+: HNil) _) = mkPrintFunDecl t
+        in return (IRFunDef (IRFunDecl' funDecl) [PrintC (IRVar arg1), Ret (IRLit IRVoid)], [])
+
+genListEqOrdIRInstr :: (forall a. IRType a -> IRFunDecl '[a, a] Bool) ->
+                    IRType (Ptr [b]) -> IRMonad (IRFunDef '[Ptr [b], Ptr [b], Bool], [Some1 IRFunDecl'])
+genListEqOrdIRInstr f t@(IRListType t1) = do
+        let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = f t
+            innerFunDecl1 = f t1
+        funBody <- declareBodyAs $ do
+            end <- mkLabel "End"
+            whileStart <- mkLabel "WhileStart"
+
+            result <- mkTmpVar IRBoolType
+            body <>= [StoreV result (IRLit $ IRBool True)]
+            tmp <- mkTmpVar IRBoolType
+            body <>= [SetLabel whileStart]
+
+            Some1 isEmpty1'@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 (IRVar arg1)]
+            Some1 isEmpty2'@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 (IRVar arg2)]
+
+            let isEmpty1 = IRVar isEmpty1'
+                isEmpty2 = IRVar isEmpty2'
+            body <>= [And result isEmpty1 isEmpty2, BrTrue (IRVar result) end]
+            body <>= [Not tmp isEmpty1, And tmp (IRVar tmp) isEmpty2, BrTrue (IRVar tmp) end]
+            body <>= [Not tmp isEmpty2, And tmp isEmpty1 (IRVar tmp), BrTrue (IRVar tmp) end]
+
+            Some1 hd1 <- callFunWith "hd" [Some1 (IRVar arg1)]
+            hd1' <- castVar hd1 t1
+            Some1 hd2 <- callFunWith "hd" [Some1 (IRVar arg2)]
+            hd2' <- castVar hd2 t1
+
+            body <>= [Call result (IRLit $ IRFun innerFunDecl1) (IRVar hd1' :+: IRVar hd2' :+: HNil)]
+            body <>= [BrFalse (IRVar result) end]
+
+            Some1 tl1 <- callFunWith "tl" [Some1 (IRVar arg1)]
+            tl1' <- castVar tl1 t
+            Some1 tl2 <- callFunWith "tl" [Some1 (IRVar arg2)]
+            tl2' <- castVar tl1 t
+
+            body <>= [StoreV arg1 (IRVar tl1'), StoreV arg2 (IRVar tl2')]
+            body <>= [BrAlways whileStart]
+
+            body <>= [SetLabel end]
+            body <>= [Ret (IRVar result)]
+
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [Some1 (IRFunDecl' innerFunDecl1)])
+
+genListEqOrdIRInstr _ IRPtrType{} = error "impossible"
 
 instance GenTConFun a => GenTConFun (Ptr [a]) where
-    -- Given arguments: arg1 arg2
-    -- while (True) {
-    --     if (isEmpty(arg1) && isEmpty(arg2))
-    --         return True;
-    --     if (!isEmpty(arg1) && isEmpty(arg2))
-    --         return False;
-    --     if (isEmpty(arg1) && !isEmpty(arg2))
-    --         return False;
+    genEqIRInstr = genListEqOrdIRInstr mkEqFunDecl
+    genOrdIRInstr = genListEqOrdIRInstr mkOrdFunDecl
+    genPrintIRInstr t@(IRListType t1) = do
+        let funDecl@(IRFunDecl _ (arg :+: HNil) _) = mkPrintFunDecl t
+            innerFunDecl1 = mkPrintFunDecl t1
+        funBody <- declareBodyAs $ do
+            whileStart <- mkLabel "WhileStart"
+            end <- mkLabel "End"
 
-    --     hd1 = hd(arg1);
-    --     hd2 = hd(arg2);
-    --     if (hd1 != hd2)
-    --         return False;
-    --     arg1 = tl(arg1);
-    --     arg2 = tl(arg2);
-    -- }
-    genEqOrdIRInstr f arg1@(Var _ listT@(IRListType elemT)) arg2 = do
-        returnFalse <- mkLabel "ReturnFalse"
+            voidVar <- getVoidVar
+            body <>= printString "["
+
+            body <>= [SetLabel whileStart]
+
+            Some1 isEmpty@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 $ IRVar arg]
+
+            body <>= [BrTrue (IRVar isEmpty) end]
+
+            Some1 hd <- callFunWith "hd" [Some1 $ IRVar arg]
+            hd' <- castVar hd t1
+
+            body <>= [Call voidVar (IRLit $ IRFun innerFunDecl1) (IRVar hd' :+: HNil)]
+
+            Some1 tl <- callFunWith "tl" [Some1 $ IRVar arg]
+
+            Some1 isEmpty@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 $ IRVar tl]
+            body <>= [BrTrue (IRVar isEmpty) end]
+            body <>= printString " "
+
+            tl' <- castVar tl t
+            body <>= [StoreV arg (IRVar tl'), BrAlways whileStart]
+            body <>= [SetLabel end]
+            body <>= printString "]"
+            body <>= [Ret (IRLit IRVoid)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [Some1 (IRFunDecl' innerFunDecl1)])
+
+    genPrintIRInstr IRPtrType{} = error "impossible"
+
+genTupEqOrdIRInstr :: (forall a. IRType a -> IRFunDecl '[a, a] Bool) ->
+                    IRType (Ptr (a,b)) -> IRMonad (IRFunDef '[Ptr (a,b), Ptr (a,b), Bool], [Some1 IRFunDecl'])
+genTupEqOrdIRInstr f t@(IRTupleType t1 t2) = do
+    let funDecl@(IRFunDecl _ (arg1 :+: arg2 :+: HNil) _) = f t
+        innerFunDecl1 = f t1
+        innerFunDecl2 = f t2
+    funBody <- declareBodyAs $ do
         end <- mkLabel "End"
-        whileStart <- mkLabel "WhileStart"
 
         result <- mkTmpVar IRBoolType
-        body <>= [StoreB result True]
-        tmp1 <- mkTmpVar IRBoolType
-        tmp2 <- mkTmpVar IRBoolType
-        body <>= [SetLabel whileStart]
+        body <>= [StoreV result (IRLit $ IRBool True)]
 
-        Some1 isEmpty1@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg1]
-        Some1 isEmpty2@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg2]
+        Some1 fst1 <- callFunWith "fst" [Some1 $ IRVar arg1]
+        fst1' <- castVar fst1 t1
+        Some1 fst2 <- callFunWith "fst" [Some1 $ IRVar arg2]
+        fst2' <- castVar fst2 t1
 
-        body <>= [And tmp1 isEmpty1 isEmpty2, BrTrue tmp1 end]
-        body <>= [Not tmp2 isEmpty1, And tmp1 tmp2 isEmpty2, BrTrue tmp1 returnFalse]
-        body <>= [Not tmp2 isEmpty2, And tmp1 isEmpty1 tmp2, BrTrue tmp1 returnFalse]
+        body <>= [Call result (IRLit $ IRFun innerFunDecl1) (IRVar fst1' :+: IRVar fst2' :+: HNil)]
+        body <>= [BrFalse (IRVar result) end]
 
-        Some1 hd1 <- callFunWith "hd" [Some1 arg1]
-        hd1' <- unsafeCast hd1 elemT
-        Some1 hd2 <- callFunWith "hd" [Some1 arg2]
-        hd2' <- unsafeCast hd2 elemT
+        Some1 snd1 <- callFunWith "snd" [Some1 $ IRVar arg1]
+        snd1' <- castVar snd1 t2
+        Some1 snd2 <- callFunWith "snd" [Some1 $ IRVar arg2]
+        snd2' <- castVar snd2 t2
 
-        hdEqual <- f hd1' hd2'
-        body <>= [ BrFalse hdEqual returnFalse ]
+        body <>= [Call result (IRLit $ IRFun innerFunDecl2) (IRVar snd1' :+: IRVar snd2' :+: HNil)]
 
-        Some1 tl1 <- callFunWith "tl" [Some1 arg1]
-        tl1' <- unsafeCast tl1 listT
-        Some1 tl2 <- callFunWith "tl" [Some1 arg2]
-        tl2' <- unsafeCast tl1 listT
+        body <>= [SetLabel end, Ret (IRVar result)]
 
-        body <>= [StoreV arg1 tl1', StoreV arg2 tl2', BrAlways whileStart]
-        body <>= [SetLabel returnFalse, StoreB result False]
-        body <>= [SetLabel end]
-
-        return result
-    genEqOrdIRInstr _ _ _ = coreError
-    genPrintIRInstr arg@(Var _ listT@(IRListType elemT)) = do
-        whileStart <- mkLabel "WhileStart"
-        end <- mkLabel "End"
-
-        tmp1 <- mkTmpVar IRBoolType
-        tmp2 <- mkTmpVar IRCharType
-
-        body <>= [StoreC tmp2 '[', PrintC tmp2]
-        body <>= [SetLabel whileStart]
-
-        Some1 isEmpty@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 arg]
-
-        body <>= [BrTrue isEmpty end]
-
-        Some1 hd <- callFunWith "hd" [Some1 arg]
-        hd' <- unsafeCast hd elemT
-
-        genPrintIRInstr hd'
-
-        Some1 tl <- callFunWith "tl" [Some1 arg]
-
-        Some1 isEmpty@(Var _ IRBoolType) <- callFunWith "isEmpty" [Some1 tl]
-        body <>= [BrTrue isEmpty end]
-        body <>= [StoreC tmp2 ' ', PrintC tmp2]
-
-        tl' <- unsafeCast tl listT
-        body <>= [StoreV arg tl', BrAlways whileStart]
-        body <>= [SetLabel end]
-        body <>= [StoreC tmp2 ']', PrintC tmp2]
-    genPrintIRInstr _ = coreError
+    return (IRFunDef (IRFunDecl' funDecl) funBody, [Some1 (IRFunDecl' innerFunDecl1), Some1 (IRFunDecl' innerFunDecl2)])
+genTupEqOrdIRInstr _ IRPtrType{} = error "impossible"
 
 instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
-    genEqOrdIRInstr f arg1@(Var _ tupT@(IRTupleType elemT1 elemT2)) arg2 = do
-        returnFalse <- mkLabel "ReturnFalse"
-        end <- mkLabel "End"
+    genEqIRInstr = genTupEqOrdIRInstr mkEqFunDecl
+    genOrdIRInstr = genTupEqOrdIRInstr mkOrdFunDecl
 
-        result <- mkTmpVar IRBoolType
-        body <>= [StoreB result True]
+    genPrintIRInstr t@(IRTupleType t1 t2) = do
+        let funDecl@(IRFunDecl _ (arg :+: HNil) _) = mkPrintFunDecl t
+            innerFunDecl1 = mkPrintFunDecl t1
+            innerFunDecl2 = mkPrintFunDecl t2
+        funBody <- declareBodyAs $ do
+            body <>= printString "("
+            Some1 fst <- callFunWith "fst" [Some1 $ IRVar arg]
+            fst'@(Var _ fstT _)  <- castVar fst t1
 
-        Some1 fst1 <- callFunWith "fst" [Some1 arg1]
-        fst1' <- unsafeCast fst1 elemT1
-        Some1 fst2 <- callFunWith "fst" [Some1 arg2]
-        fst2' <- unsafeCast fst2 elemT1
+            voidVar <- getVoidVar
+            body <>= [Call voidVar (IRLit $ IRFun innerFunDecl1) (IRVar fst' :+: HNil)]
 
-        fstEqual <- f fst1' fst2'
-        body <>= [BrFalse fstEqual returnFalse]
+            body <>= printString ","
 
-        Some1 snd1 <- callFunWith "snd" [Some1 arg1]
-        snd1' <- unsafeCast snd1 elemT2
-        Some1 snd2 <- callFunWith "snd" [Some1 arg2]
-        snd2' <- unsafeCast snd2 elemT2
+            Some1 snd <- callFunWith "snd" [Some1 $ IRVar arg]
+            snd'@(Var _ sndT _) <- castVar snd t2
+            body <>= [Call voidVar (IRLit $ IRFun innerFunDecl2) (IRVar snd' :+: HNil)]
 
-        sndEqual <- genEqIRInstr snd1' snd2'
-        body <>= [BrFalse sndEqual returnFalse]
-        body <>= [BrAlways end]
+            body <>= printString ")"
+            body <>= [Ret (IRLit IRVoid)]
+        return (IRFunDef (IRFunDecl' funDecl) funBody, [Some1 (IRFunDecl' innerFunDecl1), Some1 (IRFunDecl' innerFunDecl2)])
 
-        body <>= [SetLabel returnFalse, StoreB result False, BrAlways end]
-        body <>= [SetLabel end]
-
-        return result
-    genEqOrdIRInstr _ _ _ = coreError
-    genPrintIRInstr arg@(Var _ (IRTupleType elemT1 elemT2)) = do
-        tmp <- mkTmpVar IRCharType
-
-        body <>= [StoreC tmp '(', PrintC tmp]
-
-        Some1 fst <- callFunWith "fst" [Some1 arg]
-        fst' <- unsafeCast fst elemT1
-        genPrintIRInstr fst'
-
-        body <>= [StoreC tmp ',', PrintC tmp]
-
-        Some1 snd <- callFunWith "snd" [Some1 arg]
-        snd' <- unsafeCast snd elemT2
-        genPrintIRInstr snd'
-
-        body <>= [StoreC tmp ')', PrintC tmp]
     genPrintIRInstr _ = coreError
 
 toConstrained :: (MonadFail m, HasCallStack) => IRType a -> m (Constrained GenTConFun IRType a)
@@ -254,37 +319,53 @@ toConstrained (IRTupleType elemT1 elemT2) = do
 toConstrained t = fail $
     "Cannot generate overloaded constraint for this type: " <> show t
 
-solveFunDeclConstraints :: IRFunDecl xs r -> IRMonad [Some1 IRFunDef]
+genAllFunDeclRec :: forall xs b. GenTConFun b =>
+                    (forall a. GenTConFun a => IRType a -> IRMonad (Some1 IRFunDef, [Some1 IRFunDecl'])) ->
+                    IRType b ->
+                    IRMonad (Some1 IRFunDecl', [Some1 IRFunDef])
+genAllFunDeclRec generator t = do
+    (Some1 def@(IRFunDef decl _), decls) <- generator t
+    funcs %= (\(Some1 env) -> Some1 $ decl :+: env)
+    defs' <- concat <$> forM decls (\(Some1 f) -> do
+        envDecls <- (\(Some1 hs) -> hListToList hs) <$> use funcs
+        case Some1 f `shouldGenerate` envDecls of
+            Nothing -> pure mempty
+            Just (Some1 t') -> do
+                Constrained t'' <- toConstrained t'
+                snd <$> genAllFunDeclRec generator t'')
+
+    return (Some1 decl, Some1 def : defs')
+
+    where
+        getEnvFuncNames :: IRMonad [Identifier]
+        getEnvFuncNames = use funcs >>= (\(Some1 env) -> pure $ hListMapToList getId env)
+
+        getId :: IRFunDecl' xs -> Identifier
+        getId (IRFunDecl' (IRFunDecl id _ _)) = id
+
+        shouldGenerate :: Some1 IRFunDecl' -> [Some1 IRFunDecl'] -> Maybe (Some1 IRType)
+        shouldGenerate (Some1 (IRFunDecl' (IRFunDecl id ((Var _ t _) :+: _) _))) ys =
+            if id `elem` map (\(Some1 y) -> getId y) ys then
+                Nothing
+            else
+               Just $ Some1 t
+        shouldGenerate _ _ = Nothing
+
+genAllEqFunDeclRec :: GenTConFun a => IRType a -> IRMonad (Some1 IRFunDecl', [Some1 IRFunDef])
+genAllEqFunDeclRec = genAllFunDeclRec (fmap (first Some1) . genEqIRInstr)
+
+genAllOrdFunDeclRec :: GenTConFun a => IRType a -> IRMonad (Some1 IRFunDecl', [Some1 IRFunDef])
+genAllOrdFunDeclRec = genAllFunDeclRec (fmap (first Some1) . genOrdIRInstr)
+
+genAllPrintFunDeclRec :: GenTConFun a => IRType a -> IRMonad (Some1 IRFunDecl', [Some1 IRFunDef])
+genAllPrintFunDeclRec = genAllFunDeclRec (fmap (first Some1) . genPrintIRInstr)
+
+solveFunDeclConstraints :: IRFunDecl xs r -> IRMonad ([Some1 IRFunDecl'], [Some1 IRFunDef])
 solveFunDeclConstraints (IRFunDecl _ args _) = do
-    forM (hListToList args) $ \(Some1 (Var id (IRFunType (varT :+: _) _))) -> do
+    foldl (<>) mempty <$> forM (hListToList args) (\(Some1 (Var id (IRFunType (varT :+: _) _) _)) -> do
         Constrained varT' <- toConstrained varT
-        body .= []
-        case T.unpack id of
-            ('0':'e':'q':'_':'c':'o':'n':_) -> do
-                funName <- mkLabel "eq_con"
-                let arg1 = Var "x" varT
-                    arg2 = Var "y" varT
-                    funDecl' = IRFunDecl' (IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType)
-                funBody <- declareBodyAs $ do
-                    dst <- genEqIRInstr arg1 arg2
-                    body <>= [RetV dst]
-                return . Some1 $ IRFunDef funDecl' funBody
-            ('0':'o':'r':'d':'_':'c':'o':'n':_) -> do
-                funName <- mkLabel "ord_con"
-                let arg1 = Var "x" varT
-                    arg2 = Var "y" varT
-                    funDecl' = IRFunDecl' (IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType)
-                funBody <- declareBodyAs $ do
-                    dst <- genOrdIRInstr arg1 arg2
-                    body <>= [RetV dst]
-                return . Some1 $ IRFunDef funDecl' funBody
-            ('0':'p':'r':'i':'n':'t':'_':'c':'o':'n':_) -> do
-                funName <- mkLabel "print_con"
-                let arg = Var "x" varT
-                    funDecl' = IRFunDecl' (IRFunDecl funName (arg :+: HNil) IRVoidType)
-                funBody <- declareBodyAs $ do
-                    genPrintIRInstr arg
-                    dst <- mkTmpVar IRVoidType
-                    body <>= [RetV dst]
-                return . Some1 $ IRFunDef funDecl' funBody
-            _ -> coreError
+        if | T.isPrefixOf "0eq_con" id -> first pure <$> genAllEqFunDeclRec varT
+           | T.isPrefixOf "0ord_con" id -> first pure <$> genAllOrdFunDeclRec varT
+           | T.isPrefixOf "0print_con" id -> first pure <$> genAllPrintFunDeclRec varT
+           | otherwise -> pure mempty
+        )

@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module SPL.Compiler.CodeGen.IRLang (
         Identifier,
@@ -22,24 +23,27 @@ module SPL.Compiler.CodeGen.IRLang (
         Src2,
         Ptr,
         Unknown,
+        Value(..),
         Var(..),
+        VarKind(..),
+        IRConstant(..),
         IRLang(..),
         IRFunDecl(..),
         IRFunDef(..),
-        toIRType,
         type (-->),
         CollapseFunType,
+        Castable,
         funId,
         funArgs,
         funRetType,
         funBody,
         varIdentifier,
         varType,
-        hasUnknownType,
         IRFunDecl'(..),
         IRGlobal(..),
         IRInstr(..),
-        IRType(..)
+        IRType(..),
+        Typeable(..)
     ) where
 
 import Data.Text (Text)
@@ -61,9 +65,12 @@ data Ptr a
 data (-->) (a :: [*]) r
 data Unknown
 
+data VarKind = Temp | Declared
+
 data Var a = Var {
     _varIdentifier :: Identifier,
-    _varType :: IRType a
+    _varType :: IRType a,
+    _varKind :: VarKind
 }
 data Value a = IRVar (Var a) | IRLit (IRConstant a)
 
@@ -85,46 +92,45 @@ data IRFunDef xs = IRFunDef {
     _funBody :: [IRInstr]
 }
 
-type family CollapseFunType (a :: *) :: [*] where 
+type family CollapseFunType (a :: *) :: [*] where
     CollapseFunType (Ptr (as --> r)) = Snoc as r
     CollapseFunType a = '[a]
 
 data IRInstr where
-    Add :: Dst Int -> Src1 Int -> Src2 Int -> IRInstr
-    Sub :: Dst Int -> Src1 Int -> Src2 Int -> IRInstr
-    Mul :: Dst Int -> Src1 Int -> Src2 Int -> IRInstr
-    Div :: Dst Int -> Src1 Int -> Src2 Int -> IRInstr
-    Mod :: Dst Int -> Src1 Int -> Src2 Int -> IRInstr
-    And :: Dst Bool -> Src1 Bool -> Src2 Bool -> IRInstr
-    Or :: Dst Bool -> Src1 Bool -> Src2 Bool -> IRInstr
-    Not :: Dst Bool -> Src Bool -> IRInstr
-    Neg :: Dst Int -> Src Int -> IRInstr
-    Eq :: Dst Bool -> Src1 Int -> Src2 Int -> IRInstr
-    Lt :: Dst Bool -> Src1 Int -> Src2 Int -> IRInstr
-    Le :: Dst Bool -> Src1 Int -> Src2 Int -> IRInstr
-    Gt :: Dst Bool -> Src1 Int -> Src2 Int -> IRInstr
-    Ge :: Dst Bool -> Src1 Int -> Src2 Int -> IRInstr
-    Declare :: Var a -> IRInstr
+    Add :: Var Int -> Value Int -> Value Int -> IRInstr
+    Sub :: Var Int -> Value Int -> Value Int -> IRInstr
+    Mul :: Var Int -> Value Int -> Value Int -> IRInstr
+    Div :: Var Int -> Value Int -> Value Int -> IRInstr
+    Mod :: Var Int -> Value Int -> Value Int -> IRInstr
+    And :: Var Bool -> Value Bool -> Value Bool -> IRInstr
+    Or :: Var Bool -> Value Bool -> Value Bool -> IRInstr
+    Xor :: Var Bool -> Value Bool -> Value Bool -> IRInstr
+    Not :: Var Bool -> Value Bool -> IRInstr
+    Neg :: Var Int -> Value Int -> IRInstr
+    Eq :: Var Bool -> Value Int -> Value Int -> IRInstr
+    Lt :: Var Bool -> Value Int -> Value Int -> IRInstr
+    Le :: Var Bool -> Value Int -> Value Int -> IRInstr
+    Gt :: Var Bool -> Value Int -> Value Int -> IRInstr
+    Ge :: Var Bool -> Value Int -> Value Int -> IRInstr
+    DeclareV :: Var a -> IRInstr
+    DeclareTmp :: Var a -> IRInstr
     SetLabel :: Label -> IRInstr
-    BrTrue :: Var Bool -> Label -> IRInstr
-    BrFalse :: Var Bool -> Label -> IRInstr
+    BrTrue :: Value Bool -> Label -> IRInstr
+    BrFalse :: Value Bool -> Label -> IRInstr
     BrAlways :: Label -> IRInstr
-    Call :: Dst r -> Value (Ptr (as --> r)) -> HList Var as -> IRInstr
-    StoreI :: Dst Int -> Int -> IRInstr
-    StoreC :: Dst Char -> Char -> IRInstr
-    StoreB :: Dst Bool -> Bool -> IRInstr
-    StoreV :: Dst a -> Src a -> IRInstr
-    StoreA :: Dst (Ptr a) -> Src a -> IRInstr
-    StoreVUnsafe :: Dst b -> Src a -> IRInstr
-    LoadA :: Dst a -> Src (Ptr a) -> IRInstr
-    Ref :: Dst (Ptr a) -> Src a -> IRInstr
-    MkNilList :: Dst (Ptr [a]) -> IRInstr
-    ConsList :: Dst (Ptr [a]) -> Src1 (Ptr [a]) -> Src2 a -> IRInstr
-    MkTup :: Dst (Ptr (a, b)) -> Src1 a -> Src2 b -> IRInstr
-    RetV :: Var a -> IRInstr
+    Call :: Var r -> Value (Ptr (as --> r)) -> HList Value as -> IRInstr
+    StoreV :: Var a -> Value a -> IRInstr
+    StoreA :: Var (Ptr a) -> Value a -> IRInstr
+    Cast :: forall a b. Castable a b => Var b -> Value a -> IRInstr
+    LoadA :: Var a -> Var (Ptr a) -> IRInstr
+    Ref :: Var (Ptr a) -> Var a -> IRInstr
+    MkNilList :: Var (Ptr [a]) -> IRInstr
+    ConsList :: Var (Ptr [a]) -> Var (Ptr [a]) -> Value a -> IRInstr
+    MkTup :: Var (Ptr (a, b)) -> Value a -> Value b -> IRInstr
+    Ret :: Value a -> IRInstr
     Halt :: IRInstr
-    PrintI :: Var Int -> IRInstr
-    PrintC :: Var Char -> IRInstr
+    PrintI :: Value Int -> IRInstr
+    PrintC :: Value Char -> IRInstr
 
 data IRType a where
     IRIntType :: IRType Int
@@ -138,69 +144,44 @@ data IRType a where
     IRTupleType :: IRType a -> IRType b -> IRType (Ptr (a, b))
 
 data IRConstant a where
+    IRVoid :: IRConstant Unit
     IRInt :: Int -> IRConstant Int
-    IRBool :: Bool -> IRConstant Bool 
-    IRChar :: Char -> IRConstant Char 
-    IRFun :: IRFunDecl as r -> IRConstant (Ptr (as --> r)) 
+    IRBool :: Bool -> IRConstant Bool
+    IRChar :: Char -> IRConstant Char
+    IRFun :: IRFunDecl as r -> IRConstant (Ptr (as --> r))
 
-class FromHaskellType a where
-    fromHaskellType :: Proxy a -> IRType a
-    
-instance FromHaskellType Int where
-    fromHaskellType _ = IRIntType
+class Castable a b
 
-instance FromHaskellType Bool where
-    fromHaskellType _ = IRBoolType
+instance Castable Bool Int
+instance Castable Char Int
+instance {-# INCOHERENT #-} Castable a Unknown
+instance Castable Unknown a
+instance {-# OVERLAPPABLE #-} Castable a b => Castable (Ptr a) (Ptr b)
+instance {-# OVERLAPS #-} Castable a b => Castable (Ptr [a]) (Ptr [b])
+instance {-# OVERLAPS #-} (Castable a1 a2, Castable b1 b2) => Castable (Ptr (a1,b1)) (Ptr (a2,b2))
+instance Castable '[] '[]
+instance (Castable x y, Castable xs ys) =>
+         Castable (x ': xs) (y ': ys)
+instance {-# OVERLAPS #-} (Castable as1 as2, Castable r1 r2) =>
+         Castable (Ptr (as1 --> r1)) (Ptr (as2 --> r2))
 
-instance FromHaskellType Char where
-    fromHaskellType _ = IRCharType
-
-instance FromHaskellType () where
-    fromHaskellType _ = IRVoidType
-
-instance FromHaskellType Unknown where
-    fromHaskellType _ = IRUnknownType ""
-
-instance FromHaskellType a => FromHaskellType (Ptr [a]) where
-    fromHaskellType _ = IRListType (fromHaskellType (Proxy @a))
-
-instance (FromHaskellType a, FromHaskellType b) => FromHaskellType (Ptr (a,b)) where
-    fromHaskellType _ = IRTupleType (fromHaskellType (Proxy @a)) (fromHaskellType (Proxy @b))
-
-instance (ConstrMap FromHaskellType xs, HListFromProxy xs, FromHaskellType r) => FromHaskellType (Ptr (xs --> r)) where
-    fromHaskellType _ = IRFunType 
-        (hListFromHaskellType $ hListFromProxy (Proxy @xs)) 
-        (fromHaskellType (Proxy @r))
-        where
-            hListFromHaskellType :: forall xs. ConstrMap FromHaskellType xs => HList Proxy xs -> HList IRType xs
-            hListFromHaskellType HNil = HNil
-            hListFromHaskellType (x :+: xs) = fromHaskellType x :+: hListFromHaskellType xs
-
-toIRType :: forall a. FromHaskellType a => IRType a
-toIRType = fromHaskellType (Proxy @a)
-    
-hasUnknownType :: IRType a -> Bool
-hasUnknownType (IRUnknownType _) = True
-hasUnknownType (IRPtrType ct) = hasUnknownType ct
-hasUnknownType (IRListType ct) = hasUnknownType ct
-hasUnknownType (IRTupleType cta ctb) = hasUnknownType cta || hasUnknownType ctb
-hasUnknownType (IRFunType cta ctb) =
-    hListFoldl (\acc t -> acc || hasUnknownType t) False cta || hasUnknownType ctb
-hasUnknownType _ = False
+class Typeable f where
+    getType :: f a -> IRType a
+    setType :: f a -> IRType b -> f b
 
 instance Show (Var a) where
-    show (Var id t) = T.unpack id <> "%" <> show t
+    show (Var id t _) = T.unpack id <> "%" <> show t
 
 instance Show (IRType a) where
     show IRIntType = "i"
     show IRBoolType = "b"
     show IRCharType = "c"
     show IRVoidType = "v"
-    show (IRUnknownType var) = "?" 
+    show (IRUnknownType var) = "?"
     show (IRPtrType a) = "*(" <> show a <> ")"
     show (IRListType a) = "*[" <> show a <> "]"
     show (IRTupleType a b) = "*(" <> show a <> "," <> show b <> ")"
-    show (IRFunType as r) = 
+    show (IRFunType as r) =
         "*(" <> L.intercalate "->" (hListMapToList show as) <> "->" <> show r <> ")"
 
 makeLenses ''IRFunDecl

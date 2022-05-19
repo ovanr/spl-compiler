@@ -39,6 +39,12 @@ data Constrained (c :: * -> Constraint) (f :: * -> *) (a :: *) where
 fromConstrained :: c a => Constrained c f a -> f a
 fromConstrained (Constrained fa) = fa
 
+data Constrained2 (c :: k -> k -> Constraint) (f :: k -> *) (a :: k) (b :: k) where
+    Constrained2 :: forall c f a b. c a b => f a -> f b -> Constrained2 c f a b 
+    
+fromConstrained2 :: c a b => Constrained2 c f a b -> (f a, f b)
+fromConstrained2 (Constrained2 fa fb) = (fa, fb)
+
 class HListFromProxy as where
     hListFromProxy :: Proxy as -> HList Proxy as
 
@@ -57,8 +63,11 @@ data Some2 (f :: k -> z -> *) where
 withSome1 :: Some1 f -> (forall x. f x -> c) -> c
 withSome1 (Some1 x) f = f x
 
-bindSome :: Some1 f -> (forall x. f x -> Some1 f) -> Some1 f
+bindSome :: Some1 f -> (forall x. f x -> Some1 g) -> Some1 g
 bindSome (Some1 x) f = f x
+
+fmapSome :: (forall x. f x -> g x) -> Some1 f -> Some1 g
+fmapSome f (Some1 x) = Some1 (f x)
 
 liftA2Some :: (forall x y. f x -> f y -> Some1 f) -> Some1 f -> Some1 f -> Some1 f
 liftA2Some f (Some1 x) (Some1 y) = f x y
