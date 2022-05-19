@@ -31,7 +31,7 @@ class PrettyPrint a where
 instance PrettyPrint TCT where
     toCode _ (TCT varDecls funDecls) =
         T.unlines .
-        (\xs -> if null xs then xs else init xs) .
+        init .
         concatMap (\i -> [i, mempty]) $
         map (toCode 0) varDecls <> concatMap (map (toCode 0)) funDecls
 

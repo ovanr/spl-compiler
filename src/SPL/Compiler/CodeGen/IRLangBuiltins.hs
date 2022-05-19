@@ -58,24 +58,16 @@ mkMagicFuncs = Some1 $ isEmpty :+: hd :+: tl :+: fst :+: snd :+: hdAssign
         isEmpty = mkMagicFun "isEmpty" (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) IRBoolType
 
         hd :: IRFunDef '[Ptr [Unknown], Unknown]
-        hd = mkMagicFun "hd" 
-                (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) 
-                (IRUnknownType "a")
+        hd = mkMagicFun "hd" (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) (IRUnknownType "a")
 
         tl :: IRFunDef '[Ptr [Unknown], Ptr [Unknown]]
-        tl = mkMagicFun "tl" 
-                (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) 
-                (IRListType (IRUnknownType "a"))
+        tl = mkMagicFun "tl" (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) (IRListType (IRUnknownType "a"))
 
         fst :: IRFunDef '[Ptr (Unknown, Unknown), Unknown]
-        fst = mkMagicFun "fst" 
-                (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) 
-                (IRUnknownType "a")
+        fst = mkMagicFun "fst" (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) (IRUnknownType "a")
 
         snd :: IRFunDef '[Ptr (Unknown, Unknown), Unknown]
-        snd = mkMagicFun "snd" 
-                    (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) 
-                    (IRUnknownType "b")
+        snd = mkMagicFun "snd" (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) (IRUnknownType "b")
 
         hdAssign :: IRFunDef '[Ptr [Unknown], Ptr Unknown]
         hdAssign = mkMagicFun "0hd_assign"
