@@ -3,25 +3,25 @@ module SPL.Compiler.SemanticAnalysis.ConstantFold (
     constantFold
     ) where
 
-import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.Core
 import qualified Data.List as L
 
-constantFold :: TCT -> TCT
-constantFold (TCT varDecls funDecls) = 
-    TCT (map optimizeVarDecl varDecls)
-        (map (map optimizeFunDecl) funDecls)
+constantFold :: Core -> Core
+constantFold (Core varDecls funDecls) = 
+    Core (map optimizeVarDecl varDecls)
+        (map optimizeFunDecl funDecls)
 
-optimizeVarDecl :: TCTVarDecl -> TCTVarDecl
-optimizeVarDecl (TCTVarDecl l t id e) = TCTVarDecl l t id (optimizeExpr e)
+optimizeVarDecl :: CoreVarDecl -> CoreVarDecl
+optimizeVarDecl (CoreVarDecl l t id e) = CoreVarDecl l t id (optimizeExpr e)
 
-optimizeFunDecl :: TCTFunDecl -> TCTFunDecl
-optimizeFunDecl (TCTFunDecl l id args t tcons (TCTFunBody lb vars stmts)) =
-    TCTFunDecl l id args t tcons $ 
-        TCTFunBody lb 
+optimizeFunDecl :: CoreFunDecl -> CoreFunDecl
+optimizeFunDecl (CoreFunDecl l id args t (CoreFunBody lb vars stmts)) =
+    CoreFunDecl l id args t $ 
+        CoreFunBody lb 
             (map optimizeVarDecl vars) 
             (elimUnreachableStmt $ concatMap optimizeStmt stmts)
 
-optimizeStmt :: TCTStmt -> [TCTStmt]
+optimizeStmt :: CoreStmt -> [CoreStmt]
 optimizeStmt (IfElseStmt l e taken nTaken) =
     case optimizeExpr e of
         (BoolExpr _ True) -> elimUnreachableStmt $ concatMap optimizeStmt taken
@@ -32,17 +32,11 @@ optimizeStmt (WhileStmt l e stmts) =
     case optimizeExpr e of
         (BoolExpr _ False) -> []
         e' -> [WhileStmt l e' (elimUnreachableStmt $ concatMap optimizeStmt stmts)]
-optimizeStmt (AssignStmt l fd e) = [AssignStmt l fd (optimizeExpr e)]
-optimizeStmt (FunCallStmt l f) = [FunCallStmt l (optimizeFunCall f)]
+optimizeStmt (AssignStmt l i fd t e) = [AssignStmt l i fd t (optimizeExpr e)]
+optimizeStmt (FunCallStmt f) = [FunCallStmt (optimizeFunCall f)]
 optimizeStmt (ReturnStmt l e) = [ReturnStmt l (optimizeExpr <$> e)]
 
-syntaxEqFieldSelectors :: TCTFieldSelector -> TCTFieldSelector -> Bool
-syntaxEqFieldSelectors (TCTFieldSelector _ (TCTIdentifier _ id1) _ fd1) 
-                       (TCTFieldSelector _ (TCTIdentifier _ id2) _ fd2)
-    | id1 == id2 = and $ zipWith (==) fd1 fd2
-    | otherwise = False
-
-elimUnreachableStmt :: [TCTStmt] -> [TCTStmt]
+elimUnreachableStmt :: [CoreStmt] -> [CoreStmt]
 elimUnreachableStmt xs =
     case L.findIndex isReturn xs of
         (Just retIx) -> L.take (retIx + 1) xs
@@ -51,7 +45,7 @@ elimUnreachableStmt xs =
         isReturn (ReturnStmt _ _) = True
         isReturn _ = False
 
-optimizeExpr :: TCTExpr -> TCTExpr
+optimizeExpr :: CoreExpr -> CoreExpr
 optimizeExpr e@(Op2Expr l e1 op e2) =
     case (optimizeExpr e1, optimizeExpr e2, op) of
         (IntExpr _ i1, IntExpr _ i2, _) -> evaluateI l i1 op i2
@@ -59,16 +53,8 @@ optimizeExpr e@(Op2Expr l e1 op e2) =
         (BoolExpr _ c1, BoolExpr _ c2, _) -> evaluateB l c1 op c2
         (eb@(BoolExpr _ True), _, LogOr) -> eb
         (eb@(BoolExpr _ False), _, LogAnd) -> eb
-        (FieldSelectExpr f1, FieldSelectExpr f2, Equal) ->
-            if syntaxEqFieldSelectors f1 f2 then
-                BoolExpr l True
-            else
-                e
-        (FieldSelectExpr f1, FieldSelectExpr f2, Nequal) ->
-            if syntaxEqFieldSelectors f1 f2 then
-                BoolExpr l False
-            else
-                e
+        (VarIdentifierExpr f1, VarIdentifierExpr f2, Equal) | f1 == f2 -> BoolExpr l True
+        (VarIdentifierExpr f1, VarIdentifierExpr f2, Nequal) | f1 == f2 -> BoolExpr l False
         (e1', e2', _) -> Op2Expr l e1' op e2'
 
 optimizeExpr (OpExpr l op1 e) =
@@ -81,10 +67,10 @@ optimizeExpr (TupExpr l e1 e2) = TupExpr l (optimizeExpr e1) (optimizeExpr e2)
 optimizeExpr (FunCallExpr f) = FunCallExpr (optimizeFunCall f)
 optimizeExpr e = e
 
-optimizeFunCall :: TCTFunCall -> TCTFunCall
-optimizeFunCall (TCTFunCall l name t tcons args) = TCTFunCall l name t tcons (map optimizeExpr args)
+optimizeFunCall :: CoreFunCall -> CoreFunCall
+optimizeFunCall (CoreFunCall l name t args) = CoreFunCall l name t (map optimizeExpr args)
 
-evaluateI :: EntityLoc -> Integer -> OpBin -> Integer -> TCTExpr
+evaluateI :: EntityLoc -> Integer -> OpBin -> Integer -> CoreExpr
 evaluateI l i1 op i2 =
         case op of
             Plus -> IntExpr l (i1 + i2)
@@ -101,7 +87,7 @@ evaluateI l i1 op i2 =
             Nequal -> BoolExpr l (i1 /= i2)
             _ -> error "internal optimization error: pattern should not occur"
 
-evaluateC :: EntityLoc -> Char -> OpBin -> Char -> TCTExpr
+evaluateC :: EntityLoc -> Char -> OpBin -> Char -> CoreExpr
 evaluateC l c1 op c2 =
         case op of
             Equal -> BoolExpr l (c1 == c2)
@@ -112,7 +98,7 @@ evaluateC l c1 op c2 =
             Nequal -> BoolExpr l (c1 /= c2)
             _ -> error "internal optimization error: pattern should not occur"
 
-evaluateB :: EntityLoc -> Bool -> OpBin -> Bool -> TCTExpr
+evaluateB :: EntityLoc -> Bool -> OpBin -> Bool -> CoreExpr
 evaluateB l b1 op b2 =
         case op of
             Equal -> BoolExpr l (b1 == b2)

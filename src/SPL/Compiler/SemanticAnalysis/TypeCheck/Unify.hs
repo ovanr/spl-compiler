@@ -17,7 +17,8 @@ module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify (
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Bifunctor (second)
+import Data.Set.Ordered (OSet)
+import Data.Bifunctor (second, Bifunctor (first))
 import Control.Monad
 import Control.Lens ((^?), ix, (%~), (<>~), (^.), (.~), use)
 import Control.Monad.State
@@ -27,12 +28,14 @@ import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Set.Ordered as SO
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
-import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.Core
 import {-# SOURCE #-} SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
-import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
+import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
+import Data.Foldable (toList)
 
 class Types a where
     ($*) :: Subst -> a -> a
@@ -40,12 +43,12 @@ class Types a where
 
 infixr 1 $*
 
-addSubst :: TypeVar -> TCTType -> TCMonad ()
+addSubst :: TypeVar -> CoreType -> TCMonad ()
 addSubst tv t = modify $
     \st -> let newSubst = Subst . M.insert tv t . unSubst $ st ^. getSubst
             in st & getSubst .~ newSubst
                   & getEnv %~ (newSubst $*)
-                  & getTcons %~ (L.nub . (newSubst $*))
+                  & getTCons %~ (newSubst $*)
 
 instance Semigroup Subst where
     -- Subst stores the substitutions in a lazy manner
@@ -63,20 +66,20 @@ instance Monoid Subst where
 minimizeSubst :: Subst -> Subst
 minimizeSubst s@(Subst s') = Subst $ (s $*) <$> s'
 
-instance Types TCTType where
-    s $* (TCTIntType l) = TCTIntType l
-    s $* (TCTCharType l) = TCTCharType l
-    s $* (TCTBoolType l) = TCTBoolType l
-    s $* (TCTVoidType l) = TCTVoidType l
-    s@(Subst s') $* v@(TCTVarType l a) =
+instance Types CoreType where
+    s $* (CoreIntType l) = CoreIntType l
+    s $* (CoreCharType l) = CoreCharType l
+    s $* (CoreBoolType l) = CoreBoolType l
+    s $* (CoreVoidType l) = CoreVoidType l
+    s@(Subst s') $* v@(CoreVarType l a) =
         if M.member a s' then s $* setLoc l (M.findWithDefault v a s') else v
-    s $* (TCTListType l a) = TCTListType l (s $* a)
-    s $* (TCTTupleType l a b) = TCTTupleType l (s $* a) (s $* b)
-    s $* (TCTFunType l a b) = TCTFunType l (s $* a) (s $* b)
-    freeVars v@(TCTVarType _ a) = S.singleton a
-    freeVars (TCTListType _ a) = freeVars a
-    freeVars (TCTTupleType _ a b) = freeVars a <> freeVars b
-    freeVars (TCTFunType _ a b) = freeVars a <> freeVars b
+    s $* (CoreListType l a) = CoreListType l (s $* a)
+    s $* (CoreTupleType l a b) = CoreTupleType l (s $* a) (s $* b)
+    s $* (CoreFunType l tcons a b) = CoreFunType l (s $* tcons) (s $* a) (s $* b)
+    freeVars v@(CoreVarType _ a) = S.singleton a
+    freeVars (CoreListType _ a) = freeVars a
+    freeVars (CoreTupleType _ a b) = freeVars a <> freeVars b
+    freeVars (CoreFunType _ c a b) = freeVars c <> freeVars a <> freeVars b
     freeVars _ = mempty
 
 instance Types TCon where
@@ -95,79 +98,80 @@ instance (Types a, Ord a) => Types (Set a) where
     s $* xs = S.map (s $*) xs
     freeVars xs = foldMap freeVars xs
 
+instance (Types a, Ord a) => Types (OSet a) where
+    s $* xs = SO.fromList $ s $* toList xs
+    freeVars xs = foldMap freeVars xs
+
 instance Types Scheme where
-    (Subst s) $* (Scheme tv tcons t) =
-        let s' = Subst (foldr M.delete s tv) in Scheme tv (s' $* tcons) (s' $* t)
-    freeVars (Scheme tv _ t) = freeVars t `S.difference` tv
+    (Subst s) $* (Scheme tv t) =
+        let s' = Subst (foldr M.delete s tv) in Scheme tv (s' $* t)
+    freeVars (Scheme tv t) = freeVars t `S.difference` tv
 
 instance Types TypeEnv where
     s $* (TypeEnv env) = TypeEnv $ second (s $*) <$> env
     freeVars (TypeEnv env) = freeVars . map snd $ M.elems env
 
-instance Types TCT where
-    s $* (TCT varDecls funDecls) = TCT (map (s $*) varDecls) (map (map (s $*)) funDecls)
-    freeVars (TCT varDecls funDecls) = freeVars varDecls <> foldMap (foldMap freeVars) funDecls
+instance Types Core where
+    s $* (Core varDecls funDecls) = Core (map (s $*) varDecls) (map (s $*) funDecls)
+    freeVars (Core varDecls funDecls) = freeVars varDecls <> foldMap freeVars funDecls
 
-instance Types TCTVarDecl where
-    s $* (TCTVarDecl loc t id expr) = TCTVarDecl loc (s $* t) id (s $* expr)
-    freeVars (TCTVarDecl _ t _ _) = freeVars t
+instance Types CoreVarDecl where
+    s $* (CoreVarDecl loc t id expr) = CoreVarDecl loc (s $* t) id (s $* expr)
+    freeVars (CoreVarDecl _ t _ _) = freeVars t
 
-instance Types TCTFunDecl where
-    s $* (TCTFunDecl loc id args t tcons body) = TCTFunDecl loc id args (s $* t) (s $* tcons) (s $* body)
-    freeVars (TCTFunDecl _ _ _ t _ _) = freeVars t
+instance Types CoreFunDecl where
+    s $* (CoreFunDecl loc id args t body) =
+        CoreFunDecl loc id args (s $* t) (s $* body)
+    freeVars (CoreFunDecl _ _ _ t _) = freeVars t
 
-instance Types TCTFunBody where
-    s $* (TCTFunBody loc varDecls stmts) = TCTFunBody loc (map (s $*) varDecls) (map (s $*) stmts)
-    freeVars (TCTFunBody _ varDecl stmts) = freeVars varDecl <> freeVars stmts
+instance Types CoreFunBody where
+    s $* (CoreFunBody loc varDecls stmts) = CoreFunBody loc (map (s $*) varDecls) (map (s $*) stmts)
+    freeVars (CoreFunBody _ varDecl stmts) = freeVars varDecl <> freeVars stmts
 
-instance Types TCTStmt where
+instance Types CoreStmt where
     s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
     s $* (WhileStmt loc e stmt) = WhileStmt loc (s $* e) (s $* stmt)
-    s $* (AssignStmt loc fd e) = AssignStmt loc (s $* fd) (s $* e)
+    s $* (AssignStmt loc i t fd e) = AssignStmt loc i (s $* t) fd (s $* e)
     s $* (ReturnStmt loc me) = ReturnStmt loc (($*) s <$> me)
-    s $* (FunCallStmt l f) = FunCallStmt l (s $* f)
+    s $* (FunCallStmt f) = FunCallStmt (s $* f)
     freeVars (IfElseStmt _ e s1 s2) = freeVars e <> freeVars s1 <> freeVars s2
     freeVars (WhileStmt _ e stmt) = freeVars e <> freeVars stmt
-    freeVars (AssignStmt loc fd stmt) = freeVars stmt
+    freeVars (AssignStmt loc i t fd stmt) = freeVars t <> freeVars stmt
     freeVars (ReturnStmt loc me) = maybe mempty freeVars me
-    freeVars (FunCallStmt l f) = freeVars f
+    freeVars (FunCallStmt f) = freeVars f
 
-instance Types TCTExpr where
+instance Types CoreExpr where
     s $* (FunCallExpr f) = FunCallExpr (s $* f)
-    s $* (FieldSelectExpr fd) = FieldSelectExpr (s $* fd)
     s $* (OpExpr l op e) = OpExpr l op (s $* e)
     s $* (Op2Expr l e1 op e2) = Op2Expr l (s $* e1) op (s $* e2)
     s $* (TupExpr l e1 e2) = TupExpr l (s $* e1) (s $* e2)
     s $* (EmptyListExpr l t) = EmptyListExpr l (s $* t)
     s $* e = e
     freeVars (FunCallExpr f) = freeVars f
-    freeVars (FieldSelectExpr fd) = freeVars fd
     freeVars (OpExpr l op e) = freeVars e
     freeVars (Op2Expr l e1 op e2) = freeVars e1 <> freeVars e2
     freeVars (TupExpr l e1 e2) = freeVars e1 <> freeVars e2
     freeVars (EmptyListExpr l t) = freeVars t
     freeVars _ = mempty
 
-instance Types TCTFunCall where
-    s $* (TCTFunCall l id t tcons args) = TCTFunCall l id (s $* t) (s $* tcons) (s $* args)
-    freeVars (TCTFunCall _ _ t _ args) = freeVars t <> freeVars args
+instance Types CoreFunCall where
+    s $* (CoreFunCall l e t args) = CoreFunCall l (s $* e) (s $* t) (s $* args)
+    freeVars (CoreFunCall _ _ t args) = freeVars t <> freeVars args
 
-instance Types TCTFieldSelector where
-    s $* (TCTFieldSelector l id t fds) = TCTFieldSelector l id (s $* t) fds
-    freeVars (TCTFieldSelector _ _ t _) = freeVars t
-
-generalise :: TCTType -> [TCon] -> TCMonad Scheme
-generalise t tcon = do
+generalise :: CoreType -> TCMonad Scheme
+generalise t = do
     subst <- use getSubst
     env <- use getEnv
     let t' = subst $* t
-    pure $ Scheme (freeVars t' `S.difference` freeVars env) (subst $* tcon) t'
+        freeTV = freeVars t' `S.difference` freeVars env
+        freeTCons = getFreeTCons freeTV (getTCon t')
+    pure $ Scheme freeTV (updateTCon freeTCons t')
 
 -- liftToScheme lifts a type to a scheme that has no quantified variables
-liftToScheme :: [TCon] -> TCTType -> Scheme
+liftToScheme :: CoreType -> Scheme
 liftToScheme = Scheme mempty
 
-typeMismatchError :: TCTType -> TCTType -> TCMonad a
+typeMismatchError :: CoreType -> CoreType -> TCMonad a
 typeMismatchError expT actT = do
     let header = [ T.pack $
             "Couldn't match expected type '" <> show expT <>
@@ -180,10 +184,10 @@ typeMismatchError expT actT = do
     tcError $ header <> typeLocTrace
 
 
-occurs :: TypeVar -> TCTType -> Bool
+occurs :: TypeVar -> CoreType -> Bool
 occurs var t = S.member var (freeVars t)
 
-occursError :: TypeVar -> TCTType -> TCMonad a
+occursError :: TypeVar -> CoreType -> TCMonad a
 occursError var t = do
     typeLocTrace <- definition (T.pack $ "'" <>
                                          show t <>
@@ -196,40 +200,58 @@ occursError var t = do
         <> T.pack (show t)
         ] <> typeLocTrace
 
-unify :: TCTType -> TCTType -> TCMonad ()
-unify expT actT = use getSubst >>= (\s -> unify' (s $* expT) (s $* actT))
+unify :: CoreType -> CoreType -> TCMonad ()
+unify expT actT = do
+    s <- use getSubst
+    unify' (s $* expT) (s $* actT)
     where
-        unify' TCTIntType{} TCTIntType{} = return ()
-        unify' TCTCharType{} TCTCharType{} = return ()
-        unify' TCTBoolType{} TCTBoolType{} = return ()
-        unify' TCTVoidType{} TCTVoidType{} = return ()
+        unify' CoreIntType{} CoreIntType{} = return ()
+        unify' CoreCharType{} CoreCharType{} = return ()
+        unify' CoreBoolType{} CoreBoolType{} = return ()
+        unify' CoreVoidType{} CoreVoidType{} = return ()
 
-        unify' v1@(TCTVarType _ a) v2@(TCTVarType _ b)
+        unify' v1@(CoreVarType _ a) v2@(CoreVarType _ b)
             | a == b = return ()
             | otherwise = addSubst a v2
 
-        unify' v@(TCTVarType _ a) t = do
+        unify' v@(CoreVarType _ a) t = do
             if not $ occurs a t then
                 addSubst a t
             else
                 occursError a t
 
-        unify' t v@(TCTVarType _ a) = do
+        unify' t v@(CoreVarType _ a) = do
             if not $ occurs a t then
                 addSubst a t
             else
                 occursError a t
 
-        unify' (TCTListType _ a) (TCTListType _ b) = unify' a b
+        unify' (CoreListType _ a) (CoreListType _ b) = unify' a b
 
-        unify' (TCTTupleType _ a1 b1) (TCTTupleType _ a2 b2) = do
+        unify' (CoreTupleType _ a1 b1) (CoreTupleType _ a2 b2) = do
             unify' a1 a2
             subst <- use getSubst
             unify' (subst $* b1) (subst $* b2)
 
-        unify' (TCTFunType _ a1 b1) (TCTFunType _ a2 b2) = do
-            unify' a1 a2
-            subst <- use getSubst
-            unify' (subst $* b1) (subst $* b2)
+        unify' (CoreFunType _ tcon1 as1 r1) (CoreFunType _ tcon2 as2 r2)
+            | length as1 == length as2 &&
+              length tcon1' == length tcon2' &&
+              and (zipWith areTConSameKind tcon1' tcon2') = do
+                zipWithM_ (\a1 a2 -> do
+                        subst <- use getSubst
+                        unify' (subst $* a1) (subst $* a2)
+                    ) (map unTCon tcon1') (map unTCon tcon2')
+                zipWithM_ (\a1 a2 -> do
+                        subst <- use getSubst
+                        unify' (subst $* a1) (subst $* a2)
+                    ) as1 as2
+                subst <- use getSubst
+                unify' (subst $* r1) (subst $* r2)
+            where
+                tcon1' = getNonConcreteTCon tcon1
+                tcon2' = getNonConcreteTCon tcon2
 
         unify' t1 t2 = typeMismatchError t1 t2
+
+        getNonConcreteTCon :: [TCon] -> [TCon]
+        getNonConcreteTCon = filter (not . isConcreteType . unTCon)

@@ -1,0 +1,50 @@
+
+
+
+/* bar () { */
+/*     return print; */
+/* } */
+
+/* foo(x, y) :: (a a Int -> b) Int -> Void { */
+/*     (bar())(x); */
+/*     print(([1,3,4]).hd); */
+/*     return; */
+/* } */
+
+myrec(x, y) :: a Int -> a {
+    if (y == 0) 
+        return x;
+
+    print(x);
+    return myrec(x, y - 1);
+}
+
+
+odd(x) :: Int -> Bool {
+    if (x == 0)
+        return False;
+    
+    if (x == 1)
+        return True;
+
+    return even(x-1);
+}
+
+even(x) :: Int -> Bool {
+    if (x == 0)
+        return True;
+    print(x); 
+    if (x == 1)
+        return False;
+
+    mys(id);
+    return odd(x-1);
+}
+
+mys (f) :: (a -> a) -> (a -> a) {
+    return f;
+}
+
+id (x) {
+    return x;
+}

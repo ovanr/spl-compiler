@@ -24,6 +24,7 @@ dependencies:
 - extra
 - array
 - containers
+- ordered-containers
 - bytestring
 - text
 - constraints
@@ -31,6 +32,7 @@ dependencies:
 - transformers
 - random
 - MonadRandom
+- hashable
 - HTF
 - lens
 - data-default

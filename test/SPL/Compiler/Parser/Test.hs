@@ -100,38 +100,35 @@ test_parse_fargs_5 = do
     executeMultipleTests pFargs [test]
 
 test_parse_ftype_1 = do
-    let test = [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', TypeToken IntType]
-                --> ASTFunType def [ASTIntType def]
+    let test = [SymbolToken '-', SymbolToken '>', TypeToken IntType]
+                --> ASTFunType def [] (ASTIntType def)
     executeMultipleTests pFunType [test]
 
 test_parse_ftype_2 = do
-    let test = [SymbolToken ':', SymbolToken ':',
-                TypeToken IntType, IdentifierToken "a",
+    let test = [ TypeToken IntType, IdentifierToken "a",
                 SymbolToken '-', SymbolToken '>', TypeToken CharType]
-                --> ASTFunType def [ASTIntType def, ASTVarType def "a", ASTCharType def]
+                --> ASTFunType def [ASTIntType def, ASTVarType def "a"] (ASTCharType def)
     executeMultipleTests pFunType [test]
     
 test_parse_ftype_3 = do
-    let test = [SymbolToken ':', SymbolToken ':',
-                TypeToken IntType, IdentifierToken "a",
+    let test = [ TypeToken IntType, IdentifierToken "a",
                 SymbolToken '-', SymbolToken '>', TypeToken CharType]
-                --> ASTFunType def [ASTIntType def, ASTVarType def "a", ASTCharType def]
+                --> ASTFunType def [ASTIntType def, ASTVarType def "a"] (ASTCharType def)
     executeMultipleTests pFunType [test]
 
 test_parse_ftype_4 = do
-    let test = [SymbolToken ':', SymbolToken ':',
-                TypeToken IntType, SymbolToken '[', IdentifierToken "a", SymbolToken ']',
+    let test = [ TypeToken IntType, SymbolToken '[', IdentifierToken "a", SymbolToken ']',
                 SymbolToken '-', SymbolToken '>',
                 TypeToken CharType
-            ] --> ASTFunType def [ASTIntType def, ASTListType def (ASTVarType def "a"), ASTCharType def]
+            ] --> ASTFunType def [ASTIntType def, ASTListType def (ASTVarType def "a")] (ASTCharType def)
     executeMultipleTests pFunType [test]
 
 test_parse_ftype_5 = do
-    let test = [SymbolToken ':', SymbolToken ':', SymbolToken '-', SymbolToken '>', SymbolToken '{'] --> ASTUnknownType def
+    let test = failure [SymbolToken '-', SymbolToken '>', SymbolToken '{']
     executeMultipleTests pFunType [test]
                 
 test_parse_ftype_6 = do
-    let test = [SymbolToken ':', SymbolToken ':', TypeToken CharType] --> ASTUnknownType def
+    let test = failure [TypeToken CharType] 
     executeMultipleTests pFunType [test]
 
 test_parse_pexpr_tuple_1 = do
@@ -155,14 +152,14 @@ test_parse_pexpr_tuple_2 = do
            SymbolToken ')']
                --> TupExpr def
                        (Op2Expr def
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p1") [Fst def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p1") [Fst def])
                            Plus
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p2") [Fst def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p2") [Fst def])
                        )
                        (Op2Expr def
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p1") [Snd def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p1") [Snd def])
                            Minus
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p2") [Snd def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p2") [Snd def])
                        )
     executeMultipleTests pExpr [test]
 
@@ -188,20 +185,20 @@ test_parse_pexpr_tuple_3 = do
            SymbolToken ')']
                --> TupExpr def
                        (Op2Expr def
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p1") [Fst def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p1") [Fst def])
                            Plus
-                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p2") [Fst def]))
+                           (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p2") [Fst def])
                        )
                        (TupExpr def
                            (Op2Expr def
-                               (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p1") [Snd def, Fst def]))
+                               (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p1") [Snd def, Fst def])
                            Div
-                               (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p2") [Snd def, Fst def]))
+                               (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p2") [Snd def, Fst def])
                            )
                            (Op2Expr def
-                               (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p1") [Snd def, Snd def]))
+                               (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p1") [Snd def, Snd def])
                            Mul
-                               (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "p2") [Snd def, Snd def]))
+                               (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "p2") [Snd def, Snd def])
                            )
                        )
     executeMultipleTests pExpr [test]
@@ -234,12 +231,12 @@ test_parse_pexpr_complex_1 = do
                 IdentifierToken "getIndex", SymbolToken '(', SymbolToken ')'
               ] -->
               Op2Expr def 
-                (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "tempDay") [])) 
+                (IdentifierExpr $ ASTIdentifier def "tempDay")
                 Minus 
                 (OpExpr def UnMinus 
                     (OpExpr def UnMinus 
                         (OpExpr def UnMinus 
-                            (FunCallExpr (ASTFunCall def (ASTIdentifier def "getIndex") []))
+                            (FunCallExpr (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "getIndex") []))
                         )
                     )
                 )
@@ -256,10 +253,10 @@ test_parse_pexpr_complex_2 = do
                 SymbolToken ')'
               ] -->
               Op2Expr def
-                   (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [Hd def]))
+                   (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "list") [Hd def])
                    LogOr (FunCallExpr
-                        (ASTFunCall def (ASTIdentifier def "sum")
-                             [ FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [Tl def] ) ]
+                        (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "sum")
+                             [ FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "list") [Tl def] ]
                         ))
     executeMultipleTests pExpr [test]
 
@@ -274,12 +271,12 @@ test_parse_pexpr_complex_3 = do
               , SymbolToken ')'
               ] -->
               Op2Expr def
-                   (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [Hd def]))
+                   (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "list") [Hd def])
                    LogAnd
                    (FunCallExpr
-                        (ASTFunCall def (ASTIdentifier def "sum")
+                        (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "sum")
                              [ 
-                                FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [Tl def])
+                                FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "list") [Tl def]
                              ]
                         )
                    )
@@ -299,21 +296,21 @@ test_parse_pexpr_complex_4 = do
               ] -->
               Op2Expr def
                    (Op2Expr def 
-                        (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "facN") []))
+                        (IdentifierExpr $ ASTIdentifier def "facN")
                         Nequal
                         (FunCallExpr
-                             (ASTFunCall def (ASTIdentifier def "facI")
-                                  [FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "n") [])]
+                             (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "facI")
+                                  [IdentifierExpr $ ASTIdentifier def "n"]
                              )
                         )
                    )
                    LogOr
                    (Op2Expr def 
-                        (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "facN") []))
+                        (IdentifierExpr $ ASTIdentifier def "facN")
                         Nequal
                         (FunCallExpr
-                             (ASTFunCall def (ASTIdentifier def "facL")
-                                  [FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "n") [])]
+                             (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "facL")
+                                  [IdentifierExpr $ ASTIdentifier def "n"]
                             )
                         )
                    )
@@ -335,8 +332,8 @@ test_parse_pexpr_complex_5 = do
                         (OpExpr def
                             UnNeg
                             (FunCallExpr
-                                 (ASTFunCall def (ASTIdentifier def "isEmpty")
-                                    [FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [])]
+                                 (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "isEmpty")
+                                    [IdentifierExpr $ ASTIdentifier def "list"]
                                  )
                             )
                         )
@@ -344,7 +341,7 @@ test_parse_pexpr_complex_5 = do
                 LogAnd
                 (Op2Expr def
                      (Op2Expr def
-                         (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "list") [Hd def]))
+                         (FieldSelectExpr def (IdentifierExpr $ ASTIdentifier def "list") [Hd def])
                           Mod
                           (IntExpr def 2))
                      Equal
@@ -361,10 +358,10 @@ test_parse_pexpr_complex_6 = do
             , SymbolToken '.' , IdentifierToken "fst"
             ] -->
                            FunCallExpr (ASTFunCall def
-                                     (ASTIdentifier def "f")
+                                     (IdentifierExpr $ ASTIdentifier def "f")
                                      [ TupExpr def
-                                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "x") []))
-                                           (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "x") []))
+                                           (IdentifierExpr $ ASTIdentifier def "x")
+                                           (IdentifierExpr $ ASTIdentifier def "x")
                                      ])
     executeMultipleTests pExpr [test]
 
@@ -372,7 +369,7 @@ test_parse_stmt_1 = do
     -- foo();
     let test = 
             [IdentifierToken "foo",SymbolToken '(',SymbolToken ')',SymbolToken ';']
-            --> FunCallStmt def (ASTFunCall def (ASTIdentifier def "foo") [])
+            --> FunCallStmt (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "foo") [])
     executeMultipleTests pStmt [test]
             
             
@@ -395,8 +392,8 @@ test_parse_stmt_3 = do
 test_parse_stmt_4 = do
     -- a = b;
     let test = [IdentifierToken "a",SymbolToken '=',IdentifierToken "b",SymbolToken ';']
-            --> AssignStmt def (ASTFieldSelector def (ASTIdentifier def "a") []) 
-                    (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "b") []))
+            --> AssignStmt def (ASTIdentifier def "a") [] 
+                    (IdentifierExpr $ ASTIdentifier def "b")
     executeMultipleTests pStmt [test]
 
 test_parse_stmt_5 = do
@@ -404,8 +401,8 @@ test_parse_stmt_5 = do
     let test = [KeywordToken If,SymbolToken '(',IntToken 3,SymbolToken '=',SymbolToken '=',IdentifierToken "x",SymbolToken ')'
             ,SymbolToken '{',IdentifierToken "function",SymbolToken '(',SymbolToken ')',SymbolToken ';',SymbolToken '}'
             ,KeywordToken Else,SymbolToken '{',KeywordToken Return,SymbolToken ';',SymbolToken '}']
-            --> IfElseStmt def (Op2Expr def (IntExpr def 3) Equal (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "x") [])))
-                    [FunCallStmt def (ASTFunCall def (ASTIdentifier def "function") [])] [ReturnStmt def Nothing]
+            --> IfElseStmt def (Op2Expr def (IntExpr def 3) Equal (IdentifierExpr $ ASTIdentifier def "x"))
+                    [FunCallStmt (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "function") [])] [ReturnStmt def Nothing]
     executeMultipleTests pStmt [test]
 
 test_parse_stmt_6 = do
@@ -416,11 +413,11 @@ test_parse_stmt_6 = do
              SymbolToken '{', KeywordToken Return, BoolToken True, SymbolToken ';', SymbolToken '}']
              --> IfElseStmt def 
                     (Op2Expr def 
-                        (FunCallExpr (ASTFunCall def (ASTIdentifier def "isEmpty") 
-                            [FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "a") [])]))
+                        (FunCallExpr (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "isEmpty") 
+                            [IdentifierExpr $ ASTIdentifier def "a"]))
                         LogAnd
-                        (FunCallExpr (ASTFunCall def (ASTIdentifier def "isEmpty") 
-                            [FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "b") [])]))
+                        (FunCallExpr (ASTFunCall def (IdentifierExpr $ ASTIdentifier def "isEmpty") 
+                            [IdentifierExpr $ ASTIdentifier def "b"]))
                     )
                     [ ReturnStmt def $ Just (BoolExpr def True) ]
                     []
@@ -433,7 +430,7 @@ test_parser_var_decl_1 = do
             [KeywordToken Var, IdentifierToken "x", SymbolToken '=', IdentifierToken "y", SymbolToken ';']
                 --> ASTVarDecl def (ASTUnknownType def) 
                                    (ASTIdentifier def "x") 
-                                   (FieldSelectExpr (ASTFieldSelector def (ASTIdentifier def "y") []))
+                                   (IdentifierExpr $ ASTIdentifier def "y")
     executeMultipleTests pVarDecl [test]
             
 test_parser_var_decl_2 = do

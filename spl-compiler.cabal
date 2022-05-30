@@ -37,23 +37,22 @@ library
       SPL.Compiler.Parser.ASTEntityLocation
       SPL.Compiler.Parser.ASTParser
       SPL.Compiler.Parser.ASTPrettyPrint
-      SPL.Compiler.Parser.ASTPrinter
       SPL.Compiler.Parser.ASTRunner
       SPL.Compiler.Parser.ParserCombinator
       SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis
       SPL.Compiler.SemanticAnalysis.CallGraphAnalysis
       SPL.Compiler.SemanticAnalysis.ConstantFold
       SPL.Compiler.SemanticAnalysis.ConstantGlobalVar
+      SPL.Compiler.SemanticAnalysis.Core
+      SPL.Compiler.SemanticAnalysis.CoreEntityLocation
+      SPL.Compiler.SemanticAnalysis.CorePrettyPrint
       SPL.Compiler.SemanticAnalysis.ReturnPathCheck
       SPL.Compiler.SemanticAnalysis.SemanticAnalysis
-      SPL.Compiler.SemanticAnalysis.TCT
-      SPL.Compiler.SemanticAnalysis.TCTEntityLocation
-      SPL.Compiler.SemanticAnalysis.TCTPrettyPrint
-      SPL.Compiler.SemanticAnalysis.TreeTransformer
       SPL.Compiler.SemanticAnalysis.TypeCheck
       SPL.Compiler.SemanticAnalysis.TypeCheck.Env
       SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
       SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+      SPL.Compiler.SemanticAnalysis.TypeCheckLib
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -69,9 +68,11 @@ library
     , data-default
     , directory
     , extra
+    , hashable
     , lens
     , mtl
     , optparse-applicative
+    , ordered-containers
     , random
     , text
     , transformers
@@ -95,9 +96,11 @@ executable spl-compiler
     , data-default
     , directory
     , extra
+    , hashable
     , lens
     , mtl
     , optparse-applicative
+    , ordered-containers
     , random
     , spl-compiler
     , text
@@ -119,7 +122,6 @@ test-suite spl-compiler-test
       SPL.Compiler.SemanticAnalysis.Testable
       SPL.Compiler.SemanticAnalysis.TestTypeCheck
       SPL.Compiler.SemanticAnalysis.TestTypeUnify
-      SPL.Compiler.SemanticAnalysis.TypeCheckPropertyTest
       SPL.Compiler.SemanticAnalysis.TypeProperty
       Paths_spl_compiler
   hs-source-dirs:
@@ -136,9 +138,11 @@ test-suite spl-compiler-test
     , data-default
     , directory
     , extra
+    , hashable
     , lens
     , mtl
     , optparse-applicative
+    , ordered-containers
     , random
     , spl-compiler
     , text

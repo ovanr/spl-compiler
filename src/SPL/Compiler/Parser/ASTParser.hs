@@ -49,9 +49,9 @@ mkError err state@(ParserState _ (s@(MkToken _ t):_) _ _) =
 mkError err ParserState{} = [err]
 
 pAST :: SPLParser AST
-pAST = AST <$> (many' pASTLeaf <* pEnd)
+pAST = ASTUnordered <$> (many' pASTLeaf <* pEnd)
     where
-        pASTLeaf = (ASTVar <$> pVarDecl) <<|> (ASTFun <$> pFunDecl)
+        pASTLeaf = (Left <$> pVarDecl) <<|> (Right <$> pFunDecl)
         pEnd = pReplaceError (mkError "Expected end of file here") $
                     satisfy (\case EOF -> True; _ -> False)
 
@@ -60,15 +60,16 @@ pFunDecl = pWrapErrors (\_ -> (<>) ["Function declaration"]) $
     (\i fargs t body -> ASTFunDecl (i |-| body) i fargs t body)
                 <$> pIdentifier
                 <*> (pIsSymbol '(' *> pFargs <* pIsSymbol ')')
-                <*> pFunType
+                <*> ((pDblColon *>  pFunType) <<|> pUnknownType)
                 <*> pFunBody
 
     where
-        pFunBody = (\start v s end -> ASTFunBody (start |-| end) v s)
+        pFunBody = (\start vs st end -> ASTFunBody (start |-| end) vs st)
                         <$> pIsSymbol '{'
                         <*> many' pVarDecl
-                        <*> some' pStmt
+                        <*> many' pStmt
                         <*> pIsSymbol '}'
+        pDblColon = pTwice (pIsSymbol ':')
 
 pFargs :: SPLParser [ASTIdentifier]
 pFargs = pList pIdentifier $ pIsSymbol ','
@@ -92,46 +93,73 @@ pBasicType =
             Just . ASTVoidType $ getLoc t
         toASTBasicType _ = Nothing
 
+pUnknownType :: SPLParser ASTType
+pUnknownType =
+    peek <&>
+    \t -> let start = getStartLoc t
+           in ASTUnknownType (EntityLoc start start)
+
 pType :: SPLParser ASTType
 pType =
     pWrapErrors (\_ -> (<>) ["Type"]) $
-        pBasicType
-        <<|> (identifierToVar <$> pIdentifier)
-        <<|> tupError ((\start t1 t2 end -> ASTTupleType (start |-| end) t1 t2)
-                            <$> pIsSymbol '('
-                            <*> pType
-                            <*> (pIsSymbol ',' *> pType)
-                            <*> pIsSymbol ')')
-        <<|> listError ((\start t end -> ASTListType (start |-| end) t)
-                            <$> pIsSymbol '['
-                            <*> pType
-                            <*> pIsSymbol ']')
+        noArgFunType <<|> (toType <$> pBaseType <*> pMaybe _pFunType)
+
     where
-        identifierToVar i@(ASTIdentifier _ v) = ASTVarType (getLoc i) v
-        tupError = pWrapErrors (\_ -> (<>) ["Tuple type"])
-        listError = pWrapErrors (\_ -> (<>) ["List type"])
+        noArgFunType = pWrapErrors (\_ -> (<>) ["Function type"]) $
+                        toNoArgFunType <$> (pArrow *> pBaseType)
+        toNoArgFunType r = ASTFunType (getLoc r) [] r
+        toType x Nothing = x
+        toType x (Just (ASTFunType _ xs r)) = ASTFunType (x |-| r) (x:xs) r
+        toType _ _ = error "impossible"
+
+pBaseType :: SPLParser ASTType
+pBaseType = 
+    pWrapErrors (\_ -> (<>) ["Simple Type"]) $
+        pParensOrTupType
+                <<|> pBasicType
+                <<|> pVarType
+                <<|> pListType
+
+pVarType :: SPLParser ASTType
+pVarType = (\i@(ASTIdentifier _ v) -> ASTVarType (getLoc i) v) <$> pIdentifier
+
+pFunType :: SPLParser ASTType
+pFunType = _pFunType <<|> pParens pFunType
+
+_pFunType :: SPLParser ASTType
+_pFunType =
+    pWrapErrors (\_ -> (<>) ["Function type"]) $
+        (\as r -> let loc = if null as then getLoc r else head as |-| r
+                  in ASTFunType loc as r)
+            <$> many' pBaseType
+            <*> (pArrow *> pBaseType)
+
+pListType :: SPLParser ASTType
+pListType =
+    pWrapErrors (\_ -> (<>) ["List type"]) $
+        (\start t end -> ASTListType (start |-| end) t)
+            <$> pIsSymbol '['
+            <*> pType
+            <*> pIsSymbol ']'
+
+pParensOrTupType :: SPLParser ASTType
+pParensOrTupType =
+    pWrapErrors (\_ -> (<>) ["Tuple type or Parenthesis"]) $
+        toType
+        <$> pIsSymbol '('
+        <*> pType
+        <*> pMaybe (pIsSymbol ',' *> pWrapErrors (\_ -> (<>) ["Tuple Type Constructor"]) pType)
+        <*> (pIsSymbol ')' <<|> pErrorMax (mkError "Expected ')' here"))
+
+    where
+        toType lParens typ1 (Just typ2) rParens =
+            ASTTupleType (lParens |-| rParens) typ1 typ2
+        toType _ t Nothing rParens = t
 
 -- note that: (someParser $> a) == someParser *> pure a 
 pArrow :: SPLParser ()
 pArrow = pIsSymbol '-' *> pIsSymbol '>' $> ()
     <<|> pError (mkError "Expected '->' here")
-
-pFunType :: SPLParser ASTType
-pFunType =
-    pWrapErrors (\_ -> (<>) ["Function type"]) $
-            (\t r -> ASTFunType (t |-| r) (t ++ [r]))
-                <$> (pTwice (pIsSymbol ':') *> pFtype <* pArrow)
-                <*> pRetType
-            <<|> pUnknownType
-    where
-        pUnknownType =
-            peek <&>
-            \t -> let start = getStartLoc t
-                   in ASTUnknownType (EntityLoc start start)
-        pFtype :: SPLParser [ASTType]
-        pFtype = many' pType
-        pRetType :: SPLParser ASTType
-        pRetType = pType
 
 pVarDecl :: SPLParser ASTVarDecl
 pVarDecl =
@@ -148,8 +176,7 @@ pVarDecl =
                                _ -> False)
 
 pStmt :: SPLParser ASTStmt
-pStmt =
-        pIfElseStmt
+pStmt = pIfElseStmt
         <<|> pWhileStmt
         <<|> pAssignStmt
         <<|> pFunCallStmt
@@ -192,19 +219,31 @@ pWhileStmt =
                             _ -> False)
         pBody = many' pStmt
 
+pField :: SPLParser Field
+pField =
+    pWrapErrors (\_ -> (<>) ["Field selector"]) $
+        satisfyAs (\case
+            t@(MkToken _ (IdentifierToken "hd")) -> Just . Hd . getLoc $ t
+            t@(MkToken _ (IdentifierToken "tl")) -> Just . Tl . getLoc $ t
+            t@(MkToken _ (IdentifierToken "fst")) -> Just . Fst . getLoc $ t
+            t@(MkToken _ (IdentifierToken "snd")) -> Just . Snd . getLoc $ t
+            _ -> Nothing
+        )
+
 pAssignStmt :: SPLParser ASTStmt
 pAssignStmt =
     pWrapErrors (\_ -> (<>) ["Assignment statement"]) $
-    (\id val semic -> AssignStmt (id |-| semic) id val)
-        <$> pFieldSelect  <* pIsSymbol '='
+    (\id fds val semic -> AssignStmt (id |-| semic) id fds val)
+        <$> pIdentifier
+        <*> many' (pIsSymbol '.' *> pField) <* pIsSymbol '='
         <*> pExpr
         <*> pIsSymbol ';'
 
 pFunCallStmt :: SPLParser ASTStmt
 pFunCallStmt =
     pWrapErrors (\_ -> (<>) ["Function call statement"]) $
-    (\call col -> FunCallStmt (call |-| col) call)
-        <$> pFunCall False
+    (\call col -> FunCallStmt call)
+        <$> pFunCall
         <*> pIsSymbol ';'
 
 pReturnStmt :: SPLParser ASTStmt
@@ -225,10 +264,18 @@ pReturnStmt =
                 <*> pExpr
                 <*> pIsSymbol ';'
 
-pFunCall :: Bool -> SPLParser ASTFunCall
-pFunCall fromExprCxt = (\id args rParen -> ASTFunCall (id |-| rParen) id args)
+pFunCall :: SPLParser ASTFunCall
+pFunCall = literalFunCall <<|> bracketedFunCall
+    where
+        bracketedFunCall = 
+            (\e args rParen -> ASTFunCall (e |-| rParen) e args)
+                <$> pParens _pExpr
+                <*> (pIsSymbol '(' *> pList _pExpr (pIsSymbol ','))
+                <*> pIsSymbol ')'
+        literalFunCall = 
+            (\id args rParen -> ASTFunCall (id |-| rParen) (IdentifierExpr id) args)
                 <$> pIdentifier
-                <*> (pIsSymbol '(' *> pList (if fromExprCxt then _pExpr else pExpr) (pIsSymbol ','))
+                <*> (pIsSymbol '(' *> pList _pExpr (pIsSymbol ','))
                 <*> pIsSymbol ')'
 
 pExpr :: SPLParser ASTExpr
@@ -253,12 +300,32 @@ _pExpr =
         baseExpr = pTupExprOrParens
                    <<|> pIntExpr
                    <<|> pBoolExpr
-                   <<|> pFunCallExpr
+                   <<|> pIdentifierExpr
                    <<|> pListExpr
                    <<|> pCharExpr
                    <<|> pStringExpr
-                   <<|> pFieldSelectExpr
                    <<|> pErrorMax (mkError "Unknown expression encountered here")
+
+pFunOrFieldFollowUp :: SPLParser (ASTExpr -> ASTExpr)
+pFunOrFieldFollowUp = (toExprGen <$> pAlternative pFunCall pFieldSelector) <<|> pure id
+    where
+        pFieldSelector = some' (pIsSymbol '.' *> pField)
+        pFunCall = (,) <$> (pIsSymbol '(' *> pList _pExpr (pIsSymbol ',')) <*> pIsSymbol ')'
+
+        toExprGen (Left (args, endC)) baseExpr =
+            let loc = baseExpr |-| endC
+            in FunCallExpr $ ASTFunCall loc baseExpr args
+        toExprGen (Right []) baseExpr = error "impossible"
+        toExprGen (Right (f:fs)) baseExpr =
+            let loc = baseExpr |-| if null fs then f else last fs
+            in FieldSelectExpr loc baseExpr (f:fs)
+
+pIdentifierExpr :: SPLParser ASTExpr
+pIdentifierExpr =
+    toExpr <$> pIdentifier <*> pFunOrFieldFollowUp
+
+    where
+        toExpr id exprGen = exprGen (IdentifierExpr id)
 
 pUnaryOp :: String -> SPLParser (ASTExpr -> ASTExpr)
 pUnaryOp "!" = pReplaceError (mkError "Expected unary operator '!' here") (pIsSymbol '!')
@@ -292,19 +359,18 @@ pBinOp op = pReplaceError
 
 pTupExprOrParens :: SPLParser ASTExpr
 pTupExprOrParens =
-    pWrapErrors (\_ -> (<>) ["Tuple constructor or Parens"]) $
+    pWrapErrors (\_ -> (<>) ["Tuple constructor or Parenthesis or Function call"]) $
         toASTExpr
             <$> pIsSymbol '('
             <*> _pExpr
             <*> pMaybe (pIsSymbol ',' *> (pWrapErrors (\_ -> (<>) ["Tuple Constructor"]) _pExpr))
             <*> (pIsSymbol ')' <<|> pErrorMax (mkError "Expected ')' here"))
+            <*> pFunOrFieldFollowUp
 
     where
-        toASTExpr lParens expr1 (Just expr2) rParens = TupExpr (lParens |-| rParens) expr1 expr2
-        toASTExpr _ expr Nothing _ = expr
-
-pFieldSelectExpr :: SPLParser ASTExpr
-pFieldSelectExpr = FieldSelectExpr <$> pFieldSelect
+        toASTExpr lParens expr1 (Just expr2) rParens exprGen =
+            exprGen $ TupExpr (lParens |-| rParens) expr1 expr2
+        toASTExpr _ expr Nothing rParens exprGen = exprGen expr
 
 pIntExpr :: SPLParser ASTExpr
 pIntExpr = (\token@(MkToken loc (IntToken i)) -> IntExpr (getLoc token) i) <$>
@@ -332,30 +398,10 @@ pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$
                             MkToken _ (BoolToken _) -> True
                             _ -> False)
 
-pFunCallExpr :: SPLParser ASTExpr
-pFunCallExpr = FunCallExpr <$> pFunCall True
-
-pFieldSelect :: SPLParser ASTFieldSelector
-pFieldSelect =
-    pWrapErrors (\_ -> (<>) ["Field selector"]) $
-        liftA2 mkFieldSelector pIdentifier (many' (pIsSymbol '.' *> pField))
-    where
-        pField =
-            satisfyAs (\case
-                t@(MkToken _ (IdentifierToken "hd")) -> Just . Hd . getLoc $ t
-                t@(MkToken _ (IdentifierToken "tl")) -> Just . Tl . getLoc $ t
-                t@(MkToken _ (IdentifierToken "fst")) -> Just . Fst . getLoc $ t
-                t@(MkToken _ (IdentifierToken "snd")) -> Just . Snd . getLoc $ t
-                _ -> Nothing
-            )
-
-        mkFieldSelector id [] = ASTFieldSelector (id |-| id) id []
-        mkFieldSelector id fs = ASTFieldSelector (id |-| last fs) id fs
-
 pListExpr :: SPLParser ASTExpr
 pListExpr =
     toASTExpr <$> pIsSymbol '['
-              <*> pList _pExpr (pIsSymbol ',') 
+              <*> pList _pExpr (pIsSymbol ',')
               <*> pIsSymbol ']'
     where
         toASTExpr lParens [] rParens = EmptyListExpr (lParens |-| rParens)

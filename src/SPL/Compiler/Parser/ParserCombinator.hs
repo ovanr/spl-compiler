@@ -6,7 +6,8 @@ module SPL.Compiler.Parser.ParserCombinator where
 
 import SPL.Compiler.Lexer.AlexLexGen (Token(..), SPLToken(..), Keyword(..), Type(..), AlexPosn(..))
 import SPL.Compiler.Parser.AST
-import SPL.Compiler.Common.Error
+import SPL.Compiler.Common.Error hiding (Error)
+
 import Control.Applicative
 import Control.Lens ((%~), _1, _2, _Left, _Right, traversed, folded, maximumOf)
 import Data.Text (Text)
@@ -87,6 +88,9 @@ x <<|> y =
                 | otherwise ->
                     case runParser y s of
                          ys -> filter isRight ys ++ getLongestError (ys ++ xs)
+
+pAlternative :: Parser s e a -> Parser s e b -> Parser s e (Either a b)
+pAlternative pl pr = (Left <$> pl) <<|> (Right <$> pr)
 
 -- Parser that returns the current token without consuming it
 peek :: Parser s e s

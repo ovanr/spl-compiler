@@ -53,7 +53,7 @@ instance IRLangPrinter (HList Value xs) where
 
 instance IRLangPrinter (IRLang gs fs) where 
     showCL ident (IRLang globals funcs) = 
-        showCL ident globals <> "\n" <> showCL ident funcs
+        showCL ident globals <> "\n\n" <> showCL ident funcs
 
 instance IRLangPrinter (HList IRGlobal gs) where
     showCL ident = T.intercalate "\n" . hListMapToList (showCL 0)

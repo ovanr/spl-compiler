@@ -9,10 +9,10 @@ import qualified Data.Map as M
 import Data.Text (Text)
 
 import SPL.Compiler.SemanticAnalysis.Testable
-import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
 
-instance Arbitrary TCTType where
+instance Arbitrary CoreType where
     arbitrary = frequency
         [
             (2, varGen),
@@ -25,13 +25,13 @@ instance Arbitrary TCTType where
         ]
 
        where
-            intGen = return (TCTIntType def)
-            boolGen = return (TCTBoolType def)
-            charGen = return (TCTCharType def)
-            varGen = oneof $ return . TCTVarType def <$> ["a", "b", "c", "d"]
-            tupleGen = liftA2 (TCTTupleType def) arbitrary arbitrary
-            funGen = liftA2 (TCTFunType def) arbitrary arbitrary
-            listGen = TCTListType def <$> arbitrary
+            intGen = return (CoreIntType def)
+            boolGen = return (CoreBoolType def)
+            charGen = return (CoreCharType def)
+            varGen = oneof $ return . CoreVarType def <$> ["a", "b", "c", "d"]
+            tupleGen = liftA2 (CoreTupleType def) arbitrary arbitrary
+            funGen = liftA2 (CoreFunType def []) (take 2 <$> arbitrary) arbitrary
+            listGen = CoreListType def <$> arbitrary
 
 instance Arbitrary Text where
     arbitrary = oneof $ return <$> ["a1", "b1", "c1", "d1"]

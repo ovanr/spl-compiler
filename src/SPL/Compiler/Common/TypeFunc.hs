@@ -122,13 +122,17 @@ hListZipM1 f (x :+: xs) (y :+: ys) = do
     fxsys <- hListZipM1 f xs ys
     pure (fxy :+: fxsys)
 
-hListFoldl :: (forall x . acc -> f x -> acc) -> acc -> HList f xs -> acc
+hListFoldl :: (forall x. acc -> f x -> acc) -> acc -> HList f xs -> acc
 hListFoldl _ acc HNil = acc
 hListFoldl f acc (x :+: xs) = hListFoldl f (f acc x) xs
 
 hListToList :: HList f xs -> [Some1 f]
 hListToList HNil = []
 hListToList (x :+: xs) = Some1 x : hListToList xs
+
+hListElem :: (forall x y. f x -> f y -> Bool) -> f x -> HList f xs -> Bool 
+hListElem _ _ HNil = False
+hListElem eq x (y :+: ys) = eq x y || hListElem eq x ys
 
 (+++) :: HList f xs -> HList f ys -> HList f (Append xs ys)
 HNil +++ ys = ys

@@ -1,0 +1,34 @@
+apply (f, x) {
+    return f(x);
+}
+
+idPrint (x) {
+    print(x);
+    return x;
+}
+
+id (x) {
+    return x;
+}
+
+add (x,y) {
+    return x + y;
+}
+
+fact (x) :: Int -> Int { 
+    var r = x * fact(x - 1); 
+    return r; 
+} 
+
+nada () :: -> Int {
+    return 3;
+}
+test (x,y) :: [Int] (Bool, [Int]) -> Void {
+    print(x);
+    print(y);
+}
+main () {
+    var z = [];
+    /* print(z); */
+    ((idPrint, idPrint).fst)(3);
+}

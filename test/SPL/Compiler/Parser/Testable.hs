@@ -14,7 +14,7 @@ instance Testable ASTFunCall where
 
 instance Testable ASTType where
     toTestForm (ASTUnknownType l) = ASTUnknownType def
-    toTestForm (ASTFunType _ t) = ASTFunType def (toTestForm t)
+    toTestForm (ASTFunType _ t r) = ASTFunType def (toTestForm t) (toTestForm r)
     toTestForm (ASTTupleType _ t1 t2) = ASTTupleType def (toTestForm t1) (toTestForm t2)
     toTestForm (ASTListType _ t) = ASTListType def (toTestForm t)
     toTestForm (ASTVarType _ v) = ASTVarType def v
@@ -23,19 +23,17 @@ instance Testable ASTType where
     toTestForm (ASTCharType _) = ASTCharType def
     toTestForm (ASTVoidType _) = ASTVoidType def
 
-instance Testable ASTField where
+instance Testable Field where
     toTestForm (Hd _) = Hd def
     toTestForm (Tl _) = Tl def
     toTestForm (Fst _) = Fst def
     toTestForm (Snd _) = Snd def
 
-instance Testable ASTFieldSelector where
-    toTestForm (ASTFieldSelector _ i fs) = ASTFieldSelector def (toTestForm i) (toTestForm fs)
-
 instance Testable ASTExpr where
     toTestForm (TupExpr _ p1 p2) = TupExpr def (toTestForm p1) (toTestForm p2)
     toTestForm (FunCallExpr c) = FunCallExpr (toTestForm c)
-    toTestForm (FieldSelectExpr i) = FieldSelectExpr (toTestForm i)
+    toTestForm (IdentifierExpr i) = IdentifierExpr (toTestForm i)
+    toTestForm (FieldSelectExpr _ e fds) = FieldSelectExpr def (toTestForm e) (toTestForm fds)
     toTestForm (IntExpr _ i) = IntExpr def i
     toTestForm (CharExpr _ c) = CharExpr def c
     toTestForm (BoolExpr _ b) = BoolExpr def b
@@ -56,6 +54,6 @@ instance Testable ASTFunBody where
 instance Testable ASTStmt where
     toTestForm (IfElseStmt _ val1 val2 val3) = IfElseStmt def (toTestForm val1) (toTestForm val2) (toTestForm val3)
     toTestForm (WhileStmt _ val1 val2) = WhileStmt def (toTestForm val1) (toTestForm val2)
-    toTestForm (AssignStmt _ val1 val2) = AssignStmt def (toTestForm val1) (toTestForm val2)
-    toTestForm (FunCallStmt _ val1) = FunCallStmt def (toTestForm val1)
+    toTestForm (AssignStmt _ id fds e) = AssignStmt def (toTestForm id) (toTestForm fds) (toTestForm e)
+    toTestForm (FunCallStmt val1) = FunCallStmt (toTestForm val1)
     toTestForm (ReturnStmt _ val1) = ReturnStmt def (toTestForm val1)

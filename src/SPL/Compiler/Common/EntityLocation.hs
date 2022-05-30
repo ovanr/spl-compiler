@@ -8,7 +8,7 @@ import qualified Data.Text as T
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
 
 -- Location is (LineNum, ColumnNum)
-type Location = (Natural, Natural)
+type Location = (Int, Int)
 
 -- EntityLoc is StartLocation and EndLocation in source file
 data EntityLoc = EntityLoc {

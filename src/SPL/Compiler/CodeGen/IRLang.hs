@@ -31,8 +31,9 @@ module SPL.Compiler.CodeGen.IRLang (
         IRFunDecl(..),
         IRFunDef(..),
         type (-->),
-        CollapseFunType,
         Castable,
+        isConcreteType,
+        isConcreteTCon,
         funId,
         funArgs,
         funRetType,
@@ -43,6 +44,7 @@ module SPL.Compiler.CodeGen.IRLang (
         IRGlobal(..),
         IRInstr(..),
         IRType(..),
+        TCon(..),
         Typeable(..)
     ) where
 
@@ -65,7 +67,7 @@ data Ptr a
 data (-->) (a :: [*]) r
 data Unknown
 
-data VarKind = Temp | Declared
+data VarKind = Temp | Local | Global
 
 data Var a = Var {
     _varIdentifier :: Identifier,
@@ -91,10 +93,6 @@ data IRFunDef xs = IRFunDef {
     _funDecl :: IRFunDecl' xs,
     _funBody :: [IRInstr]
 }
-
-type family CollapseFunType (a :: *) :: [*] where
-    CollapseFunType (Ptr (as --> r)) = Snoc as r
-    CollapseFunType a = '[a]
 
 data IRInstr where
     Add :: Var Int -> Value Int -> Value Int -> IRInstr
@@ -150,8 +148,14 @@ data IRConstant a where
     IRChar :: Char -> IRConstant Char
     IRFun :: IRFunDecl as r -> IRConstant (Ptr (as --> r))
 
+data TCon a where 
+    TEq :: IRType a -> TCon (Ptr ('[a, a] --> Bool))
+    TOrd :: IRType a -> TCon (Ptr ('[a,a] --> Bool))
+    TPrint :: IRType a -> TCon (Ptr ('[a] --> Unit))
+
 class Castable a b
 
+instance {-# INCOHERENT #-} Castable a a
 instance Castable Bool Int
 instance Castable Char Int
 instance {-# INCOHERENT #-} Castable a Unknown
@@ -172,6 +176,11 @@ class Typeable f where
 instance Show (Var a) where
     show (Var id t _) = T.unpack id <> "%" <> show t
 
+instance Show (TCon a) where
+    show (TEq t) = "TEq " <> show t
+    show (TOrd t) = "TOrd " <> show t
+    show (TPrint t) = "TPrint " <> show t
+
 instance Show (IRType a) where
     show IRIntType = "i"
     show IRBoolType = "b"
@@ -183,6 +192,19 @@ instance Show (IRType a) where
     show (IRTupleType a b) = "*(" <> show a <> "," <> show b <> ")"
     show (IRFunType as r) =
         "*(" <> L.intercalate "->" (hListMapToList show as) <> "->" <> show r <> ")"
+
+isConcreteTCon :: TCon a -> Bool
+isConcreteTCon (TEq t) = isConcreteType t
+isConcreteTCon (TOrd t) = isConcreteType t
+isConcreteTCon (TPrint t) = isConcreteType t
+
+isConcreteType :: IRType a -> Bool
+isConcreteType (IRUnknownType _) = False
+isConcreteType (IRPtrType t) = isConcreteType t
+isConcreteType (IRListType a) = isConcreteType a
+isConcreteType (IRTupleType a b) = isConcreteType a && isConcreteType b
+isConcreteType (IRFunType as r) = and (hListMapToList isConcreteType as) && isConcreteType r
+isConcreteType _ = True
 
 makeLenses ''IRFunDecl
 makeLenses ''IRFunDef

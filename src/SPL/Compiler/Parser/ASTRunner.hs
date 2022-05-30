@@ -17,9 +17,11 @@ printParserError :: [Text] -> Text
 printParserError [] = mempty
 printParserError xs =
     let header = "Error occurred during parsing phase!"
-        info = "Best match parse branch:  " <> (T.intercalate " -> " . init $ xs)
+        info = "The error occurred while attempting to parse a " <> last (init xs)
+        extraInfo = "The parsing branch is as follows: " 
+        branch = "    " <> (T.intercalate " -> " . init $ xs)
         err = last xs
-      in T.init $ T.unlines [header, "", info, err]
+      in T.init $ T.unlines [header, "", info, extraInfo, branch, err]
 
 
 performParsing :: [Token] -> FilePath -> [Text] -> Either Text AST

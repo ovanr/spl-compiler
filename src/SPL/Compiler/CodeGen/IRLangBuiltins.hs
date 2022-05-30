@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators #-}
 
 module SPL.Compiler.CodeGen.IRLangBuiltins where
 
@@ -20,19 +21,19 @@ mkBuiltins = do
 
 mkPowFunc :: IRMonad (IRFunDef '[Int, Int, Int])
 mkPowFunc = do
-        let arg1 = Var "x" IRIntType Declared
-            arg2 = Var "y" IRIntType Declared
-            funDecl' = IRFunDecl' (IRFunDecl "0pow" (arg1 :+: arg2 :+: HNil) IRIntType)
+        let arg1 = Var "x" IRIntType Local
+            arg2 = Var "y" IRIntType Local
+            funDecl' = IRFunDecl' (IRFunDecl "_pow" (arg1 :+: arg2 :+: HNil) IRIntType)
 
         funBody <- declareBodyAs $ do
             returnFalse <- mkLabel "ReturnFalse"
             end <- mkLabel "End"
             whileStart <- mkLabel "WhileStart"
 
-            let resultV = Var "acc" IRIntType Declared
-            body <>= [DeclareV resultV]
+            let resultV = Var "acc" IRIntType Local
+            let tmp1 = Var "tmp" IRBoolType Local
+            body <>= [DeclareV resultV, DeclareV tmp1]
             body <>= [StoreV resultV (IRLit $ IRInt 1)]
-            tmp1 <- mkTmpVar IRBoolType
 
             body <>= [SetLabel whileStart]
 
@@ -48,52 +49,57 @@ mkPowFunc = do
         return (IRFunDef funDecl' funBody)
 
 mkMagicFuncs :: Some1 (HList IRFunDef)
-mkMagicFuncs = Some1 $ isEmpty :+: hd :+: tl :+: fst :+: snd :+: hdAssign 
-                               :+: tlAssign :+: fstAssign :+: sndAssign :+: HNil
+mkMagicFuncs = Some1 $ print :+: isEmpty :+: hd :+: tl :+: fst :+: snd :+: 
+                       hdAssign :+: tlAssign :+: fstAssign :+: sndAssign :+: HNil
     where
         mkMagicFun :: Identifier -> HList Var xs -> IRType r -> IRFunDef (Snoc xs r)
         mkMagicFun id args retType = IRFunDef (IRFunDecl' (IRFunDecl id args retType)) [Halt]
 
+        print :: IRFunDef '[Ptr ('[Unknown] --> Unit), Unknown, Unit]
+        print = mkMagicFun "print" (Var "p" (IRFunType (IRUnknownType "a" :+: HNil) IRVoidType) Local :+:
+                                    Var "x" (IRUnknownType "a") Local :+: 
+                                    HNil) IRVoidType
+
         isEmpty :: IRFunDef '[Ptr [Unknown], Bool]
-        isEmpty = mkMagicFun "isEmpty" (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) IRBoolType
+        isEmpty = mkMagicFun "isEmpty" (Var "x" (IRListType (IRUnknownType "a")) Local :+: HNil) IRBoolType
 
         hd :: IRFunDef '[Ptr [Unknown], Unknown]
         hd = mkMagicFun "hd" 
-                (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) 
+                (Var "x" (IRListType (IRUnknownType "a")) Local :+: HNil) 
                 (IRUnknownType "a")
 
         tl :: IRFunDef '[Ptr [Unknown], Ptr [Unknown]]
         tl = mkMagicFun "tl" 
-                (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil) 
+                (Var "x" (IRListType (IRUnknownType "a")) Local :+: HNil) 
                 (IRListType (IRUnknownType "a"))
 
         fst :: IRFunDef '[Ptr (Unknown, Unknown), Unknown]
         fst = mkMagicFun "fst" 
-                (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) 
+                (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Local :+: HNil) 
                 (IRUnknownType "a")
 
         snd :: IRFunDef '[Ptr (Unknown, Unknown), Unknown]
         snd = mkMagicFun "snd" 
-                    (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil) 
+                    (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Local :+: HNil) 
                     (IRUnknownType "b")
 
         hdAssign :: IRFunDef '[Ptr [Unknown], Ptr Unknown]
-        hdAssign = mkMagicFun "0hd_assign"
-                        (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil)
+        hdAssign = mkMagicFun "_hd_assign"
+                        (Var "x" (IRListType (IRUnknownType "a")) Local :+: HNil)
                         (IRPtrType (IRUnknownType "a"))
 
         tlAssign :: IRFunDef '[Ptr [Unknown], Ptr (Ptr [Unknown])]
-        tlAssign = mkMagicFun "0tl_assign"
-                        (Var "x" (IRListType (IRUnknownType "a")) Declared :+: HNil)
+        tlAssign = mkMagicFun "_tl_assign"
+                        (Var "x" (IRListType (IRUnknownType "a")) Local :+: HNil)
                         (IRPtrType $ IRListType (IRUnknownType "a"))
 
         fstAssign :: IRFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        fstAssign = mkMagicFun "0fst_assign"
-                        (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil)
+        fstAssign = mkMagicFun "_fst_assign"
+                        (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Local :+: HNil)
                         (IRPtrType (IRUnknownType "a"))
 
         sndAssign :: IRFunDef '[Ptr (Unknown, Unknown), Ptr Unknown]
-        sndAssign = mkMagicFun "0snd_assign"
-                        (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Declared :+: HNil)
+        sndAssign = mkMagicFun "_snd_assign"
+                        (Var "x" (IRTupleType (IRUnknownType "a") (IRUnknownType "b")) Local :+: HNil)
                         (IRPtrType (IRUnknownType "b"))
 

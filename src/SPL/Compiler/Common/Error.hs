@@ -8,6 +8,7 @@ import Data.Text (Text)
 import Control.Lens ((^?), ix)
 import qualified Data.Text as T
 
+type Error = [Text]
 class ContainsSource s where
     getFilePath :: s -> FilePath
     getSource :: s -> [Text]

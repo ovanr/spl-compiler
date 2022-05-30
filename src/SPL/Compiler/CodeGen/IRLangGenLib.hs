@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module SPL.Compiler.CodeGen.IRLangGenLib where
 
@@ -20,15 +21,17 @@ import GHC.Stack
 import Control.Applicative
 
 import SPL.Compiler.CodeGen.IRLang
+import {-# SOURCE #-} SPL.Compiler.CodeGen.IRLangTConGen
 import SPL.Compiler.Common.TypeFunc
-import qualified SPL.Compiler.SemanticAnalysis.TCT as TCT
-import qualified SPL.Compiler.SemanticAnalysis.TypeCheck as TCT
+import qualified SPL.Compiler.SemanticAnalysis.Core as Core
+import qualified SPL.Compiler.SemanticAnalysis.TypeCheck as Core
 
 type Error = Text
 data IRState = IRState {
     _vars :: Some1 (HList Var),
     _funcs :: Some1 (HList IRFunDecl'),
     _body :: [IRInstr],
+    _neededTConGen :: Some1 (HList TCon),
     _varCounter :: Int,
     _labelCounter :: Int
 }
@@ -91,7 +94,7 @@ mkName :: Identifier -> IRMonad Identifier
 mkName prefix = do
     c <- use varCounter
     varCounter += 1
-    return $ "0" <> prefix <> T.pack (show c)
+    return $ "_" <> prefix <> T.pack (show c)
 
 mkLabel :: Text -> IRMonad Label
 mkLabel prefix = do
@@ -130,7 +133,6 @@ cast va b = do
         rewriteUnknown (IRFunType as r) = IRFunType (hListTCMap rewriteUnknown as) (rewriteUnknown r)
         rewriteUnknown t = t
 
-
 copyV :: Var a -> IRMonad (Var a)
 copyV var@(Var id ct _) = do
     newVar <- mkTmpVar ct
@@ -142,11 +144,6 @@ getRef var = do
     varRef <- mkTmpVar (IRPtrType $ var ^. varType)
     body <>= [Ref varRef var]
     return varRef
-
-ifIRTypeEq :: forall a b c v1 v2. (Typeable v1, Typeable v2) => 
-                v1 a -> v2 b -> (v1 a -> v2 a -> c) -> (v1 a -> c) -> c
-ifIRTypeEq ta tb f g = fromRight (g ta)
-    (whenTEq ta tb (\ta tb -> Right (f ta tb)) :: Either () c)
 
 whenTEq :: (HasCallStack, MonadFail m, Typeable v1, Typeable v2) =>
                  v1 a -> v2 b -> (v1 a -> v2 a -> m c) -> m c
@@ -172,6 +169,11 @@ whenTEq v1 v2 f =
         (ta, tb) -> fail $ 
             "Unexpected Type mismatch: " <>
             show ta <> " /= " <> show tb <> "\n" <> stackTrace
+
+ifIRTypeEq :: forall a b c v1 v2. (Typeable v1, Typeable v2) => 
+                v1 a -> v2 b -> (v1 a -> v2 a -> c) -> (v1 a -> c) -> c
+ifIRTypeEq ta tb f g = fromRight (g ta)
+    (whenTEq ta tb (\ta tb -> Right (f ta tb)) :: Either () c)
 
 whenListTEq :: (HasCallStack, MonadFail m, Typeable v1, Typeable v2) =>
                 HList v1 xs -> HList v2 ys -> (HList v1 xs -> HList v2 xs -> m c) -> m c
@@ -219,42 +221,70 @@ ifFunTypeEq :: forall as1 r1 as2 r2 c v. Typeable v =>
 ifFunTypeEq decl expT f g = fromRight g
     (whenFunTEq decl expT (Right . f) :: Either () c)
 
-tctTypeToIRType :: TCT.TCTType -> [TCT.TCon] -> Some1 IRType
-tctTypeToIRType TCT.TCTIntType{} _ = Some1 IRIntType
-tctTypeToIRType TCT.TCTBoolType{} _ = Some1 IRBoolType
-tctTypeToIRType TCT.TCTCharType{} _ = Some1 IRCharType
-tctTypeToIRType TCT.TCTVoidType{} _ = Some1 IRVoidType
-tctTypeToIRType (TCT.TCTVarType _ tvar) _ = Some1 (IRUnknownType tvar)
-tctTypeToIRType (TCT.TCTTupleType _ ta tb) _ =
-    case (tctTypeToIRType ta [], tctTypeToIRType tb []) of
+whenTConEq :: (HasCallStack, MonadFail m) =>
+                 TCon a -> TCon b -> (TCon a -> TCon a -> m c) -> m c
+whenTConEq (TEq t1) (TEq t2) f = whenTEq t1 t2 (\t1' t2' -> f (TEq t1') (TEq t2'))
+whenTConEq (TOrd t1) (TOrd t2) f = whenTEq t1 t2 (\t1' t2' -> f (TOrd t1') (TOrd t2'))
+whenTConEq (TPrint t1) (TPrint t2) f = whenTEq t1 t2 (\t1' t2' -> f (TPrint t1') (TPrint t2'))
+whenTConEq v1 v2 _ = fail $ 
+    "Unexpected Type mismatch: " <>
+    show v1 <> " /= " <> show v2 <> "\n" <> stackTrace
+
+ifIRTConEq :: forall a b c. TCon a -> TCon b -> (TCon a -> c) -> c -> c
+ifIRTConEq ta tb f def = fromRight def
+    (whenTConEq ta tb (\ta tb -> Right (f ta)) :: Either () c)
+
+coreTypeToIRType :: Core.CoreType -> Some1 IRType
+coreTypeToIRType Core.CoreIntType{} = Some1 IRIntType
+coreTypeToIRType Core.CoreBoolType{} = Some1 IRBoolType
+coreTypeToIRType Core.CoreCharType{} = Some1 IRCharType
+coreTypeToIRType Core.CoreVoidType{} = Some1 IRVoidType
+coreTypeToIRType (Core.CoreVarType _ tvar) = Some1 (IRUnknownType tvar)
+coreTypeToIRType (Core.CoreTupleType _ ta tb) =
+    case (coreTypeToIRType ta, coreTypeToIRType tb) of
         (Some1 ta', Some1 tb') -> Some1 (IRTupleType ta' tb')
-tctTypeToIRType (TCT.TCTListType _ ta) _ =
-    case tctTypeToIRType ta [] of
+coreTypeToIRType (Core.CoreListType _ ta) =
+    case coreTypeToIRType ta of
         Some1 ta' -> Some1 (IRListType ta')
-tctTypeToIRType t@TCT.TCTFunType{} tcons  =
-    let (args, return) = TCT.decomposeFunType t
-    in case (hListMapFromList tctTConToIRType tcons,
-             hListFromList $ map (`tctTypeToIRType` []) args,
-             tctTypeToIRType return []) of
+coreTypeToIRType t@(Core.CoreFunType _ tcons args return) =
+    case (hListMapFromList coreTConToIRType tcons,
+          hListFromList $ map coreTypeToIRType args,
+          coreTypeToIRType return) of
         (Some1 tcon', Some1 ta', Some1 tb') -> Some1 (IRFunType (tcon' +++ ta') tb')
 
-tctTConToIRType :: TCT.TCon -> Some1 IRType
-tctTConToIRType (TCT.TPrint t) =
-    case tctTypeToIRType t [] of
+coreTConToIRType :: Core.TCon -> Some1 IRType
+coreTConToIRType (Core.TPrint t) =
+    case coreTypeToIRType t of
         Some1 t' -> Some1 $ IRFunType (t' :+: HNil) IRVoidType
-tctTConToIRType (TCT.TEq t) =
-    case tctTypeToIRType t [] of
+coreTConToIRType (Core.TEq t) =
+    case coreTypeToIRType t of
         Some1 t' -> Some1 $ IRFunType (t' :+: t' :+: HNil) IRBoolType
-tctTConToIRType (TCT.TOrd t) =
-    case tctTypeToIRType t [] of
+coreTConToIRType (Core.TOrd t) =
+    case coreTypeToIRType t of
         Some1 t' -> Some1 $ IRFunType (t' :+: t' :+: HNil) IRBoolType
+
+coreTConToIRTCon :: Core.TCon -> Some1 TCon
+coreTConToIRTCon (Core.TEq t) = 
+    case coreTypeToIRType t of
+        Some1 t' -> Some1 (TEq t')
+coreTConToIRTCon (Core.TOrd t) = 
+    case coreTypeToIRType t of
+        Some1 t' -> Some1 (TOrd t')
+coreTConToIRTCon (Core.TPrint t) = 
+    case coreTypeToIRType t of
+        Some1 t' -> Some1 (TPrint t')
 
 showVarList' :: [Some1 Var] -> String
 showVarList' = concatMap (\(Some1 v) -> show v <> " ")
 
 toCastable :: forall m a b. (MonadFail m, HasCallStack) => IRType a -> IRType b -> m (Constrained2 Castable IRType a b)
+toCastable IRIntType IRIntType = pure (Constrained2 IRIntType IRIntType)
+toCastable IRBoolType IRBoolType = pure (Constrained2 IRBoolType IRBoolType)
+toCastable IRCharType IRCharType = pure (Constrained2 IRCharType IRCharType)
+toCastable IRVoidType IRVoidType = pure (Constrained2 IRVoidType IRVoidType)
 toCastable IRBoolType IRIntType = pure (Constrained2 IRBoolType IRIntType)
 toCastable IRCharType IRIntType = pure (Constrained2 IRCharType IRIntType)
+toCastable u1@IRUnknownType{} u2@IRUnknownType{} = pure (Constrained2 u1 u2)
 toCastable t u@IRUnknownType{} = pure (Constrained2 t u)
 toCastable u@IRUnknownType{} t = pure (Constrained2 u t)
 toCastable (IRPtrType t1) (IRPtrType t2) = do
@@ -283,28 +313,39 @@ toCastable (IRFunType as1 r1) (IRFunType as2 r2) = do
             pure (Constrained2 (x' :+: xs') (y' :+: ys'))
 
 toCastable t1 t2 = fail $
-    "Cannot generate castable constraint for these types: " <> show t1 <> " " <> show t2
-    
-castFunArgs :: HList Var xs -> [Some1 Value] -> IRMonad (HList Value xs)
-castFunArgs HNil [] = pure HNil
-castFunArgs (arg :+: args) (Some1 concreteArg:concreteArgs) = do
-    concreteArg' <- cast concreteArg (getType arg) 
-    concreteArgs' <- castFunArgs args concreteArgs
-    return (concreteArg' :+: concreteArgs')
-castFunArgs hs ys = coreErrorWithDesc . T.pack $
-    "Mismatched number of function arguments: " <>
-    show (hListLength hs) <> " /= " <> show (length ys)
+    "Cannot generate castable constraint for these types: " <> show t1 <> " " <> show t2 <> "\n" <> stackTrace
+ 
+castVarList :: Typeable v => [Some1 Value] -> HList v xs -> IRMonad (HList Value xs)
+castVarList [] HNil = pure HNil
+castVarList (Some1 from:froms) (to :+: tos)  = do
+    from' <- cast from (getType to) 
+    froms' <- castVarList froms tos
+    return (from' :+: froms')
+castVarList ys hs = coreErrorWithDesc . T.pack $
+    "Casting failed: Mismatched number of elements in list: " <>
+    show (length ys) <> " /= " <> show (hListLength hs)
 
 showVarList :: [Some1 Var] -> String
 showVarList = concatMap (\(Some1 v) -> show v <> " ")
 
-callFunWith :: Identifier -> [Some1 Value] -> IRMonad (Some1 Var)
-callFunWith funName args = do
+callFunByName :: Identifier -> [Some1 Value] -> IRMonad (Some1 Var)
+callFunByName funName args = do
     Some1 (IRFunDecl' fun) <- findFunByName funName
-    args' <- castFunArgs (fun ^. funArgs) args
+    res <- callFunWith (IRLit . IRFun $ fun) args
+    pure (Some1 res)
+
+callFunWith :: Value (Ptr (as --> r)) -> [Some1 Value] -> IRMonad (Var r)
+callFunWith (IRVar var@(Var _ (IRFunType as r) _)) args = do
+    args' <- castVarList args as
+    dst <- mkTmpVar r
+    body <>= [ Call dst (IRVar var) args' ]
+    return dst
+callFunWith (IRLit (IRFun fun)) args = do
+    args' <- castVarList args (fun ^. funArgs)
     dst <- mkTmpVar (fun ^. funRetType)
     body <>= [ Call dst (IRLit $ IRFun fun) args' ]
-    return (Some1 dst)
+    return dst
+callFunWith _ _ = coreError
 
 findFunByName :: Identifier -> IRMonad (Some1 IRFunDecl')
 findFunByName id = do
@@ -350,7 +391,7 @@ findVarByName :: Identifier -> IRMonad (Some1 Var)
 findVarByName id = findVarByPred (\(Var varId _ _) -> varId == id)
 
 getVoidVar :: IRMonad (Var Unit)
-getVoidVar = findVar (== "0void_var") IRVoidType
+getVoidVar = findVar (== "_void_var") IRVoidType
 
 findVar :: forall a. (Identifier -> Bool) -> IRType a -> IRMonad (Var a)
 findVar f reqT = do
@@ -376,17 +417,31 @@ findVarByPred f = do
             | f v = pure $ Some1 v
             | otherwise = findVarByPred' rest
 
-findConVar :: TCT.TCon -> IRMonad (Some1 Var)
-findConVar tcon =
-    case tctTConToIRType tcon of
-        Some1 tconT ->
-            case tcon of
-                TCT.TPrint _ -> findVarByPred $ \(Var id varT _) ->
-                    ifIRTypeEq tconT varT (\_ _ -> T.isPrefixOf "0print_con" id) (const False)
-                TCT.TEq _ -> findVarByPred $ \(Var id varT _) ->
-                    ifIRTypeEq tconT varT (\_ _ -> T.isPrefixOf "0eq_con" id) (const False)
-                TCT.TOrd _ -> findVarByPred $ \(Var id varT _) ->
-                    ifIRTypeEq tconT varT (\_ _ -> T.isPrefixOf "0ord_con" id) (const False)
+resolveTCon :: TCon a -> IRMonad (Value a)
+resolveTCon tcon = 
+    if isConcreteTCon tcon then do
+        getStaticTConFun tcon
+    else do
+        getDynamicTConFun tcon
+
+    where
+        getStaticTConFun :: TCon a -> IRMonad (Value a)
+        getStaticTConFun t = do
+            Some1 funcs <- use neededTConGen
+            unless (hListElem (\v1 v2 -> ifIRTConEq v1 v2 (const True) False) t funcs) $
+                neededTConGen %= (\(Some1 l) -> Some1 $ t :+: l)
+                
+            case t of
+                (TPrint t') -> pure . IRLit . IRFun $ mkPrintFunDecl t'
+                (TEq t') -> pure . IRLit . IRFun $ mkEqFunDecl t'
+                (TOrd t') -> pure . IRLit . IRFun $ mkOrdFunDecl t'
+
+        getDynamicTConFun :: TCon a -> IRMonad (Value a)
+        getDynamicTConFun = 
+            \case
+                TEq t -> IRVar <$> findVar (T.isPrefixOf "_eq_con") (IRFunType (t :+: t :+: HNil) IRBoolType)
+                TOrd t -> IRVar <$> findVar (T.isPrefixOf "_ord_con") (IRFunType (t :+: t :+: HNil) IRBoolType)
+                TPrint t -> IRVar <$> findVar (T.isPrefixOf "_print_con") (IRFunType (t :+: HNil) IRVoidType)
 
 declareBodyAs :: IRMonad () -> IRMonad [IRInstr]
 declareBodyAs st = do

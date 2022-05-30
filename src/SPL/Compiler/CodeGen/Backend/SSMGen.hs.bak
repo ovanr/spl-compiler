@@ -79,6 +79,12 @@ handleInstruction instr =
         IR.StoreV dst (IR.IRVar src) -> do
             loadVarToTopStack src
             saveTopStackToVar dst
+        -- IR.StoreV dst (IR.IRLit (IR.IRFun f :: IRFunDecl)) -> do
+            --  var dst = idPrint;
+            -- a thunk of f must be produced and stored in `dst` variable
+            -- creates a thunk with 0 arguments applied
+            -- loadVarToTopStack src
+            -- saveTopStackToVar dst
         IR.StoreV dst (IR.IRLit src) -> do
             SSM.ldc src
             saveTopStackToVar dst
@@ -136,14 +142,15 @@ handleInstruction instr =
             op
             saveTopStackToVar dst
         callFunc :: IR.Var r -> IR.Value (IR.Ptr (as --> r)) -> HList IR.Value as -> SSMMonad ()
-        callFunc dst (IR.IRLit (IR.IRFun (IR.IRFunDecl label _ _))) args = do
-            let numArgs = hListLength args
-            forM_ (reverse $ hListToList args) $ \(Some1 arg) -> loadValueToTopStack arg
-            SSM.bsr label
-            SSM.ajs (-numArgs)
-            SSM.ldr RR
-            saveTopStackToVar dst
-        callFunc dst (IR.IRVar varF) args = do
+        callFunc dst (IR.IRLit (IR.IRFun (IR.IRFunDecl label funArgs _))) args 
+            | hListLength args == hListLength args = do
+                let numArgs = hListLength args
+                forM_ (reverse $ hListToList args) $ \(Some1 arg) -> loadValueToTopStack arg
+                SSM.bsr label
+                SSM.ajs (-numArgs)
+                SSM.ldr RR
+                saveTopStackToVar dst
+        callFunc dst (IR.IRVar varF) args = do -- if function is stored in variable then it is a thunk 
             let numArgs = hListLength args
             forM_ (reverse $ hListToList args) $ \(Some1 arg) -> loadValueToTopStack arg
             loadVarToTopStack varF
@@ -152,6 +159,14 @@ handleInstruction instr =
             SSM.ldr RR
             saveTopStackToVar dst
 
+-- SSM thunk evaluator/generator subroutine
+-- arg1
+-- arg2
+-- arg3
+-- label/variable that stores function
+-- num of arguments that I just applied (3 in this case)
+-- jump to SSM thunk evaluator
+--
 extractArgsVars :: IR.IRFunDecl as r -> [SSMVar]
 extractArgsVars (IR.IRFunDecl _ args _) = extractArgsVars' (-2) args
     where

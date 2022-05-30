@@ -5,53 +5,51 @@ module SPL.Compiler.SemanticAnalysis.TypeCheck.Env where
 
 import Data.Text (Text)
 import Data.Map (Map)
-import Data.Set (Set)
 import Data.Bifunctor
 import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import SPL.Compiler.Common.EntityLocation
-import SPL.Compiler.SemanticAnalysis.TCT
+import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 
-unknownDef = EntityLoc (0,0) (0,0)
 
 printEnv :: (Text, Scheme)
 printEnv = ("print", 
-             let var = TCTVarType unknownDef "a" 
-             in Scheme (S.singleton "a") [TPrint var] 
-                       (TCTFunType unknownDef var (TCTVoidType unknownDef)))
+             let var = CoreVarType mempty "a" 
+             in Scheme (S.singleton "a")
+                       (CoreFunType mempty [TPrint var] [var] (CoreVoidType mempty)))
 
 isEmptyEnv :: (Text, Scheme)
 isEmptyEnv = ("isEmpty", 
-             let listType = TCTListType unknownDef (TCTVarType unknownDef "a")
-             in Scheme (S.singleton "a") [] 
-                       (TCTFunType unknownDef listType (TCTBoolType unknownDef)))
+             let listType = CoreListType mempty (CoreVarType mempty "a")
+             in Scheme (S.singleton "a") 
+                       (CoreFunType mempty [] [listType] (CoreBoolType mempty)))
 hdEnv :: (Text, Scheme)
-hdEnv = ("hd", Scheme (S.singleton "a") []
-                (TCTFunType unknownDef 
-                    (TCTListType unknownDef (TCTVarType unknownDef "a")) 
-                    (TCTVarType unknownDef "a")))
+hdEnv = ("hd", Scheme (S.singleton "a")
+                (CoreFunType mempty []
+                    [CoreListType mempty (CoreVarType mempty "a")]
+                    (CoreVarType mempty "a")))
 
 tlEnv :: (Text, Scheme)
-tlEnv = ("tl", Scheme (S.singleton "a") []
-                   (TCTFunType unknownDef
-                            (TCTListType unknownDef (TCTVarType unknownDef "a")) 
-                            (TCTListType unknownDef (TCTVarType unknownDef "a")))) 
+tlEnv = ("tl", Scheme (S.singleton "a") 
+                   (CoreFunType mempty []
+                            [CoreListType mempty (CoreVarType mempty "a")]
+                            (CoreListType mempty (CoreVarType mempty "a")))) 
 
 fstEnv :: (Text, Scheme)
-fstEnv = ("fst", Scheme (S.fromList ["a", "b"]) []
-                    (TCTFunType unknownDef 
-                        (TCTTupleType unknownDef (TCTVarType unknownDef "a") (TCTVarType unknownDef "b"))
-                        (TCTVarType unknownDef "a")))
+fstEnv = ("fst", Scheme (S.fromList ["a", "b"]) 
+                    (CoreFunType mempty []
+                        [CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b")]
+                        (CoreVarType mempty "a")))
 
 sndEnv :: (Text, Scheme)
-sndEnv = ("snd", Scheme (S.fromList ["a", "b"]) []
-                    (TCTFunType unknownDef 
-                        (TCTTupleType unknownDef (TCTVarType unknownDef "a") (TCTVarType unknownDef "b")) 
-                        (TCTVarType unknownDef "b"))) 
+sndEnv = ("snd", Scheme (S.fromList ["a", "b"]) 
+                    (CoreFunType mempty []
+                        [CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b")]
+                        (CoreVarType mempty "b"))) 
 
 initGamma :: TypeEnv 
-initGamma = TypeEnv . M.fromList . map (bimap (,Fun) (Global,)) $ 
+initGamma = TypeEnv . M.fromList . map (second (GlobalFun,)) $ 
                 [printEnv, isEmptyEnv, hdEnv, tlEnv, fstEnv, sndEnv]

@@ -10,3 +10,6 @@ wrapStateT to from st = do
     a <- st
     modify (from initialState)
     return a
+
+impossible :: a
+impossible = error "impossible happened!"

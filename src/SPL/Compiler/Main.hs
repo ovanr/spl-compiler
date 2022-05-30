@@ -24,7 +24,7 @@ import SPL.Compiler.Lexer.AlexLexGen (tokenize)
 import SPL.Compiler.Parser.ASTRunner
 import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
 
-import qualified SPL.Compiler.SemanticAnalysis.TCTPrettyPrint as TCTPP (PrettyPrint(..))
+import qualified SPL.Compiler.SemanticAnalysis.CorePrettyPrint as CorePP (PrettyPrint(..))
 import SPL.Compiler.SemanticAnalysis.SemanticAnalysis
 
 import SPL.Compiler.CodeGen.IRLang
@@ -60,7 +60,7 @@ runCompilerMain options = do
 
 liftEither = lift . ExceptT . pure
 
-compilerMain :: StateT Options (ExceptT Error IO) Text
+compilerMain :: StateT Options (ExceptT Text IO) Text
 compilerMain = do
     path' <- gets filePath
     content' <- gets fileContents
@@ -82,7 +82,7 @@ compilerMain = do
         else do
             tct <- lift $ performSemanticAnalysis noOptimization' ast path' source
             if typeCheckDump' then
-                liftEither . Right . TCTPP.toCode 0 $ tct
+                liftEither . Right . CorePP.toCode 0 $ tct
             else do
                 Some2 core <- liftEither $ performIRLangGen tct
                 if irLangDump' then

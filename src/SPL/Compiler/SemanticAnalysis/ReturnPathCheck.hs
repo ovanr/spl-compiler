@@ -5,32 +5,32 @@ module SPL.Compiler.SemanticAnalysis.ReturnPathCheck (
 import qualified Data.Text as T
 import SPL.Compiler.Common.Error (definition)
 
-import SPL.Compiler.SemanticAnalysis.TCT
-import SPL.Compiler.SemanticAnalysis.TCTEntityLocation
+import SPL.Compiler.SemanticAnalysis.Core
+import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
 
-returnPathCheck :: TCT -> TCMonad ()
-returnPathCheck (TCT _ funDecls) =
-    mapM_ (mapM_ returnPathCheck') funDecls
+returnPathCheck :: Core -> TCMonad ()
+returnPathCheck (Core _ funDecls) =
+    mapM_ returnPathCheck' funDecls
 
-returnPathCheck' :: TCTFunDecl -> TCMonad ()
-returnPathCheck' f@(TCTFunDecl loc (TCTIdentifier _ name) _ t _ (TCTFunBody _ _ stmts)) = do
+returnPathCheck' :: CoreFunDecl -> TCMonad ()
+returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ _ stmts)) = do
     if returnsVoid t || guaranteedReturn' stmts then
         return ()
     else do
         returnTrace <- definition (T.pack "The function '" <> name <> T.pack "' is not guaranteed to return a value.") f
         tcError returnTrace
     where
-        returnsVoid :: TCTType -> Bool
-        returnsVoid (TCTVoidType _) = True
-        returnsVoid (TCTFunType _ _ t) = returnsVoid t
+        returnsVoid :: CoreType -> Bool
+        returnsVoid (CoreVoidType _) = True
+        returnsVoid (CoreFunType _ _ _ t) = returnsVoid t
         returnsVoid _ = False
 
-        guaranteedReturn :: TCTStmt -> Bool
+        guaranteedReturn :: CoreStmt -> Bool
         guaranteedReturn (ReturnStmt _ _) = True 
         guaranteedReturn (WhileStmt _ (BoolExpr _ True) _) = True 
         guaranteedReturn (IfElseStmt _ _ thenStmts elseStmts) = guaranteedReturn' thenStmts && guaranteedReturn' elseStmts
         guaranteedReturn _ = False
 
-        guaranteedReturn' :: [TCTStmt] -> Bool
+        guaranteedReturn' :: [CoreStmt] -> Bool
         guaranteedReturn' = any guaranteedReturn
 

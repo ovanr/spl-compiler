@@ -11,12 +11,10 @@ import System.IO
 import Control.Lens
 
 import SPL.Compiler.Parser.AST (AST)
-import SPL.Compiler.SemanticAnalysis.TCT(TCT(..), Error, TypeCheckState(..), getWarnings)
-import SPL.Compiler.SemanticAnalysis.TreeTransformer (ast2tct)
+import SPL.Compiler.SemanticAnalysis.Core(Core(..), Error, TypeCheckState(..), getWarnings)
 import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (detectDuplicateFunctionNames)
 import SPL.Compiler.SemanticAnalysis.ConstantGlobalVar (globalVarConstantCheck)
-import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderTct)
-import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckTCT)
+import SPL.Compiler.SemanticAnalysis.TypeCheck (typeCheckToCore)
 import SPL.Compiler.SemanticAnalysis.ReturnPathCheck (returnPathCheck)
 import SPL.Compiler.SemanticAnalysis.ConstantFold (constantFold) 
 import Data.Functor (($>))
@@ -33,13 +31,12 @@ printTypeCheckWarnings warnings =
     let lines = T.init $ T.unlines $ map ("Warning: " <>) warnings
     in TIO.hPutStrLn stderr lines
 
-performSemanticAnalysis :: Bool -> AST -> FilePath -> [Text] -> (ExceptT Text IO) TCT
+performSemanticAnalysis :: Bool -> AST -> FilePath -> [Text] -> (ExceptT Text IO) Core
 performSemanticAnalysis noOptimization ast path source = do
     let tcState = TypeCheckState 0 mempty mempty mempty mempty path source
-    let initTCT = reorderTct . ast2tct $ ast
-    let typeCheck = detectDuplicateFunctionNames initTCT >> 
-                    globalVarConstantCheck initTCT >> 
-                    typeCheckTCT initTCT  >>=
+    let typeCheck = detectDuplicateFunctionNames ast >> 
+                    globalVarConstantCheck ast >> 
+                    typeCheckToCore ast >>=
                     (if noOptimization then pure else pure . constantFold) >>= 
                     (\r -> returnPathCheck r $> r)
     case runStateT typeCheck tcState of

@@ -1,49 +1,59 @@
+{-# LANGUAGE TemplateHaskell #-}
 module SPL.Compiler.Parser.AST where
 
 import SPL.Compiler.Lexer.AlexLexGen (AlexPosn(..), Token(..), SPLToken(..), Keyword(..), Type(..))
 import SPL.Compiler.Common.EntityLocation
 import Data.Text (Text)
+import Data.Graph (SCC(..))
 import qualified Data.Text as T
 import Control.Lens
 
-newtype AST = AST [ASTLeaf]
-
-data ASTLeaf = 
-        ASTVar ASTVarDecl
-    |   ASTFun ASTFunDecl
+data AST = 
+    ASTUnordered [Either ASTVarDecl ASTFunDecl]
+    | ASTOrdered [ASTVarDecl] [SCC ASTFunDecl]
 
 data ASTFunDecl = 
-    ASTFunDecl 
-        EntityLoc 
-        ASTIdentifier 
-        [ASTIdentifier] 
-        ASTType 
-        ASTFunBody
+    ASTFunDecl {
+        _funLoc :: EntityLoc,
+        _funId :: ASTIdentifier,
+        _funArgs :: [ASTIdentifier],
+        _funType :: ASTType,
+        _funBody :: ASTFunBody
+    }
     deriving (Eq, Show)
 
 data ASTVarDecl = ASTVarDecl EntityLoc ASTType ASTIdentifier ASTExpr
     deriving (Eq, Show)
 
-data ASTIdentifier = ASTIdentifier EntityLoc Text 
+data ASTIdentifier = ASTIdentifier { _idLoc :: EntityLoc, _idName :: Text }
     deriving (Eq, Show)
 
 data ASTFunBody = ASTFunBody EntityLoc [ASTVarDecl] [ASTStmt]
     deriving (Eq, Show)
 
-data ASTFunCall = ASTFunCall EntityLoc ASTIdentifier [ASTExpr]
+data ASTFunCall = ASTFunCall EntityLoc ASTExpr [ASTExpr]
     deriving (Eq, Show)
 
-data ASTFieldSelector = ASTFieldSelector EntityLoc ASTIdentifier [ASTField]
-    deriving (Eq, Show)
+data Field = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc 
 
-data ASTField = Hd EntityLoc | Tl EntityLoc | Fst EntityLoc | Snd EntityLoc 
-    deriving (Eq, Show)
+instance Eq Field where
+    (Hd _) == (Hd _) = True
+    (Tl _) == (Tl _) = True
+    (Fst _) == (Fst _) = True
+    (Snd _) == (Snd _) = True
+    _ == _ = False
+
+instance Show Field where
+    show (Hd _) = "hd"
+    show (Tl _) = "tl"
+    show (Fst _) = "fst"
+    show (Snd _) = "snd"
 
 data ASTStmt = 
         IfElseStmt EntityLoc ASTExpr [ASTStmt] [ASTStmt]
     |   WhileStmt EntityLoc ASTExpr [ASTStmt]
-    |   AssignStmt EntityLoc ASTFieldSelector ASTExpr
-    |   FunCallStmt EntityLoc ASTFunCall
+    |   AssignStmt EntityLoc ASTIdentifier [Field] ASTExpr
+    |   FunCallStmt ASTFunCall
     |   ReturnStmt EntityLoc (Maybe ASTExpr)  
     deriving (Eq, Show)
 
@@ -52,7 +62,8 @@ data ASTExpr =
     |   CharExpr EntityLoc Char
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall
-    |   FieldSelectExpr ASTFieldSelector
+    |   IdentifierExpr ASTIdentifier
+    |   FieldSelectExpr EntityLoc ASTExpr [Field]
     |   OpExpr EntityLoc OpUnary ASTExpr
     |   Op2Expr EntityLoc ASTExpr OpBin ASTExpr  
     |   EmptyListExpr EntityLoc
@@ -82,7 +93,7 @@ data OpBin =
 
 data ASTType =
         ASTUnknownType EntityLoc
-    |   ASTFunType EntityLoc [ASTType]
+    |   ASTFunType EntityLoc [ASTType] ASTType
     |   ASTTupleType EntityLoc ASTType ASTType
     |   ASTListType EntityLoc ASTType
     |   ASTVarType EntityLoc T.Text
@@ -91,3 +102,6 @@ data ASTType =
     |   ASTCharType EntityLoc 
     |   ASTVoidType EntityLoc 
     deriving (Eq, Show)
+
+makeLenses ''ASTFunDecl
+makeLenses ''ASTIdentifier

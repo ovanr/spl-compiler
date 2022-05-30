@@ -1,7 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 module SPL.Compiler.CodeGen.IRLangTConGen where
@@ -28,8 +27,8 @@ printString = map (PrintC . IRLit . IRChar)
 
 mkEqOrdFunDecl :: Identifier -> IRType a -> IRFunDecl '[a, a] Bool
 mkEqOrdFunDecl funName elemT =
-    let arg1 = Var "x" elemT Declared
-        arg2 = Var "y" elemT Declared
+    let arg1 = Var "x" elemT Local
+        arg2 = Var "y" elemT Local
     in IRFunDecl funName (arg1 :+: arg2 :+: HNil) IRBoolType
 
 mkEqFunDecl :: IRType a -> IRFunDecl '[a, a] Bool
@@ -40,30 +39,30 @@ mkOrdFunDecl elemT = mkEqOrdFunDecl (mkOrdFunName elemT) elemT
 
 mkPrintFunDecl :: IRType a -> IRFunDecl '[a] Unit
 mkPrintFunDecl elemT =
-    let arg1 = Var "x" elemT Declared
-        arg2 = Var "y" elemT Declared
+    let arg1 = Var "x" elemT Local
+        arg2 = Var "y" elemT Local
     in IRFunDecl (mkPrintFunName elemT) (arg1 :+: HNil) IRVoidType
 
 mkEqFunName :: IRType a -> Identifier
-mkEqFunName t = "0eq_tcon_" <> textifyType t
+mkEqFunName t = "_eq_tcon_" <> textifyType t
 
 mkOrdFunName :: IRType a -> Identifier
-mkOrdFunName t = "0ord_tcon_" <> textifyType t
+mkOrdFunName t = "_ord_tcon_" <> textifyType t
 
 mkPrintFunName :: IRType a -> Identifier
-mkPrintFunName t = "0print_tcon_" <> textifyType t
+mkPrintFunName t = "_print_tcon_" <> textifyType t
 
 textifyType :: IRType a -> Identifier
-textifyType IRIntType = "int"
-textifyType IRBoolType = "bool"
-textifyType IRCharType = "char"
-textifyType IRVoidType = "void"
-textifyType (IRUnknownType txt) = "unknown"
-textifyType (IRPtrType t) = "ptr_" <> textifyType t
-textifyType (IRListType t) = "list_" <> textifyType t
+textifyType IRIntType = "i"
+textifyType IRBoolType = "b"
+textifyType IRCharType = "c"
+textifyType IRVoidType = "v"
+textifyType (IRUnknownType txt) = "u"
+textifyType (IRPtrType t) = "ptr_" <> textifyType t <> "_"
+textifyType (IRListType t) = "list_" <> textifyType t <> "_"
 textifyType (IRFunType hl r) =
-    "fun_" <> T.intercalate "_" (hListMapToList textifyType hl) <> "_" <> textifyType r
-textifyType (IRTupleType a b) = "tup_" <> textifyType a <> "_" <> textifyType b
+    "fun_" <> T.intercalate "_" (hListMapToList textifyType hl) <> "_" <> textifyType r <> "_"
+textifyType (IRTupleType a b) = "tup_" <> textifyType a <> "_" <> textifyType b <> "_"
 
 instance GenTConFun Unit where
     genEqIRInstr t =
@@ -173,8 +172,8 @@ genListEqOrdIRInstr f t@(IRListType t1) = do
             tmp <- mkTmpVar IRBoolType
             body <>= [SetLabel whileStart]
 
-            Some1 isEmpty1'@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 (IRVar arg1)]
-            Some1 isEmpty2'@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 (IRVar arg2)]
+            Some1 isEmpty1'@(Var _ IRBoolType _) <- callFunByName "isEmpty" [Some1 (IRVar arg1)]
+            Some1 isEmpty2'@(Var _ IRBoolType _) <- callFunByName "isEmpty" [Some1 (IRVar arg2)]
 
             let isEmpty1 = IRVar isEmpty1'
                 isEmpty2 = IRVar isEmpty2'
@@ -182,17 +181,17 @@ genListEqOrdIRInstr f t@(IRListType t1) = do
             body <>= [Not tmp isEmpty1, And tmp (IRVar tmp) isEmpty2, BrTrue (IRVar tmp) end]
             body <>= [Not tmp isEmpty2, And tmp isEmpty1 (IRVar tmp), BrTrue (IRVar tmp) end]
 
-            Some1 hd1 <- callFunWith "hd" [Some1 (IRVar arg1)]
+            Some1 hd1 <- callFunByName "hd" [Some1 (IRVar arg1)]
             hd1' <- castVar hd1 t1
-            Some1 hd2 <- callFunWith "hd" [Some1 (IRVar arg2)]
+            Some1 hd2 <- callFunByName "hd" [Some1 (IRVar arg2)]
             hd2' <- castVar hd2 t1
 
             body <>= [Call result (IRLit $ IRFun innerFunDecl1) (IRVar hd1' :+: IRVar hd2' :+: HNil)]
             body <>= [BrFalse (IRVar result) end]
 
-            Some1 tl1 <- callFunWith "tl" [Some1 (IRVar arg1)]
+            Some1 tl1 <- callFunByName "tl" [Some1 (IRVar arg1)]
             tl1' <- castVar tl1 t
-            Some1 tl2 <- callFunWith "tl" [Some1 (IRVar arg2)]
+            Some1 tl2 <- callFunByName "tl" [Some1 (IRVar arg2)]
             tl2' <- castVar tl1 t
 
             body <>= [StoreV arg1 (IRVar tl1'), StoreV arg2 (IRVar tl2')]
@@ -220,18 +219,18 @@ instance GenTConFun a => GenTConFun (Ptr [a]) where
 
             body <>= [SetLabel whileStart]
 
-            Some1 isEmpty@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 $ IRVar arg]
+            Some1 isEmpty@(Var _ IRBoolType _) <- callFunByName "isEmpty" [Some1 $ IRVar arg]
 
             body <>= [BrTrue (IRVar isEmpty) end]
 
-            Some1 hd <- callFunWith "hd" [Some1 $ IRVar arg]
+            Some1 hd <- callFunByName "hd" [Some1 $ IRVar arg]
             hd' <- castVar hd t1
 
             body <>= [Call voidVar (IRLit $ IRFun innerFunDecl1) (IRVar hd' :+: HNil)]
 
-            Some1 tl <- callFunWith "tl" [Some1 $ IRVar arg]
+            Some1 tl <- callFunByName "tl" [Some1 $ IRVar arg]
 
-            Some1 isEmpty@(Var _ IRBoolType _) <- callFunWith "isEmpty" [Some1 $ IRVar tl]
+            Some1 isEmpty@(Var _ IRBoolType _) <- callFunByName "isEmpty" [Some1 $ IRVar tl]
             body <>= [BrTrue (IRVar isEmpty) end]
             body <>= printString " "
 
@@ -256,17 +255,17 @@ genTupEqOrdIRInstr f t@(IRTupleType t1 t2) = do
         result <- mkTmpVar IRBoolType
         body <>= [StoreV result (IRLit $ IRBool True)]
 
-        Some1 fst1 <- callFunWith "fst" [Some1 $ IRVar arg1]
+        Some1 fst1 <- callFunByName "fst" [Some1 $ IRVar arg1]
         fst1' <- castVar fst1 t1
-        Some1 fst2 <- callFunWith "fst" [Some1 $ IRVar arg2]
+        Some1 fst2 <- callFunByName "fst" [Some1 $ IRVar arg2]
         fst2' <- castVar fst2 t1
 
         body <>= [Call result (IRLit $ IRFun innerFunDecl1) (IRVar fst1' :+: IRVar fst2' :+: HNil)]
         body <>= [BrFalse (IRVar result) end]
 
-        Some1 snd1 <- callFunWith "snd" [Some1 $ IRVar arg1]
+        Some1 snd1 <- callFunByName "snd" [Some1 $ IRVar arg1]
         snd1' <- castVar snd1 t2
-        Some1 snd2 <- callFunWith "snd" [Some1 $ IRVar arg2]
+        Some1 snd2 <- callFunByName "snd" [Some1 $ IRVar arg2]
         snd2' <- castVar snd2 t2
 
         body <>= [Call result (IRLit $ IRFun innerFunDecl2) (IRVar snd1' :+: IRVar snd2' :+: HNil)]
@@ -286,7 +285,7 @@ instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
             innerFunDecl2 = mkPrintFunDecl t2
         funBody <- declareBodyAs $ do
             body <>= printString "("
-            Some1 fst <- callFunWith "fst" [Some1 $ IRVar arg]
+            Some1 fst <- callFunByName "fst" [Some1 $ IRVar arg]
             fst'@(Var _ fstT _)  <- castVar fst t1
 
             voidVar <- getVoidVar
@@ -294,7 +293,7 @@ instance (GenTConFun a, GenTConFun b) => GenTConFun (Ptr (a,b)) where
 
             body <>= printString ","
 
-            Some1 snd <- callFunWith "snd" [Some1 $ IRVar arg]
+            Some1 snd <- callFunByName "snd" [Some1 $ IRVar arg]
             snd'@(Var _ sndT _) <- castVar snd t2
             body <>= [Call voidVar (IRLit $ IRFun innerFunDecl2) (IRVar snd' :+: HNil)]
 
@@ -360,12 +359,15 @@ genAllOrdFunDeclRec = genAllFunDeclRec (fmap (first Some1) . genOrdIRInstr)
 genAllPrintFunDeclRec :: GenTConFun a => IRType a -> IRMonad (Some1 IRFunDecl', [Some1 IRFunDef])
 genAllPrintFunDeclRec = genAllFunDeclRec (fmap (first Some1) . genPrintIRInstr)
 
-solveFunDeclConstraints :: IRFunDecl xs r -> IRMonad ([Some1 IRFunDecl'], [Some1 IRFunDef])
-solveFunDeclConstraints (IRFunDecl _ args _) = do
-    foldl (<>) mempty <$> forM (hListToList args) (\(Some1 (Var id (IRFunType (varT :+: _) _) _)) -> do
-        Constrained varT' <- toConstrained varT
-        if | T.isPrefixOf "0eq_con" id -> first pure <$> genAllEqFunDeclRec varT
-           | T.isPrefixOf "0ord_con" id -> first pure <$> genAllOrdFunDeclRec varT
-           | T.isPrefixOf "0print_con" id -> first pure <$> genAllPrintFunDeclRec varT
-           | otherwise -> pure mempty
-        )
+solveTConConstraint :: Some1 TCon -> IRMonad [Some1 IRFunDef]
+solveTConConstraint (Some1 tcon) = do
+    case tcon of
+        TEq varT -> do
+            Constrained varT' <- toConstrained varT
+            snd <$> genAllEqFunDeclRec varT
+        TOrd varT -> do
+            Constrained varT' <- toConstrained varT
+            snd <$> genAllOrdFunDeclRec varT
+        TPrint varT -> do
+            Constrained varT' <- toConstrained varT
+            snd <$> genAllPrintFunDeclRec varT
