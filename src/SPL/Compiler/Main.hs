@@ -27,12 +27,12 @@ import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
 import qualified SPL.Compiler.SemanticAnalysis.CorePrettyPrint as CorePP (PrettyPrint(..))
 import SPL.Compiler.SemanticAnalysis.SemanticAnalysis
 
-import SPL.Compiler.CodeGen.IRLang
-import SPL.Compiler.CodeGen.IRLangGen
-import SPL.Compiler.CodeGen.IRLangGenLib
-import SPL.Compiler.CodeGen.IRLangPrinter
+-- import SPL.Compiler.CodeGen.IRLang
+-- import SPL.Compiler.CodeGen.IRLangGen
+-- import SPL.Compiler.CodeGen.IRLangGenLib
+-- import SPL.Compiler.CodeGen.IRLangPrinter
 
-import SPL.Compiler.CodeGen.Backend.SSMGen
+-- import SPL.Compiler.CodeGen.Backend.SSMGen
 
 data Options = Options {
     filePath :: FilePath,
@@ -84,12 +84,13 @@ compilerMain = do
             if typeCheckDump' then
                 liftEither . Right . CorePP.toCode 0 $ tct
             else do
-                Some2 core <- liftEither $ performIRLangGen tct
-                if irLangDump' then
-                    liftEither . Right $ showCL 0 core
-                else do
-                    if emitSSM' then do
-                        ssm <- liftEither $ produceSSM core
-                        pure $ T.unlines ssm
-                    else
-                        liftEither $ Left "Not implemented"
+                undefined
+                -- Some2 core <- liftEither $ performIRLangGen tct
+                -- if irLangDump' then
+                --     liftEither . Right $ showCL 0 core
+                -- else do
+                --     if emitSSM' then do
+                --         ssm <- liftEither $ produceSSM core
+                --         pure $ T.unlines ssm
+                --     else
+                --         liftEither $ Left "Not implemented"

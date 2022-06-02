@@ -22,15 +22,13 @@ import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
-import SPL.Compiler.Common.Misc (wrapStateT)
+import SPL.Compiler.Common.Misc (wrapStateT, impossible)
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderAst)
-import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
-import Debug.Trace
 
 
 typeCheckExpr :: AST.ASTExpr -> CoreType -> TCMonad CoreExpr
@@ -53,7 +51,7 @@ typeCheckExpr (AST.EmptyListExpr loc) tau = do
 typeCheckExpr (AST.IdentifierExpr id) tau = do
     (id', scheme) <- typeCheckVar id tau
     case scheme of
-        GlobalFun -> return (FunIdentifierExpr id')
+        GlobalFun -> return (FunIdentifierExpr tau id')
         _ -> return (VarIdentifierExpr id')
 typeCheckExpr (AST.FunCallExpr f) tau = do
     f' <- typeCheckFunCall f tau
@@ -103,46 +101,42 @@ typeCheckExpr e@(AST.Op2Expr loc e1 op e2) tau =
 
     where
         handleIntOp = do
-            e1' <- typeCheckExpr e1 (CoreIntType (getLoc e1))
-            e2' <- typeCheckExpr e2 (CoreIntType (getLoc e2))
+            let e1T = CoreIntType (getLoc e1)
+                e2T = CoreIntType (getLoc e2)
+            e1' <- typeCheckExpr e1 e1T
+            e2' <- typeCheckExpr e2 e2T
             let expectedType = CoreIntType loc
             unify expectedType tau
-            return $ Op2Expr loc e1' op e2'
+            return $ Op2Expr loc e1' e1T op e2' e2T
 
         handleBoolOp = do
-            e1' <- typeCheckExpr e1 (CoreBoolType (getLoc e1))
-            e2' <- typeCheckExpr e2 (CoreBoolType (getLoc e2))
+            let e1T = CoreBoolType (getLoc e1)
+                e2T = CoreBoolType (getLoc e2)
+            e1' <- typeCheckExpr e1 e1T
+            e2' <- typeCheckExpr e2 e2T
             let expectedType = CoreBoolType loc
             unify expectedType tau
-            return $ Op2Expr loc e1' op e2'
+            return $ Op2Expr loc e1' e1T op e2' e2T
 
         handleConsOp = do
             c <- freshVar (getLoc e1) "c"
             e1' <- typeCheckExpr e1 c
-            e2' <- typeCheckExpr e2 (CoreListType (getLoc e2) c)
+
+            let e2T = CoreListType (getLoc e2) c
+            e2' <- typeCheckExpr e2 e2T
+
             let expectedType = CoreListType (getLoc e) c
             unify expectedType tau
-            return $ Op2Expr loc e1' op e2'
+            return $ Op2Expr loc e1' c op e2' e2T
 
         handleOverloadedOp = do
             o <- freshVar (getLoc e1) "o"
             e1' <- typeCheckExpr e1 o
             e2' <- typeCheckExpr e2 o
-            let constraint =
-                    case op of
-                        Equal -> TEq o
-                        Nequal -> TEq o
-                        Less -> TOrd o
-                        Greater -> TOrd o
-                        LessEq -> TOrd o
-                        GreaterEq -> TOrd o
-                        _ -> error "impossible"
             let expectedType = CoreBoolType loc
-            tauSubst <- unify expectedType tau
+            unify expectedType tau
 
-            getTCons <>= S.singleton constraint
-
-            pure $ Op2Expr loc e1' op e2'
+            pure $ Op2Expr loc e1' o op e2' o
 
 typeCheckVar :: AST.ASTIdentifier -> CoreType -> TCMonad (CoreIdentifier, Scope)
 typeCheckVar (AST.ASTIdentifier l idName) tau = do
@@ -152,8 +146,7 @@ typeCheckVar (AST.ASTIdentifier l idName) tau = do
     case value of
         Just (scope, sch) -> do
             (instScheme, _) <- instantiate sch
-            let instScheme' = updateTCon (setLoc (getLoc tau) $ getTCon instScheme) instScheme  
-            unify instScheme'  tau
+            unify instScheme  tau
             return (CoreIdentifier l idName, scope)
         Nothing -> variableNotFoundErr (CoreIdentifier l idName)
 
@@ -165,9 +158,7 @@ typeCheckFunCall (AST.ASTFunCall loc e args) tau = do
     e' <- typeCheckExpr e a
 
     subst <- use getSubst
-    let tcons = getTCon (subst $* a)
-    let expectedFunType = CoreFunType loc tcons argTypes tau
-    getTCons <>= S.fromList tcons
+    let expectedFunType = CoreFunType loc argTypes tau
     unify a expectedFunType
 
     return $ CoreFunCall loc e' expectedFunType args'
@@ -197,7 +188,7 @@ typeCheckFieldSelector id fields tau = do
             typeCheckVar (toVar field) expectedType
 
             resultType <- freshVar (getLoc id) "f"
-            let actualType = CoreFunType (getLoc field) [] [argType] resultType
+            let actualType = CoreFunType (getLoc field) [argType] resultType
 
             unify expectedType actualType
             return resultType
@@ -252,23 +243,14 @@ typeCheckFunDecl :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args tau body) abstractType = do
     initEnv <- (\(TypeEnv env) -> TypeEnv (M.delete idName env)) <$> use getEnv
 
-    let CoreFunType _ mempty argTypes retType = abstractType
+    let CoreFunType _ argTypes retType = abstractType
     addArgsToEnv (zip argTypes args')
 
-    getTCons .= S.empty
     body' <- do { b <- typeCheckFunBody body retType;
                   subst <- use getSubst;
                   adjustForMissingReturn abstractType b }
 
-    tcons <- use getTCons
     subst <- use getSubst
-
-    mapM_ sanityCheckTCon tcons
-    mapM_ (ambiguousTConCheck initEnv abstractType) tcons
-
-    let freeTCons = getFreeTCons (freeVars (subst $* abstractType) `S.difference` freeVars initEnv)
-                                 (S.toList tcons)
-
 
     case ast2coreType tau of
         Nothing -> pure ()
@@ -279,7 +261,7 @@ typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args 
 
     return $ CoreFunDecl loc (CoreIdentifier idLoc idName)
                              args'
-                             (updateTCon freeTCons abstractType)
+                             abstractType
                              body'
 
     where
@@ -287,21 +269,19 @@ typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args 
 
 sandBoxedTypeCheckFun :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 sandBoxedTypeCheckFun fun funType = do
-    getTCons .= mempty
     envBefore <- use getEnv
     fun' <- typeCheckFunDecl fun funType
     getEnv .= envBefore
-    getTCons .= mempty
     pure fun'
 
-typeCheckFunDecls :: SCC AST.ASTFunDecl -> TCMonad [CoreFunDecl]
+typeCheckFunDecls :: SCC AST.ASTFunDecl -> TCMonad (SCC CoreFunDecl)
 typeCheckFunDecls (AcyclicSCC func) = do
     funType <- makeAbstractFunType func
     func'@(CoreFunDecl _ _ _ t _ ) <- sandBoxedTypeCheckFun func funType
 
     scheme <- generalise t
     addToEnv GlobalFun (func' ^. funId.idName) scheme
-    pure [func']
+    pure (AcyclicSCC func')
 
 typeCheckFunDecls (CyclicSCC funcs) = do
     initEnv <- use getEnv
@@ -311,37 +291,11 @@ typeCheckFunDecls (CyclicSCC funcs) = do
 
     funcs' <- zipWithM sandBoxedTypeCheckFun funcs funTypes
 
-    getEnv .= initEnv
-
-    -- 1st pass
-    forM_ funcs' $
+    CyclicSCC <$> forM funcs' (
         \f@(CoreFunDecl _ (CoreIdentifier _ id) _ t _) -> do
             scheme <- generalise t
             addToEnv GlobalFun id scheme
-
-    -- Recursive functions that are overloaded need to be type-checked 3x times:
-    -- TODO: this must be optimized
-    -- 1st pass: environment does not store type constraints 
-    -- 2nd pass: environment stores type constraints derived from own body
-    -- 3rd pass: environment stores type constraints derived from mut.recursive functions as well
-    if any isFunctionOverloaded funcs' then do
-        -- 2nd pass
-        funcs'' <- zipWithM sandBoxedTypeCheckFun funcs funTypes
-        forM_ funcs'' $
-            \f@(CoreFunDecl _ (CoreIdentifier _ id) _ t _) -> do
-                scheme <- generalise t
-                addToEnv GlobalFun id scheme
-                pure f
-
-        -- 3rd pass
-        funcs''' <- zipWithM sandBoxedTypeCheckFun funcs funTypes
-        forM funcs''' $
-            \f@(CoreFunDecl _ (CoreIdentifier _ id) _ t _) -> do
-                scheme <- generalise t
-                addToEnv GlobalFun id scheme
-                pure f
-    else
-        pure funcs'
+            pure f)
 
     where
         toIdentifier :: AST.ASTFunDecl -> CoreIdentifier
@@ -371,10 +325,10 @@ typeCheckToCore ast = do
     let (AST.ASTOrdered varDecls funDecls) = reorderAst ast
     getEnv .= initGamma
     varDecls' <- mapM typeCheckGlobVarDecl varDecls
-    funDecls' <- concat <$> mapM typeCheckFunDecls funDecls
+    funDecls' <- mapM typeCheckFunDecls funDecls
 
     subst <- use getSubst
-    let tct' = Core (subst $* varDecls') (subst $* funDecls')
+    let tct' = Core (subst $* varDecls') (map (fmap (subst $*)) funDecls')
 
     sanityCheck tct'
     pure tct'
@@ -391,10 +345,8 @@ sanityCheck (Core varDecls funDecls) = do
                 "found in type " <> T.pack (show t) <> ":") t
             >>= tcError
 
-    if isJust main then do
-        let (Just main') = main
-        forM_ (main' ^. funType & getTCon) (tconError >=> tcError)
-    else
+    when (isNothing main) $
         throwWarning "No 'main' function found. Program will not execute"
+
     where
-        main = L.find (\f -> f ^. funId.idName == "main") funDecls
+        main = mapM (^? traversed.funId.idName.filtered (== "main")) funDecls

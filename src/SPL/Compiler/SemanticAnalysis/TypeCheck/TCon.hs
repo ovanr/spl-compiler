@@ -1,87 +1,94 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module SPL.Compiler.SemanticAnalysis.TypeCheck.TCon where
 
-import SPL.Compiler.Common.Error
-import Data.Maybe (fromMaybe)
-import Control.Lens
-import Control.Monad.State
-import Data.Hashable
-import Data.Set (Set)
-import qualified Data.List as L
 import qualified Data.Map as M
-import qualified Data.Text as T
-import qualified Data.Set as S
-import qualified Data.Set.Ordered as SO
-import Data.Foldable (toList)
+import Data.Text (Text)
+import Data.Graph
+import Data.Map
+import Control.Monad.State
+import Control.Lens
 
-import SPL.Compiler.SemanticAnalysis.Core
+import SPL.Compiler.SemanticAnalysis.Core hiding (getSourceCode, getSourcePath, _getSourcePath, _getSourceCode)
+import SPL.Compiler.Common.Error
 import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
-import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
-import Control.Monad.Extra (unlessM)
-import Debug.Trace
 
-getTCon :: CoreType -> [TCon]
-getTCon (CoreFunType _ x _ _) = x
-getTCon _ = []
+data TConState = TConState {
+    _env :: Map Text [TCon],
+    _newTCon :: [TCon],
+    _getSourcePath :: FilePath,
+    _getSourceCode :: [Text]
+}
 
-getFreeTCons :: Set TypeVar -> [TCon] -> [TCon]
-getFreeTCons freeTV = filter (not . S.null . S.intersection freeTV . freeVars . unTCon)
+makeLenses 'TConState
 
-updateTCon :: [TCon] -> CoreType -> CoreType
-updateTCon tcons (CoreFunType loc _ as r) = CoreFunType loc tcons as r
-updateTCon _ t = t
+instance ContainsSource TConState where
+    getFilePath = _getSourcePath
+    getSource = _getSourceCode
 
-sanityCheckTCon :: TCon -> TCMonad ()
-sanityCheckTCon tcon = do 
-    subst <- use getSubst 
-    sanityCheckTCon' (subst $* tcon)
+type TConMonad a = StateT TConState (Either Error) a
 
-    where
-        sanityCheckTCon' t@(TEq CoreFunType{}) = tconError t >>= tcError
-        sanityCheckTCon' t@(TOrd CoreFunType{}) = tconError t >>= tcError
-        sanityCheckTCon' t@(TPrint CoreFunType{}) = tconError t >>= tcError
-        sanityCheckTCon' _ = pure ()
+genTConCore :: Core -> TConMonad Core
+genTConCore (Core varDecls funDecls) = do 
+    funDecls' <- mapM genTConFunDecls funDecls
+    pure $ Core varDecls funDecls'
 
-ambiguousTConCheck :: TypeEnv -> CoreType -> TCon -> TCMonad ()
-ambiguousTConCheck env t tcon = do
-    subst <- use getSubst
-    let freeTV = freeVars (subst $* t) <> freeVars env
-    
-    unless (all (`S.member` freeTV) $ freeVars tcon) $
-        tconError tcon >>= tcError
+genTConFunDecls :: SCC CoreFunDecl -> TConMonad (SCC CoreFunDecl)
+genTConFunDecls (AcyclicSCC fun) = _wb
+genTConFunDecls (CyclicSCC funDecls) = _wc
 
+-- genTConFunDecl :: CoreFunDecl -> TCMonad CoreFunDecl
+-- genTConFunDecl (CoreFunDecl lf id args t (CoreFunBody lb vs sts)) = _wd
 
-isConcreteTCon :: TCon -> Bool
-isConcreteTCon (TEq t) = isConcreteType t
-isConcreteTCon (TOrd t) = isConcreteType t
-isConcreteTCon (TPrint t) = isConcreteType t
+-- -- funTCons :: Text -> CoreType -> TCMonad [TCon]
+-- -- funTCons id instanceT = do
+-- --     TypeEnv env <- use getEnv
+-- --     case M.lookup id env of
+-- --         Nothing -> pure []
+-- --         Just (_, Scheme _ generalT) -> do
+-- --             unify instanceT (unwrap (length tcons) generalT)
+-- --             subst <- use getSubst
+-- --             pure (subst $* tcons)
+            
+-- --     where
+-- --         unwrap 0 t = t
+-- --         unwrap n (CoreFunType l _ r) = unwrap (n-1) r
+-- --         unwrap n t = t
 
-mkTConFunDecl :: TCon -> CoreFunDecl
-mkTConFunDecl tcon@(TEq t) =
-    let funName = CoreIdentifier mempty $ "_eq_" <> T.pack (show $ hash tcon)
-        funType = CoreFunType mempty [] [t, t] (CoreBoolType mempty)
-        args = [CoreIdentifier mempty "x", CoreIdentifier mempty "y"]
-    in CoreFunDecl mempty funName args funType (CoreFunBody mempty [] [])
+-- -- mkEqOrOrdType :: CoreType -> CoreType
+-- -- mkEqOrOrdType t = CoreFunType mempty [t, t] (CoreBoolType mempty)
 
-mkTConFunDecl tcon@(TOrd t) =
-    let funName = CoreIdentifier mempty $ "_ord_" <> T.pack (show $ hash tcon)
-        funType = CoreFunType mempty [] [t, t] (CoreBoolType mempty)
-        args = [CoreIdentifier mempty "x", CoreIdentifier mempty "y"]
-    in CoreFunDecl mempty funName args funType (CoreFunBody mempty [] [])
+-- -- resolveTCons :: TCon -> (CoreExpr, CoreType) 
+-- -- resolveTCons (TEq CoreVoidType{}) = do 
+-- --     let funType = CoreFunType mempty [CoreVoidType mempty, CoreVoidType mempty] (CoreBoolType mempty)
+-- --     (FunIdentifierExpr funType (CoreIdentifier mempty "_eq_void"), funType)
+-- -- resolveTCons (TEq (CoreListType l t)) = do 
+-- --     let funType = CoreFunType mempty [CoreVoidType mempty, CoreVoidType mempty] (CoreBoolType mempty)
+-- --     (FunIdentifierExpr funType (CoreIdentifier mempty "_eq_void"), funType)
 
-mkTConFunDecl tcon@(TPrint t) =
-    let funName = CoreIdentifier mempty $ "_print_" <> T.pack (show $ hash tcon)
-        funType = CoreFunType mempty [] [t] (CoreVoidType mempty)
-        args = [CoreIdentifier mempty "x"]
-    in CoreFunDecl mempty funName args funType (CoreFunBody mempty [] [])
+-- -- genTConExpr :: CoreExpr -> TCMonad CoreExpr
+-- -- genTConExpr (FunCallExpr fc) = FunCallExpr <$> genTConFunCall fc
+-- -- genTConExpr e@(FunIdentifierExpr typ (CoreIdentifier loc id)) = do
+-- --     tcons <- funTCons id typ
+-- --     (tConsArgs, tConsTypes) <- resolveTCons tcons
+-- --     pure $ FunCallExpr (CoreFunCall loc e (updateType tConsTypes typ) tConsArgs)
+-- -- genTConExpr (OpExpr loc op e) = OpExpr loc op <$> genTConExpr e
+-- -- genTConExpr (Op2Expr loc e1 _ _ e2 _) = _ -- op2expr needs to store type of e1 and e2
+-- -- genTConExpr (TupExpr loc e1 e2) = TupExpr loc <$> genTConExpr e1 <*> genTConExpr e2
+-- -- genTConExpr e = pure e
 
-tconError :: TCon -> TCMonad Error
-tconError tcon = do
-    let header = T.pack $ "Unable to find an instance for " <> show tcon
-    err <- definition (T.pack $ "'" <>
-                       show tcon <>
-                       "' instance has been inferred for: ") tcon
-    return $ header : err
+-- genTConFunCall :: CoreFunCall -> TCMonad CoreFunCall
+-- genTConFunCall (CoreFunCall loc e t args) = 
+--     CoreFunCall loc <$> genTConExpr e <*> pure t <*> mapM genTConExpr args
 
-isFunctionOverloaded :: CoreFunDecl -> Bool
-isFunctionOverloaded (CoreFunDecl _ _ _ t _) = not $ null (getTCon t)
+-- genTConStmt :: CoreStmt -> TCMonad CoreStmt
+-- genTConStmt (IfElseStmt loc e taken ntaken) = 
+--     IfElseStmt loc <$> genTConExpr e <*> mapM genTConStmt taken <*> mapM genTConStmt ntaken
+-- genTConStmt (WhileStmt loc e taken) =
+--     WhileStmt loc <$> genTConExpr e <*> mapM genTConStmt taken
+-- genTConStmt (AssignStmt loc id t fds e) = 
+--     AssignStmt loc id t fds <$> genTConExpr e
+-- genTConStmt (FunCallStmt funCall) =
+--     FunCallStmt <$> genTConFunCall funCall 
+-- genTConStmt stmt@(ReturnStmt _ Nothing) = pure stmt
+-- genTConStmt stmt@(ReturnStmt loc (Just e)) =
+--     ReturnStmt loc . Just <$> genTConExpr e

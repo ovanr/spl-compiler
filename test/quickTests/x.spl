@@ -1,8 +1,14 @@
 
-/* /* hello */ */
+apply (f, x) :: (a -> a) a -> a {
+    return f(x);
+}
+
+id (x) :: a -> a {
+    return x;
+}
+
 main() {
-    var x = ((1,2), (3 * 8,[4,3,4,5]));
-    x.snd.snd = [];
-    print(x);
+    a f = id;
+    var x = (id(main))();
     return;
 }

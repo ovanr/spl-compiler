@@ -9,7 +9,7 @@ import qualified Data.List as L
 constantFold :: Core -> Core
 constantFold (Core varDecls funDecls) = 
     Core (map optimizeVarDecl varDecls)
-        (map optimizeFunDecl funDecls)
+         (map (fmap optimizeFunDecl) funDecls)
 
 optimizeVarDecl :: CoreVarDecl -> CoreVarDecl
 optimizeVarDecl (CoreVarDecl l t id e) = CoreVarDecl l t id (optimizeExpr e)
@@ -46,7 +46,7 @@ elimUnreachableStmt xs =
         isReturn _ = False
 
 optimizeExpr :: CoreExpr -> CoreExpr
-optimizeExpr e@(Op2Expr l e1 op e2) =
+optimizeExpr e@(Op2Expr l e1 t1 op e2 t2) =
     case (optimizeExpr e1, optimizeExpr e2, op) of
         (IntExpr _ i1, IntExpr _ i2, _) -> evaluateI l i1 op i2
         (CharExpr _ b1, CharExpr _ b2, _) -> evaluateC l b1 op b2
@@ -55,7 +55,7 @@ optimizeExpr e@(Op2Expr l e1 op e2) =
         (eb@(BoolExpr _ False), _, LogAnd) -> eb
         (VarIdentifierExpr f1, VarIdentifierExpr f2, Equal) | f1 == f2 -> BoolExpr l True
         (VarIdentifierExpr f1, VarIdentifierExpr f2, Nequal) | f1 == f2 -> BoolExpr l False
-        (e1', e2', _) -> Op2Expr l e1' op e2'
+        (e1', e2', _) -> Op2Expr l e1' t1 op e2' t2
 
 optimizeExpr (OpExpr l op1 e) =
     case (optimizeExpr e, op1) of

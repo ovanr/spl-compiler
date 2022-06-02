@@ -7,10 +7,14 @@ import SPL.Compiler.Common.Error (definition)
 
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
+import Data.Graph
 
 returnPathCheck :: Core -> TCMonad ()
 returnPathCheck (Core _ funDecls) =
-    mapM_ returnPathCheck' funDecls
+    mapM_ (mapM_ returnPathCheck'. unSCC) funDecls
+    where
+        unSCC (AcyclicSCC x) = [x]
+        unSCC (CyclicSCC xs) = xs
 
 returnPathCheck' :: CoreFunDecl -> TCMonad ()
 returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ _ stmts)) = do
@@ -22,7 +26,7 @@ returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ _
     where
         returnsVoid :: CoreType -> Bool
         returnsVoid (CoreVoidType _) = True
-        returnsVoid (CoreFunType _ _ _ t) = returnsVoid t
+        returnsVoid (CoreFunType _ _ t) = returnsVoid t
         returnsVoid _ = False
 
         guaranteedReturn :: CoreStmt -> Bool

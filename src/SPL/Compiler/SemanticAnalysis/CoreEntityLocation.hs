@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 module SPL.Compiler.SemanticAnalysis.CoreEntityLocation where
 
@@ -27,20 +26,20 @@ instance Locatable CoreExpr where
     setLoc l (CharExpr _ c) = CharExpr l c
     setLoc l (BoolExpr _ b) = BoolExpr l b
     setLoc l (VarIdentifierExpr b) = VarIdentifierExpr (setLoc l b)
-    setLoc l (FunIdentifierExpr b) = FunIdentifierExpr (setLoc l b)
+    setLoc l (FunIdentifierExpr t b) = FunIdentifierExpr t (setLoc l b)
     setLoc l (FunCallExpr f) = FunCallExpr (setLoc l f)
     setLoc l (OpExpr _ o a) = OpExpr l o a 
-    setLoc l (Op2Expr _ o a b) = Op2Expr l o a b
+    setLoc l (Op2Expr _ e1 t1 op e2 t2) = Op2Expr l e1 t1 op e2 t2
     setLoc l (EmptyListExpr _ t) = EmptyListExpr l t
     setLoc l (TupExpr _ a b) = TupExpr l a b
     getLoc (IntExpr l _) = l
     getLoc (CharExpr l _) = l
     getLoc (BoolExpr l _) = l
     getLoc (VarIdentifierExpr i) = getLoc i
-    getLoc (FunIdentifierExpr i) = getLoc i
+    getLoc (FunIdentifierExpr i t) = getLoc i
     getLoc (FunCallExpr f) = getLoc f
     getLoc (OpExpr l _ _) = l 
-    getLoc (Op2Expr l _ _ _) = l  
+    getLoc (Op2Expr l _ _ _ _ _) = l  
     getLoc (EmptyListExpr l _) = l
     getLoc (TupExpr l _ _) = l
 
@@ -57,7 +56,7 @@ instance Locatable CoreStmt where
     getLoc (ReturnStmt l _) = l
     
 instance Locatable CoreType where
-    setLoc l (CoreFunType _ c a b) = CoreFunType l c a b
+    setLoc l (CoreFunType _ a b) = CoreFunType l a b
     setLoc l (CoreTupleType _ a b) = CoreTupleType l a b
     setLoc l (CoreListType _ x) = CoreListType l x
     setLoc l (CoreVarType _ x) = CoreVarType l x
@@ -65,7 +64,7 @@ instance Locatable CoreType where
     setLoc l (CoreBoolType _) = CoreBoolType l
     setLoc l (CoreCharType _) = CoreCharType l
     setLoc l (CoreVoidType _) = CoreVoidType l 
-    getLoc (CoreFunType l _ _ _) = l
+    getLoc (CoreFunType l _ _) = l
     getLoc (CoreTupleType l _ _) = l
     getLoc (CoreListType l _) = l
     getLoc (CoreVarType l _) = l

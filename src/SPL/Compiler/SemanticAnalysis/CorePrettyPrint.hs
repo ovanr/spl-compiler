@@ -21,6 +21,7 @@ import Data.List (intercalate)
 import Data.Text (Text)
 import Data.Set (Set)
 import qualified Data.Text as T
+import Data.Graph
 
 mkIdent :: Int -> Text
 mkIdent n = foldl (<>) "" $ replicate n "   "
@@ -33,11 +34,20 @@ instance PrettyPrint Core where
         T.unlines .
         (\xs -> if null xs then xs else init xs) .
         concatMap (\i -> [i, mempty]) $
-        map (toCode 0) varDecls <> map (toCode 0) funDecls
+        map (toCode 0) varDecls <> concatMap (map (toCode 0) . unSCC) funDecls
+        where
+            unSCC (AcyclicSCC x) = [x]
+            unSCC (CyclicSCC xs) = xs
 
 instance PrettyPrint CoreVarDecl where
     toCode n (CoreVarDecl _ t id expr) =
         mkIdent n <> toCode n t <> " " <> toCode n id <> " = " <> toCode n expr <> ";"
+
+instance PrettyPrint [TCon] where
+    toCode n [] = ""
+    toCode n xs = " /* (" <> body <> ") */ "
+        where
+            body = T.intercalate ", " . map (T.pack . show) $ xs
 
 instance PrettyPrint CoreFunDecl where
     toCode n (CoreFunDecl _ id args t body) =
@@ -54,11 +64,11 @@ instance PrettyPrint CoreExpr where
     toCode _ (IntExpr _ i) = T.pack $ show i
     toCode _ (CharExpr _ c) = T.pack $ show c
     toCode _ (BoolExpr _ b) = T.pack $ show b
-    toCode _ (FunIdentifierExpr (CoreIdentifier _ i)) = i
+    toCode _ (FunIdentifierExpr _ (CoreIdentifier _ i)) = i
     toCode _ (VarIdentifierExpr (CoreIdentifier _ i)) = i
     toCode n (FunCallExpr fCall) = toCode n fCall
     toCode n (OpExpr _ op expr) = "(" <> toCode n op <> toCode n expr <> ")"
-    toCode n (Op2Expr _ lExpr op rExpr) = "(" <> toCode n lExpr <> toCode n op <> toCode n rExpr <> ")"
+    toCode n (Op2Expr _ lExpr _ op rExpr _) = "(" <> toCode n lExpr <> toCode n op <> toCode n rExpr <> ")"
     toCode n (EmptyListExpr _ _) = "[]"
     toCode n (TupExpr _ lVal rVal) = "(" <> toCode n lVal <> "," <> toCode n rVal <> ")"
 

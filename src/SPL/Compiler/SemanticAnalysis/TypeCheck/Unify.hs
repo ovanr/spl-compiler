@@ -9,6 +9,7 @@ module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify (
     occurs,
     occursError,
     liftToScheme,
+    curryAt,
     typeMismatchError,
     minimizeSubst,
     unify
@@ -29,13 +30,14 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Set.Ordered as SO
+import Debug.Trace
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
 import SPL.Compiler.SemanticAnalysis.Core
-import {-# SOURCE #-} SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
-import Data.Foldable (toList)
+import Data.Foldable (fold)
+import Data.Graph
 
 class Types a where
     ($*) :: Subst -> a -> a
@@ -48,7 +50,6 @@ addSubst tv t = modify $
     \st -> let newSubst = Subst . M.insert tv t . unSubst $ st ^. getSubst
             in st & getSubst .~ newSubst
                   & getEnv %~ (newSubst $*)
-                  & getTCons %~ (newSubst $*)
 
 instance Semigroup Subst where
     -- Subst stores the substitutions in a lazy manner
@@ -75,11 +76,11 @@ instance Types CoreType where
         if M.member a s' then s $* setLoc l (M.findWithDefault v a s') else v
     s $* (CoreListType l a) = CoreListType l (s $* a)
     s $* (CoreTupleType l a b) = CoreTupleType l (s $* a) (s $* b)
-    s $* (CoreFunType l tcons a b) = CoreFunType l (s $* tcons) (s $* a) (s $* b)
+    s $* (CoreFunType l a b) = CoreFunType l (s $* a) (s $* b)
     freeVars v@(CoreVarType _ a) = S.singleton a
     freeVars (CoreListType _ a) = freeVars a
     freeVars (CoreTupleType _ a b) = freeVars a <> freeVars b
-    freeVars (CoreFunType _ c a b) = freeVars c <> freeVars a <> freeVars b
+    freeVars (CoreFunType _ a b) = freeVars a <> freeVars b
     freeVars _ = mempty
 
 instance Types TCon where
@@ -98,10 +99,6 @@ instance (Types a, Ord a) => Types (Set a) where
     s $* xs = S.map (s $*) xs
     freeVars xs = foldMap freeVars xs
 
-instance (Types a, Ord a) => Types (OSet a) where
-    s $* xs = SO.fromList $ s $* toList xs
-    freeVars xs = foldMap freeVars xs
-
 instance Types Scheme where
     (Subst s) $* (Scheme tv t) =
         let s' = Subst (foldr M.delete s tv) in Scheme tv (s' $* t)
@@ -112,8 +109,12 @@ instance Types TypeEnv where
     freeVars (TypeEnv env) = freeVars . map snd $ M.elems env
 
 instance Types Core where
-    s $* (Core varDecls funDecls) = Core (map (s $*) varDecls) (map (s $*) funDecls)
-    freeVars (Core varDecls funDecls) = freeVars varDecls <> foldMap freeVars funDecls
+    s $* (Core varDecls funDecls) = Core (map (s $*) varDecls) (map (fmap (s $*)) funDecls)
+    freeVars (Core varDecls funDecls) = freeVars varDecls <> foldMap (freeVars . unSCC) funDecls
+        where
+            unSCC (AcyclicSCC x) = [x]
+            unSCC (CyclicSCC xs) = xs
+        
 
 instance Types CoreVarDecl where
     s $* (CoreVarDecl loc t id expr) = CoreVarDecl loc (s $* t) id (s $* expr)
@@ -143,20 +144,20 @@ instance Types CoreStmt where
 instance Types CoreExpr where
     s $* (FunCallExpr f) = FunCallExpr (s $* f)
     s $* (OpExpr l op e) = OpExpr l op (s $* e)
-    s $* (Op2Expr l e1 op e2) = Op2Expr l (s $* e1) op (s $* e2)
+    s $* (Op2Expr l e1 t1 op e2 t2) = Op2Expr l (s $* e1) (s $* t1) op (s $* e2) (s $* t2)
     s $* (TupExpr l e1 e2) = TupExpr l (s $* e1) (s $* e2)
     s $* (EmptyListExpr l t) = EmptyListExpr l (s $* t)
     s $* e = e
     freeVars (FunCallExpr f) = freeVars f
     freeVars (OpExpr l op e) = freeVars e
-    freeVars (Op2Expr l e1 op e2) = freeVars e1 <> freeVars e2
+    freeVars (Op2Expr l e1 t1 op e2 t2) = freeVars e1 <> freeVars t1 <> freeVars e2 <> freeVars t2
     freeVars (TupExpr l e1 e2) = freeVars e1 <> freeVars e2
     freeVars (EmptyListExpr l t) = freeVars t
     freeVars _ = mempty
 
 instance Types CoreFunCall where
     s $* (CoreFunCall l e t args) = CoreFunCall l (s $* e) (s $* t) (s $* args)
-    freeVars (CoreFunCall _ _ t args) = freeVars t <> freeVars args
+    freeVars (CoreFunCall _ _ t args) = freeVars t <> freeVars args 
 
 generalise :: CoreType -> TCMonad Scheme
 generalise t = do
@@ -164,8 +165,7 @@ generalise t = do
     env <- use getEnv
     let t' = subst $* t
         freeTV = freeVars t' `S.difference` freeVars env
-        freeTCons = getFreeTCons freeTV (getTCon t')
-    pure $ Scheme freeTV (updateTCon freeTCons t')
+    pure $ Scheme freeTV t'
 
 -- liftToScheme lifts a type to a scheme that has no quantified variables
 liftToScheme :: CoreType -> Scheme
@@ -233,25 +233,24 @@ unify expT actT = do
             subst <- use getSubst
             unify' (subst $* b1) (subst $* b2)
 
-        unify' (CoreFunType _ tcon1 as1 r1) (CoreFunType _ tcon2 as2 r2)
-            | length as1 == length as2 &&
-              length tcon1' == length tcon2' &&
-              and (zipWith areTConSameKind tcon1' tcon2') = do
+        unify' t1@(CoreFunType _ as1 _) t2@(CoreFunType _ as2 _) = do
+                let (CoreFunType _ as1' r1) = curryAt (length as2) t1
+                    (CoreFunType _ as2' r2) = curryAt (length as1) t2
                 zipWithM_ (\a1 a2 -> do
                         subst <- use getSubst
                         unify' (subst $* a1) (subst $* a2)
-                    ) (map unTCon tcon1') (map unTCon tcon2')
-                zipWithM_ (\a1 a2 -> do
-                        subst <- use getSubst
-                        unify' (subst $* a1) (subst $* a2)
-                    ) as1 as2
+                    ) as1' as2'
                 subst <- use getSubst
                 unify' (subst $* r1) (subst $* r2)
-            where
-                tcon1' = getNonConcreteTCon tcon1
-                tcon2' = getNonConcreteTCon tcon2
 
         unify' t1 t2 = typeMismatchError t1 t2
 
-        getNonConcreteTCon :: [TCon] -> [TCon]
-        getNonConcreteTCon = filter (not . isConcreteType . unTCon)
+curryAt :: Int -> CoreType -> CoreType
+curryAt thresh t@(CoreFunType l as r)
+    | length as <= thresh = t
+    | length as > thresh = CoreFunType l 
+                                       (take thresh as)
+                                       (CoreFunType l (drop thresh as) r)
+curryAt _ t = t
+
+

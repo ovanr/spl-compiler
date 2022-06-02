@@ -21,7 +21,6 @@ module SPL.Compiler.SemanticAnalysis.Core
      getTvCounter,
      getSubst,
      getEnv,
-     getTCons,
      getWarnings,
      getSourcePath,
      getSourceCode,
@@ -48,7 +47,6 @@ module SPL.Compiler.SemanticAnalysis.Core
      CoreStmt(..),
      CoreExpr(..),
      TCon(..),
-     TCon'(..),
      CoreType(..),
      OpUnary(..),
      OpBin(..),
@@ -67,6 +65,7 @@ import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Graph
 import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
@@ -88,7 +87,6 @@ data TypeCheckState =
         _getTvCounter :: Integer,
         _getSubst :: Subst,
         _getEnv :: TypeEnv,
-        _getTCons :: Set TCon, 
         _getWarnings :: [Text],
         _getSourcePath :: FilePath,
         _getSourceCode :: [Text]
@@ -104,7 +102,7 @@ type TCMonad a = StateT TypeCheckState (Either Error) a
 tcError :: Error -> TCMonad a
 tcError = lift . Left
 
-data Core = Core [CoreVarDecl] [CoreFunDecl] deriving (Eq)
+data Core = Core [CoreVarDecl] [SCC CoreFunDecl] deriving (Eq)
 
 data CoreFunDecl =
     CoreFunDecl {
@@ -151,9 +149,9 @@ data CoreExpr =
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr CoreFunCall
     |   VarIdentifierExpr CoreIdentifier
-    |   FunIdentifierExpr CoreIdentifier
+    |   FunIdentifierExpr CoreType CoreIdentifier
     |   OpExpr EntityLoc OpUnary CoreExpr
-    |   Op2Expr EntityLoc CoreExpr OpBin CoreExpr
+    |   Op2Expr EntityLoc CoreExpr CoreType OpBin CoreExpr CoreType
     |   EmptyListExpr EntityLoc CoreType
     |   TupExpr EntityLoc CoreExpr CoreExpr
     deriving (Eq, Show)
@@ -166,14 +164,12 @@ data CoreType =
     |   CoreVarType EntityLoc TypeVar
     |   CoreTupleType EntityLoc CoreType CoreType
     |   CoreListType EntityLoc CoreType
-    |   CoreFunType EntityLoc [TCon] [CoreType] CoreType
+    |   CoreFunType EntityLoc [CoreType] CoreType
 
-data TCon' a =
-        TEq a
-    |   TOrd a
-    |   TPrint a
-
-type TCon = TCon' CoreType
+data TCon =
+        TEq CoreType
+    |   TOrd CoreType
+    |   TPrint CoreType
 
 unTCon :: TCon -> CoreType
 unTCon (TEq t) = t
@@ -191,8 +187,7 @@ isConcreteType CoreVarType{} = False
 isConcreteType (CoreTupleType _ t1 t2) =
     isConcreteType t1 && isConcreteType t2
 isConcreteType (CoreListType _ t) = isConcreteType t
-isConcreteType (CoreFunType _ tcon as r) = 
-    all (isConcreteType.unTCon) tcon && all isConcreteType as && isConcreteType r
+isConcreteType (CoreFunType _ as r) = all isConcreteType as && isConcreteType r
 isConcreteType _ = True
 
 alphaEq :: CoreType -> CoreType -> Bool
@@ -220,12 +215,10 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
-        alphaEq' (CoreFunType _ tcon1 xs r1) (CoreFunType _ tcon2 ys r2) = do
-            if length xs == length ys && length tcon1 == length tcon2 then do
+        alphaEq' (CoreFunType _ xs r1) (CoreFunType _ ys r2) = do
+            if length xs == length ys then do
                 fmap and . sequence $
                     [r1 `alphaEq'` r2,
-                    pure . and $ zipWith areTConSameKind tcon1 tcon2,
-                    and <$> zipWithM alphaEq' (map unTCon tcon1) (map unTCon tcon2),
                     and <$> zipWithM alphaEq' xs ys]
             else
                 return False
@@ -253,19 +246,13 @@ instance Hashable CoreType where
     hashWithSalt seed (CoreVarType _ txt) = hashWithSalt (hashWithSalt seed txt) (5 :: Int)
     hashWithSalt seed (CoreTupleType _ t1 t2) = hashWithSalt (hashWithSalt (hashWithSalt seed t1) t2) (6 :: Int)
     hashWithSalt seed (CoreListType _ t1) = hashWithSalt (hashWithSalt seed t1) (7 :: Int)
-    hashWithSalt seed (CoreFunType _ tcs as r) = 
-        foldl hashWithSalt (hashWithSalt (foldl hashWithSalt seed as) r) tcs
+    hashWithSalt seed (CoreFunType _ as r) = 
+        hashWithSalt (foldl hashWithSalt seed as) r
 
 instance Show TCon where
     show (TEq t) = "Equality " <> show t
     show (TOrd t) = "Ordered " <> show t
     show (TPrint t) = "Printable " <> show t
-
-instance {-# OVERLAPS #-} Show [TCon] where
-    show [] = ""
-    show xs = T.unpack $ " /* (" <> body <> ") */ "
-        where
-            body = T.intercalate ", " . map (T.pack . show) $ xs
 
 instance Show CoreType where
     show (CoreIntType _) = "Int"
@@ -275,8 +262,8 @@ instance Show CoreType where
     show (CoreVarType _ a) = T.unpack a
     show (CoreListType _ a) = "[" <> show a <> "]"
     show (CoreTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
-    show (CoreFunType _ _ [] r) = "-> " <> show r
-    show (CoreFunType _ cs as r) = "(" <> show cs <> unwords (map show as) <> " -> " <> show r <> ")"
+    show (CoreFunType _ [] r) = "-> " <> show r
+    show (CoreFunType _ as r) = "(" <> unwords (map show as) <> " -> " <> show r <> ")"
 
 instance Ord TCon where
     compare x y = compare (hash x) (hash y)

@@ -19,14 +19,6 @@ extra-source-files:
 
 library
   exposed-modules:
-      SPL.Compiler.CodeGen.Backend.SSMGen
-      SPL.Compiler.CodeGen.Backend.SSMGenLib
-      SPL.Compiler.CodeGen.IRLang
-      SPL.Compiler.CodeGen.IRLangBuiltins
-      SPL.Compiler.CodeGen.IRLangGen
-      SPL.Compiler.CodeGen.IRLangGenLib
-      SPL.Compiler.CodeGen.IRLangPrinter
-      SPL.Compiler.CodeGen.IRLangTConGen
       SPL.Compiler.Common.EntityLocation
       SPL.Compiler.Common.Error
       SPL.Compiler.Common.Misc
@@ -51,6 +43,7 @@ library
       SPL.Compiler.SemanticAnalysis.TypeCheck
       SPL.Compiler.SemanticAnalysis.TypeCheck.Env
       SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
+      SPL.Compiler.SemanticAnalysis.TypeCheck.TConLib
       SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
       SPL.Compiler.SemanticAnalysis.TypeCheckLib
   other-modules:
