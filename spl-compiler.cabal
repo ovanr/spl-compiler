@@ -38,14 +38,14 @@ library
       SPL.Compiler.SemanticAnalysis.Core
       SPL.Compiler.SemanticAnalysis.CoreEntityLocation
       SPL.Compiler.SemanticAnalysis.CorePrettyPrint
+      SPL.Compiler.SemanticAnalysis.Env
+      SPL.Compiler.SemanticAnalysis.Overload
+      SPL.Compiler.SemanticAnalysis.OverloadLib
       SPL.Compiler.SemanticAnalysis.ReturnPathCheck
       SPL.Compiler.SemanticAnalysis.SemanticAnalysis
       SPL.Compiler.SemanticAnalysis.TypeCheck
-      SPL.Compiler.SemanticAnalysis.TypeCheck.Env
-      SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
-      SPL.Compiler.SemanticAnalysis.TypeCheck.TConLib
-      SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
       SPL.Compiler.SemanticAnalysis.TypeCheckLib
+      SPL.Compiler.SemanticAnalysis.Unify
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -77,7 +77,7 @@ executable spl-compiler
       Paths_spl_compiler
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -O -with-rtsopts=-N
   build-depends:
       HTF
     , MonadRandom

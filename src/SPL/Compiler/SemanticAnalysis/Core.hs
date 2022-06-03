@@ -14,10 +14,7 @@ module SPL.Compiler.SemanticAnalysis.Core
      varDeclType,
      varDeclId,
      varDeclExpr,
-     tcError,
      TypeCheckState(..),
-     unTCon,
-     areTConSameKind,
      getTvCounter,
      getSubst,
      getEnv,
@@ -46,7 +43,6 @@ module SPL.Compiler.SemanticAnalysis.Core
      Field(..),
      CoreStmt(..),
      CoreExpr(..),
-     TCon(..),
      CoreType(..),
      OpUnary(..),
      OpBin(..),
@@ -71,6 +67,7 @@ import Control.Lens
 import SPL.Compiler.Common.EntityLocation (EntityLoc(..))
 import SPL.Compiler.Common.Error
 import SPL.Compiler.Parser.AST (OpUnary(..), OpBin(..), Field(..))
+import Data.Maybe (fromMaybe)
 
 type TypeVar = Text
 
@@ -98,9 +95,6 @@ instance ContainsSource TypeCheckState where
     getSource = _getSourceCode
 
 type TCMonad a = StateT TypeCheckState (Either Error) a
-
-tcError :: Error -> TCMonad a
-tcError = lift . Left
 
 data Core = Core [CoreVarDecl] [SCC CoreFunDecl] deriving (Eq)
 
@@ -134,7 +128,6 @@ data CoreFunCall =
         _funCallArgs :: [CoreExpr]
     } deriving (Eq, Show)
 
-
 data CoreStmt =
         IfElseStmt EntityLoc CoreExpr [CoreStmt] [CoreStmt]
     |   WhileStmt EntityLoc CoreExpr [CoreStmt]
@@ -164,38 +157,20 @@ data CoreType =
     |   CoreVarType EntityLoc TypeVar
     |   CoreTupleType EntityLoc CoreType CoreType
     |   CoreListType EntityLoc CoreType
-    |   CoreFunType EntityLoc [CoreType] CoreType
-
-data TCon =
-        TEq CoreType
-    |   TOrd CoreType
-    |   TPrint CoreType
-
-unTCon :: TCon -> CoreType
-unTCon (TEq t) = t
-unTCon (TOrd t) = t
-unTCon (TPrint t) = t
-
-areTConSameKind :: TCon -> TCon -> Bool
-areTConSameKind (TEq _) (TEq _) = True
-areTConSameKind (TOrd _) (TOrd _) = True
-areTConSameKind (TPrint _) (TPrint _) = True
-areTConSameKind _ _ = False
+    |   CoreFunType EntityLoc (Maybe CoreType) CoreType
 
 isConcreteType :: CoreType -> Bool
 isConcreteType CoreVarType{} = False
 isConcreteType (CoreTupleType _ t1 t2) =
     isConcreteType t1 && isConcreteType t2
 isConcreteType (CoreListType _ t) = isConcreteType t
-isConcreteType (CoreFunType _ as r) = all isConcreteType as && isConcreteType r
+isConcreteType (CoreFunType _ a b) = maybe True isConcreteType a && isConcreteType b
 isConcreteType _ = True
 
 alphaEq :: CoreType -> CoreType -> Bool
 alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
     where
-        alphaEq' :: CoreType ->
-                    CoreType ->
-                    State [(TypeVar, TypeVar)] Bool
+        alphaEq' :: CoreType -> CoreType -> State [(TypeVar, TypeVar)] Bool
         alphaEq' (CoreIntType _) (CoreIntType _) = return True
         alphaEq' (CoreBoolType _) (CoreBoolType _) = return True
         alphaEq' (CoreCharType _) (CoreCharType _) = return True
@@ -215,28 +190,15 @@ alphaEq t1 t2 = evalState (alphaEq' t1 t2) []
             r1 <- a1 `alphaEq'` a2
             r2 <- b1 `alphaEq'` b2
             return $ r1 && r2
-        alphaEq' (CoreFunType _ xs r1) (CoreFunType _ ys r2) = do
-            if length xs == length ys then do
-                fmap and . sequence $
-                    [r1 `alphaEq'` r2,
-                    and <$> zipWithM alphaEq' xs ys]
-            else
-                return False
+        alphaEq' (CoreFunType _ Nothing b1) (CoreFunType _ Nothing b2) = return $ b1 `alphaEq` b2
+        alphaEq' (CoreFunType _ (Just a1) b1) (CoreFunType _ (Just a2) b2) = do
+            r1 <- a1 `alphaEq'` a2
+            r2 <- b1 `alphaEq'` b2
+            return $ r1 && r2
         alphaEq' _ _ = return False
 
 strictTypeEq :: CoreType -> CoreType -> Bool
 strictTypeEq t1 t2 = hash t1 == hash t2
-
-instance Eq CoreType where
-    (==) = alphaEq
-
-instance Eq TCon where
-    t1 == t2 = areTConSameKind t1 t2 && unTCon t1 `strictTypeEq` unTCon t2
-
-instance Hashable TCon where
-    hashWithSalt seed (TEq t) = hashWithSalt (hashWithSalt seed t) (1 :: Int)
-    hashWithSalt seed (TOrd t) = hashWithSalt (hashWithSalt seed t) (2 :: Int)
-    hashWithSalt seed (TPrint t) = hashWithSalt (hashWithSalt seed t) (3 :: Int)
 
 instance Hashable CoreType where
     hashWithSalt seed CoreVoidType{} = hashWithSalt seed (1 :: Int)
@@ -246,27 +208,26 @@ instance Hashable CoreType where
     hashWithSalt seed (CoreVarType _ txt) = hashWithSalt (hashWithSalt seed txt) (5 :: Int)
     hashWithSalt seed (CoreTupleType _ t1 t2) = hashWithSalt (hashWithSalt (hashWithSalt seed t1) t2) (6 :: Int)
     hashWithSalt seed (CoreListType _ t1) = hashWithSalt (hashWithSalt seed t1) (7 :: Int)
-    hashWithSalt seed (CoreFunType _ as r) = 
-        hashWithSalt (foldl hashWithSalt seed as) r
+    hashWithSalt seed (CoreFunType _ a b) =
+        hashWithSalt (hashWithSalt seed a) b
 
-instance Show TCon where
-    show (TEq t) = "Equality " <> show t
-    show (TOrd t) = "Ordered " <> show t
-    show (TPrint t) = "Printable " <> show t
+instance Eq CoreType where
+    (==) = alphaEq
 
 instance Show CoreType where
-    show (CoreIntType _) = "Int"
-    show (CoreBoolType _) = "Bool"
-    show (CoreCharType _) = "Char"
-    show (CoreVoidType _) = "Void"
-    show (CoreVarType _ a) = T.unpack a
-    show (CoreListType _ a) = "[" <> show a <> "]"
-    show (CoreTupleType _ a b) = "(" <> show a <> "," <> show b <> ")"
-    show (CoreFunType _ [] r) = "-> " <> show r
-    show (CoreFunType _ as r) = "(" <> unwords (map show as) <> " -> " <> show r <> ")"
-
-instance Ord TCon where
-    compare x y = compare (hash x) (hash y)
+    show t = show' False t
+        where
+            show' _ (CoreIntType _) = "Int"
+            show' _ (CoreBoolType _) = "Bool"
+            show' _ (CoreCharType _) = "Char"
+            show' _ (CoreVoidType _) = "Void"
+            show' _ (CoreVarType _ a) = T.unpack a
+            show' _ (CoreListType _ a) = "[" <> show' False a <> "]"
+            show' _ (CoreTupleType _ a b) = "(" <> show' False a <> "," <> show' False b <> ")"
+            show' False (CoreFunType _ Nothing r) = "-> " <> show' True r
+            show' True (CoreFunType _ Nothing r) = "(-> " <> show' True r <> ")"
+            show' False (CoreFunType _ (Just a) r) = show' True a <> " -> " <> show' True r
+            show' True (CoreFunType _ (Just a) r) = "(" <> show' True a <> " -> " <> show' True r <> ")"
 
 instance Show Scheme where
     show (Scheme tv t) =

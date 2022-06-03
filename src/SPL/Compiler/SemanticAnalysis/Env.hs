@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-module SPL.Compiler.SemanticAnalysis.TypeCheck.Env where
+module SPL.Compiler.SemanticAnalysis.Env where
 
 import Data.Text (Text)
 import Data.Map (Map)
@@ -12,41 +12,40 @@ import qualified Data.Set as S
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.SemanticAnalysis.Core
-import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 
 print' :: (Text, Scheme)
 print' = ("print", 
              let var = CoreVarType mempty "a" 
              in Scheme (S.singleton "a")
-                       (CoreFunType mempty [var] (CoreVoidType mempty)))
+                       (CoreFunType mempty (Just var) (CoreVoidType mempty)))
 
 isEmpty :: (Text, Scheme)
 isEmpty = ("isEmpty", 
              let listType = CoreListType mempty (CoreVarType mempty "a")
              in Scheme (S.singleton "a") 
-                       (CoreFunType mempty [listType] (CoreBoolType mempty)))
+                       (CoreFunType mempty (Just listType) (CoreBoolType mempty)))
 hd' :: (Text, Scheme)
 hd' = ("hd", Scheme (S.singleton "a")
                 (CoreFunType mempty
-                [CoreListType mempty (CoreVarType mempty "a")]
+                (Just $ CoreListType mempty (CoreVarType mempty "a"))
                 (CoreVarType mempty "a")))
 
 tl' :: (Text, Scheme)
 tl' = ("tl", Scheme (S.singleton "a") 
                    (CoreFunType mempty
-                   [CoreListType mempty (CoreVarType mempty "a")]
+                   (Just $ CoreListType mempty (CoreVarType mempty "a"))
                    (CoreListType mempty (CoreVarType mempty "a")))) 
 
 fst' :: (Text, Scheme)
 fst' = ("fst", Scheme (S.fromList ["a", "b"]) 
                     (CoreFunType mempty
-                    [CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b")]
+                    (Just $ CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b"))
                     (CoreVarType mempty "a")))
 
 snd' :: (Text, Scheme)
 snd' = ("snd", Scheme (S.fromList ["a", "b"]) 
                     (CoreFunType mempty
-                    [CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b")]
+                    (Just $ CoreTupleType mempty (CoreVarType mempty "a") (CoreVarType mempty "b"))
                     (CoreVarType mempty "b")))
 
 -- eqVoid :: (Text, Scheme)

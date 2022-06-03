@@ -12,4 +12,4 @@ module SPL.Compiler.CodeGen.Testable where
 import GHC.TypeLits
 import Data.Proxy
 
-import SPL.Compiler.CodeGen.IRLang
+-- import SPL.Compiler.CodeGen.IRLang

@@ -73,14 +73,6 @@ instance Locatable CoreType where
     getLoc (CoreCharType l) = l
     getLoc (CoreVoidType l) = l
 
-instance Locatable TCon where
-    setLoc l (TEq t) = TEq $ setLoc l t
-    setLoc l (TOrd t) = TOrd $ setLoc l t
-    setLoc l (TPrint t) = TPrint $ setLoc l t
-    getLoc (TEq t) = getLoc t
-    getLoc (TOrd t) = getLoc t
-    getLoc (TPrint t) = getLoc t
-
 instance Locatable CoreFunBody where
     setLoc l (CoreFunBody _ v s) = CoreFunBody l v s
     getLoc (CoreFunBody l _ _) = l

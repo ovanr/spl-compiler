@@ -9,14 +9,12 @@ import SPL.Compiler.SemanticAnalysis.Core
      CoreExpr(..),
      CoreStmt(..),
      CoreFunCall(..),
-     TCon(..),
      Field(..),
      CoreFunBody(..),
      CoreIdentifier(..),
      CoreVarDecl(..),
      CoreFunDecl(..),
      Core(..))
-import SPL.Compiler.SemanticAnalysis.TypeCheck.TCon
 import Data.List (intercalate)
 import Data.Text (Text)
 import Data.Set (Set)
@@ -42,12 +40,6 @@ instance PrettyPrint Core where
 instance PrettyPrint CoreVarDecl where
     toCode n (CoreVarDecl _ t id expr) =
         mkIdent n <> toCode n t <> " " <> toCode n id <> " = " <> toCode n expr <> ";"
-
-instance PrettyPrint [TCon] where
-    toCode n [] = ""
-    toCode n xs = " /* (" <> body <> ") */ "
-        where
-            body = T.intercalate ", " . map (T.pack . show) $ xs
 
 instance PrettyPrint CoreFunDecl where
     toCode n (CoreFunDecl _ id args t body) =
@@ -92,7 +84,7 @@ instance PrettyPrint CoreStmt where
 
 instance PrettyPrint CoreFunCall where
     toCode n (CoreFunCall _ id t args) = 
-        toCode n id <> " /* " <> toCode n t <> " */ " <>
+        toCode n id <> 
         "(" <> T.intercalate "," (map (toCode n) args) <> ")"
 
 instance PrettyPrint OpUnary where

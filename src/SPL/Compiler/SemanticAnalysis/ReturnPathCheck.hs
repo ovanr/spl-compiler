@@ -3,7 +3,7 @@ module SPL.Compiler.SemanticAnalysis.ReturnPathCheck (
     ) where
 
 import qualified Data.Text as T
-import SPL.Compiler.Common.Error (definition)
+import SPL.Compiler.Common.Error (definition, throwErr)
 
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
@@ -22,7 +22,7 @@ returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ _
         return ()
     else do
         returnTrace <- definition (T.pack "The function '" <> name <> T.pack "' is not guaranteed to return a value.") f
-        tcError returnTrace
+        throwErr returnTrace
     where
         returnsVoid :: CoreType -> Bool
         returnsVoid (CoreVoidType _) = True

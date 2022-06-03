@@ -2,17 +2,17 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SPL.Compiler.SemanticAnalysis.TypeCheck.Unify (
+module SPL.Compiler.SemanticAnalysis.Unify (
     Types(..),
     addSubst,
     generalise,
     occurs,
     occursError,
     liftToScheme,
-    curryAt,
     typeMismatchError,
     minimizeSubst,
-    unify
+    unify,
+    unify'
     ) where
 
 import Data.Text (Text)
@@ -30,7 +30,6 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Set.Ordered as SO
-import Debug.Trace
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
@@ -38,6 +37,7 @@ import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
 import Data.Foldable (fold)
 import Data.Graph
+import Data.Maybe (fromMaybe)
 
 class Types a where
     ($*) :: Subst -> a -> a
@@ -57,7 +57,6 @@ instance Semigroup Subst where
     -- Example subst: s = [ b |-> a, a |-> Int ]
     -- then s $* b == Int,
     -- so first b == a, a == Int
-    -- 
     (Subst s1') <> (Subst s2') = Subst (s1' `M.union` s2')
 
 instance Monoid Subst where
@@ -83,13 +82,10 @@ instance Types CoreType where
     freeVars (CoreFunType _ a b) = freeVars a <> freeVars b
     freeVars _ = mempty
 
-instance Types TCon where
-    s $* (TEq t) = TEq (s $* t)
-    s $* (TOrd t) = TOrd (s $* t)
-    s $* (TPrint t) = TPrint (s $* t)
-    freeVars (TEq t) = freeVars t
-    freeVars (TOrd t) = freeVars t
-    freeVars (TPrint t) = freeVars t
+instance Types a => Types (Maybe a) where
+    s $* Nothing = Nothing
+    s $* (Just a) = Just (s $* a)
+    freeVars = maybe mempty freeVars
 
 instance Types a => Types [a] where
     s $* xs = map (s $*) xs
@@ -114,7 +110,6 @@ instance Types Core where
         where
             unSCC (AcyclicSCC x) = [x]
             unSCC (CyclicSCC xs) = xs
-        
 
 instance Types CoreVarDecl where
     s $* (CoreVarDecl loc t id expr) = CoreVarDecl loc (s $* t) id (s $* expr)
@@ -143,6 +138,7 @@ instance Types CoreStmt where
 
 instance Types CoreExpr where
     s $* (FunCallExpr f) = FunCallExpr (s $* f)
+    s $* (FunIdentifierExpr t i) = FunIdentifierExpr (s $* t) i
     s $* (OpExpr l op e) = OpExpr l op (s $* e)
     s $* (Op2Expr l e1 t1 op e2 t2) = Op2Expr l (s $* e1) (s $* t1) op (s $* e2) (s $* t2)
     s $* (TupExpr l e1 e2) = TupExpr l (s $* e1) (s $* e2)
@@ -157,7 +153,7 @@ instance Types CoreExpr where
 
 instance Types CoreFunCall where
     s $* (CoreFunCall l e t args) = CoreFunCall l (s $* e) (s $* t) (s $* args)
-    freeVars (CoreFunCall _ _ t args) = freeVars t <> freeVars args 
+    freeVars (CoreFunCall _ _ t args) = freeVars t <> freeVars args
 
 generalise :: CoreType -> TCMonad Scheme
 generalise t = do
@@ -171,7 +167,8 @@ generalise t = do
 liftToScheme :: CoreType -> Scheme
 liftToScheme = Scheme mempty
 
-typeMismatchError :: CoreType -> CoreType -> TCMonad a
+typeMismatchError :: (MonadTrans t, MonadState s (t (Either Error)), ContainsSource s) =>
+                     CoreType -> CoreType -> t (Either Error) a
 typeMismatchError expT actT = do
     let header = [ T.pack $
             "Couldn't match expected type '" <> show expT <>
@@ -181,19 +178,20 @@ typeMismatchError expT actT = do
                                          show expT <>
                                          "' has been inferred as the type of: ")
                                 actT
-    tcError $ header <> typeLocTrace
+    throwErr $ header <> typeLocTrace
 
 
 occurs :: TypeVar -> CoreType -> Bool
 occurs var t = S.member var (freeVars t)
 
-occursError :: TypeVar -> CoreType -> TCMonad a
+occursError :: (MonadTrans t, MonadState s (t (Either Error)), ContainsSource s) =>
+                TypeVar -> CoreType -> t (Either Error) a
 occursError var t = do
     typeLocTrace <- definition (T.pack $ "'" <>
                                          show t <>
                                          "' has been inferred as the type of: "
                                ) t
-    tcError $ [
+    throwErr $ [
         "Occurs check: cannot construct the infinite type: "
         <> var
         <> " ~ "
@@ -203,54 +201,43 @@ occursError var t = do
 unify :: CoreType -> CoreType -> TCMonad ()
 unify expT actT = do
     s <- use getSubst
-    unify' (s $* expT) (s $* actT)
-    where
-        unify' CoreIntType{} CoreIntType{} = return ()
-        unify' CoreCharType{} CoreCharType{} = return ()
-        unify' CoreBoolType{} CoreBoolType{} = return ()
-        unify' CoreVoidType{} CoreVoidType{} = return ()
+    Subst subst <- unify' (s $* expT) (s $* actT)
+    mapM_ (uncurry addSubst) $ M.toList subst
 
-        unify' v1@(CoreVarType _ a) v2@(CoreVarType _ b)
-            | a == b = return ()
-            | otherwise = addSubst a v2
+unify' :: (MonadTrans t, MonadState s (t (Either Error)), ContainsSource s) =>
+          CoreType -> CoreType -> t (Either Error) Subst
+unify' CoreIntType{} CoreIntType{} = return mempty
+unify' CoreCharType{} CoreCharType{} = return mempty
+unify' CoreBoolType{} CoreBoolType{} = return mempty
+unify' CoreVoidType{} CoreVoidType{} = return mempty
 
-        unify' v@(CoreVarType _ a) t = do
-            if not $ occurs a t then
-                addSubst a t
-            else
-                occursError a t
+unify' v1@(CoreVarType _ a) v2@(CoreVarType _ b)
+    | a == b = return mempty
+    | otherwise = pure . Subst $ M.singleton a v2
 
-        unify' t v@(CoreVarType _ a) = do
-            if not $ occurs a t then
-                addSubst a t
-            else
-                occursError a t
+unify' v@(CoreVarType _ a) t = do
+    if not $ occurs a t then
+        pure . Subst $ M.singleton a t
+    else
+        occursError a t
 
-        unify' (CoreListType _ a) (CoreListType _ b) = unify' a b
+unify' t v@(CoreVarType _ a) = do
+    if not $ occurs a t then
+        pure . Subst $ M.singleton a t
+    else
+        occursError a t
 
-        unify' (CoreTupleType _ a1 b1) (CoreTupleType _ a2 b2) = do
-            unify' a1 a2
-            subst <- use getSubst
-            unify' (subst $* b1) (subst $* b2)
+unify' (CoreListType _ a) (CoreListType _ b) = unify' a b
 
-        unify' t1@(CoreFunType _ as1 _) t2@(CoreFunType _ as2 _) = do
-                let (CoreFunType _ as1' r1) = curryAt (length as2) t1
-                    (CoreFunType _ as2' r2) = curryAt (length as1) t2
-                zipWithM_ (\a1 a2 -> do
-                        subst <- use getSubst
-                        unify' (subst $* a1) (subst $* a2)
-                    ) as1' as2'
-                subst <- use getSubst
-                unify' (subst $* r1) (subst $* r2)
+unify' (CoreTupleType _ a1 b1) (CoreTupleType _ a2 b2) = do
+    subst <- unify' a1 a2
+    (subst <>) <$> unify' (subst $* b1) (subst $* b2)
 
-        unify' t1 t2 = typeMismatchError t1 t2
+unify' (CoreFunType _ Nothing r1) (CoreFunType _ Nothing r2) = do
+    unify' r1 r2
 
-curryAt :: Int -> CoreType -> CoreType
-curryAt thresh t@(CoreFunType l as r)
-    | length as <= thresh = t
-    | length as > thresh = CoreFunType l 
-                                       (take thresh as)
-                                       (CoreFunType l (drop thresh as) r)
-curryAt _ t = t
+unify' t1@(CoreFunType _ (Just a1) r1) t2@(CoreFunType _ (Just a2) r2) = do
+    subst <- unify' a1 a2
+    (subst <>) <$> unify' (subst $* r1) (subst $* r2)
 
-
+unify' t1 t2 = typeMismatchError t1 t2

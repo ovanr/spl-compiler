@@ -10,7 +10,7 @@ import Data.Text (Text)
 
 import SPL.Compiler.SemanticAnalysis.Testable
 import SPL.Compiler.SemanticAnalysis.Core
-import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+import SPL.Compiler.SemanticAnalysis.Unify
 
 instance Arbitrary CoreType where
     arbitrary = frequency
@@ -30,7 +30,7 @@ instance Arbitrary CoreType where
             charGen = return (CoreCharType def)
             varGen = oneof $ return . CoreVarType def <$> ["a", "b", "c", "d"]
             tupleGen = liftA2 (CoreTupleType def) arbitrary arbitrary
-            funGen = liftA2 (CoreFunType def []) (take 2 <$> arbitrary) arbitrary
+            funGen = liftA2 (CoreFunType def) arbitrary arbitrary
             listGen = CoreListType def <$> arbitrary
 
 instance Arbitrary Text where

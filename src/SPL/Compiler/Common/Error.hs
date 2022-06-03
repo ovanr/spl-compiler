@@ -13,6 +13,9 @@ class ContainsSource s where
     getFilePath :: s -> FilePath
     getSource :: s -> [Text]
 
+throwErr :: MonadTrans t => Error -> t (Either Error) a
+throwErr = lift . Left
+
 definition :: (Locatable a, MonadState s m, ContainsSource s) => Text -> a -> m [Text]
 definition err elem = do
     fp <- gets getFilePath 

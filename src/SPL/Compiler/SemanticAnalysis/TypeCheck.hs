@@ -26,8 +26,8 @@ import SPL.Compiler.Common.Misc (wrapStateT, impossible)
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderAst)
-import SPL.Compiler.SemanticAnalysis.TypeCheck.Env (initGamma)
-import SPL.Compiler.SemanticAnalysis.TypeCheck.Unify
+import SPL.Compiler.SemanticAnalysis.Env (initGamma)
+import SPL.Compiler.SemanticAnalysis.Unify
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
 
 
@@ -146,7 +146,7 @@ typeCheckVar (AST.ASTIdentifier l idName) tau = do
     case value of
         Just (scope, sch) -> do
             (instScheme, _) <- instantiate sch
-            unify instScheme  tau
+            unify instScheme tau
             return (CoreIdentifier l idName, scope)
         Nothing -> variableNotFoundErr (CoreIdentifier l idName)
 
@@ -157,8 +157,10 @@ typeCheckFunCall (AST.ASTFunCall loc e args) tau = do
     a <- freshVar loc "a"
     e' <- typeCheckExpr e a
 
-    subst <- use getSubst
-    let expectedFunType = CoreFunType loc argTypes tau
+    let expectedFunType =
+            case argTypes of
+                [] -> CoreFunType loc Nothing tau 
+                _  -> foldr (CoreFunType loc) tau (Just <$> argTypes)
     unify a expectedFunType
 
     return $ CoreFunCall loc e' expectedFunType args'
@@ -188,7 +190,7 @@ typeCheckFieldSelector id fields tau = do
             typeCheckVar (toVar field) expectedType
 
             resultType <- freshVar (getLoc id) "f"
-            let actualType = CoreFunType (getLoc field) [argType] resultType
+            let actualType = CoreFunType (getLoc field) (Just argType) resultType
 
             unify expectedType actualType
             return resultType
@@ -234,7 +236,7 @@ typeCheckVarDecl (AST.ASTVarDecl loc tau (AST.ASTIdentifier l i) e) = do
         Nothing -> -- use of Var keyword
             return $ CoreVarDecl loc varT (CoreIdentifier l i) e'
         Just expectedType -> do
-            scheme <- generalise varT
+            let scheme = liftToScheme varT
             expectedType <=* scheme
             return $ CoreVarDecl loc varT (CoreIdentifier l i) e'
 
@@ -243,14 +245,10 @@ typeCheckFunDecl :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args tau body) abstractType = do
     initEnv <- (\(TypeEnv env) -> TypeEnv (M.delete idName env)) <$> use getEnv
 
-    let CoreFunType _ argTypes retType = abstractType
-    addArgsToEnv (zip argTypes args')
+    addArgsToEnv (getArgTypes abstractType args')
 
-    body' <- do { b <- typeCheckFunBody body retType;
-                  subst <- use getSubst;
+    body' <- do { b <- typeCheckFunBody body (getFunRetType abstractType);
                   adjustForMissingReturn abstractType b }
-
-    subst <- use getSubst
 
     case ast2coreType tau of
         Nothing -> pure ()
@@ -266,6 +264,9 @@ typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args 
 
     where
         args' = map (\(AST.ASTIdentifier l nm) -> CoreIdentifier l nm) args
+        getArgTypes _ [] = []
+        getArgTypes (CoreFunType l (Just a) r) (x:xs) = (a,x) : getArgTypes r xs
+        getArgTypes _ _ = impossible
 
 sandBoxedTypeCheckFun :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 sandBoxedTypeCheckFun fun funType = do
@@ -343,7 +344,7 @@ sanityCheck (Core varDecls funDecls) = do
                 "Ambigous type variables " <>
                 "[" <> T.intercalate ", " (S.toList ftv) <> "] " <>
                 "found in type " <> T.pack (show t) <> ":") t
-            >>= tcError
+            >>= throwErr
 
     when (isNothing main) $
         throwWarning "No 'main' function found. Program will not execute"
