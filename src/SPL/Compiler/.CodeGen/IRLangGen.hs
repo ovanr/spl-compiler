@@ -24,7 +24,6 @@ import SPL.Compiler.CodeGen.IRLangTConGen
 import SPL.Compiler.Common.TypeFunc
 import SPL.Compiler.Common.Misc
 import qualified SPL.Compiler.SemanticAnalysis.Core as Core
-import qualified SPL.Compiler.SemanticAnalysis.TypeCheck.TCon as Core
 import qualified SPL.Compiler.SemanticAnalysis.TypeCheck as Core
 import Data.Tuple.Extra ((&&&))
 

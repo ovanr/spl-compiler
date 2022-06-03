@@ -148,11 +148,6 @@ data IRConstant a where
     IRChar :: Char -> IRConstant Char
     IRFun :: IRFunDecl as r -> IRConstant (Ptr (as --> r))
 
-data TCon a where 
-    TEq :: IRType a -> TCon (Ptr ('[a, a] --> Bool))
-    TOrd :: IRType a -> TCon (Ptr ('[a,a] --> Bool))
-    TPrint :: IRType a -> TCon (Ptr ('[a] --> Unit))
-
 class Castable a b
 
 instance {-# INCOHERENT #-} Castable a a
@@ -176,11 +171,6 @@ class Typeable f where
 instance Show (Var a) where
     show (Var id t _) = T.unpack id <> "%" <> show t
 
-instance Show (TCon a) where
-    show (TEq t) = "TEq " <> show t
-    show (TOrd t) = "TOrd " <> show t
-    show (TPrint t) = "TPrint " <> show t
-
 instance Show (IRType a) where
     show IRIntType = "i"
     show IRBoolType = "b"
@@ -192,19 +182,6 @@ instance Show (IRType a) where
     show (IRTupleType a b) = "*(" <> show a <> "," <> show b <> ")"
     show (IRFunType as r) =
         "*(" <> L.intercalate "->" (hListMapToList show as) <> "->" <> show r <> ")"
-
-isConcreteTCon :: TCon a -> Bool
-isConcreteTCon (TEq t) = isConcreteType t
-isConcreteTCon (TOrd t) = isConcreteType t
-isConcreteTCon (TPrint t) = isConcreteType t
-
-isConcreteType :: IRType a -> Bool
-isConcreteType (IRUnknownType _) = False
-isConcreteType (IRPtrType t) = isConcreteType t
-isConcreteType (IRListType a) = isConcreteType a
-isConcreteType (IRTupleType a b) = isConcreteType a && isConcreteType b
-isConcreteType (IRFunType as r) = and (hListMapToList isConcreteType as) && isConcreteType r
-isConcreteType _ = True
 
 makeLenses ''IRFunDecl
 makeLenses ''IRFunDef

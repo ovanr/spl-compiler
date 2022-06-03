@@ -46,6 +46,8 @@ library
       SPL.Compiler.SemanticAnalysis.TypeCheck
       SPL.Compiler.SemanticAnalysis.TypeCheckLib
       SPL.Compiler.SemanticAnalysis.Unify
+      SPL.Compiler.SSM.SSMGen
+      SPL.Compiler.SSM.SSMGenLib
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:

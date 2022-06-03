@@ -6,7 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-module SPL.Compiler.CodeGen.Backend.SSMGenLib where
+module SPL.Compiler.SSM.SSMGenLib where
 
 import Data.Text (Text)
 import Data.Map (Map)
@@ -20,8 +20,6 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Control.Monad.State
 
-import qualified SPL.Compiler.CodeGen.IRLang as IR
-import SPL.Compiler.CodeGen.IRLang (type (-->))
 import SPL.Compiler.Common.TypeFunc
 
 default (Int, Text)
@@ -45,6 +43,7 @@ data SSMVar = SSMVar {
     _varType :: VarType
 } deriving Eq
 
+
 makeLenses 'SSMVar
 
 data SSMGenState = SSMGenState {
@@ -59,6 +58,10 @@ type SSMMonad a = StateT SSMGenState (Either Text) a
 
 class OpArgument a where
     toArgument :: a -> Text
+
+instance OpArgument Bool where
+    toArgument True = T.pack $ show (-1 :: Int)
+    toArgument False = T.pack $ show (0 :: Int)
 
 instance OpArgument Char where
     toArgument = T.pack . show . ord
@@ -79,13 +82,13 @@ instance OpArgument Register where
     toArgument RR = "4"
     toArgument GP = "5"
 
-instance OpArgument (IR.IRConstant a) where
-    toArgument (IR.IRInt i) = toArgument i
-    toArgument IR.IRVoid = toArgument (0 :: Int)
-    toArgument (IR.IRChar c) = toArgument c
-    toArgument (IR.IRBool True) = toArgument (-1 :: Int)
-    toArgument (IR.IRBool False) = toArgument (0 :: Int)
-    toArgument (IR.IRFun (IR.IRFunDecl label _ _)) = toArgument label
+voidVar = SSMVar "_void_var" (Just (Address GP 0)) Local
+
+newLabel :: Text -> SSMMonad Text
+newLabel prefix = do
+    c <- T.pack . show <$> use counter
+    let label = "__" <> prefix <> c
+    pure label
 
 oops :: Text -> SSMMonad a
 oops err = lift (Left err)
@@ -103,6 +106,14 @@ getVar id = do
         Nothing -> oops $ "Variable " <> id <> " not declared"
         Just [] -> oops $ "Variable " <> id <> " no longer available"
         Just (x:_) -> pure x
+
+loadVarToTopStack :: SSMVar -> SSMMonad ()
+loadVarToTopStack var@(SSMVar id address _) = do
+    annotate var
+    case var ^. varAddress of
+        Just (Address MP offset) -> op1 "ldl" offset
+        Just (Address reg offset) -> ldr reg >> lda offset
+        Nothing -> oops $ "Variable " <> id <> " address not available"
 
 addVar :: SSMVar -> SSMMonad ()
 addVar var@(SSMVar id _ _) = modify (\st -> st & vars %~ M.insertWith (++) id [var])
@@ -122,28 +133,6 @@ annotate (SSMVar id (Just (Address reg offset)) varType) = do
         loc = T.pack (show offset)
         color = if varType == Arg then "red" else "blue"
     write [T.unwords ["annote", reg', loc, loc, color, "\"" <> id <> "\""]]
-
-loadValueToTopStack :: IR.Value a -> SSMMonad ()
-loadValueToTopStack (IR.IRVar v) = loadVarToTopStack v
-loadValueToTopStack (IR.IRLit l) = ldc l
-
-loadVarToTopStack :: IR.Var a -> SSMMonad ()
-loadVarToTopStack (IR.Var id _ _) = do
-    var <- getVar id
-    annotate var
-    case var ^. varAddress of
-        Just (Address MP offset) -> op1 "ldl" offset
-        Just (Address reg offset) -> ldr reg >> lda offset
-        Nothing -> oops $ "Variable " <> id <> " address not available"
-
-saveTopStackToVar :: IR.Var a -> SSMMonad ()
-saveTopStackToVar (IR.Var id _ _) = do
-    var <- getVar id
-    annotate var
-    case var ^. varAddress of
-        Just (Address MP offset) -> stl offset
-        Just (Address reg offset) -> ldr reg >> sta offset
-        Nothing -> oops $ "Variable " <> id <> " address not available"
 
 loadAddrToTopStack :: Address -> SSMMonad ()
 loadAddrToTopStack (Address reg offset) = do
@@ -198,6 +187,7 @@ str = op1 "str"
 sta :: Int -> SSMMonad ()
 sta = op1 "sta"
 
+lda :: Int -> SSMMonad ()
 lda = op1 "lda"
 
 add = op0 "add"
@@ -209,6 +199,7 @@ and = op0 "and"
 or  = op0 "or"
 xor = op0 "xor"
 eq  = op0 "eq"
+ne  = op0 "ne"
 lt  = op0 "lt"
 le  = op0 "le"
 gt  = op0 "gt"
@@ -218,10 +209,15 @@ neg = op0 "neg"
 
 brt :: OpArgument a => a -> SSMMonad ()
 brt = op1 "brt"
+
 brf :: OpArgument a => a -> SSMMonad ()
 brf = op1 "brf"
+
 bra :: OpArgument a => a -> SSMMonad ()
 bra = op1 "bra"
+
+sth :: SSMMonad ()
+sth = op0 "sth"
 
 stmh :: OpArgument a => a -> SSMMonad ()
 stmh = op1 "stmh"
@@ -240,3 +236,6 @@ stl = op1 "stl"
 
 ldl :: Int -> SSMMonad ()
 ldl = op1 "ldl"
+
+lds :: Int -> SSMMonad ()
+lds = op1 "lds"
