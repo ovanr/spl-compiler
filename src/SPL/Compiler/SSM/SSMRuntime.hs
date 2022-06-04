@@ -125,8 +125,8 @@ genEqOrdTup = do
 genOrdInt = do
     newBlock "_ord_int"
     SSM.link 0
-    SSM.ldl (-3)
     SSM.ldl (-2)
+    SSM.ldl (-3)
     SSM.lt
     SSM.str RR
     removeStackFrame
@@ -144,8 +144,8 @@ genOrdBool = do
 genOrdChar = do
     newBlock "_ord_char"
     SSM.link 0
-    SSM.ldl (-3)
     SSM.ldl (-2)
+    SSM.ldl (-3)
     SSM.lt
     SSM.str RR
     removeStackFrame

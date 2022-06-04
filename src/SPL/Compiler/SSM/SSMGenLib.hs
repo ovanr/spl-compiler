@@ -33,17 +33,17 @@ type Instruction = Text
 data Address = Address {
     _reg :: Register,
     _offset :: Int
-} deriving Eq
+} deriving (Eq, Show)
 
 makeLenses 'Address
 
-data VarType = Arg | Local deriving Eq
+data VarType = Arg | Local deriving (Eq, Show)
 
 data SSMVar = SSMVar {
     _varName :: Text,
     _varAddress :: Maybe Address,
     _varType :: VarType
-} deriving Eq
+} deriving (Eq, Show)
 
 
 makeLenses 'SSMVar
@@ -114,7 +114,7 @@ loadVarToTopStack :: SSMVar -> SSMMonad ()
 loadVarToTopStack var@(SSMVar id address _) = do
     annotate var
     case var ^. varAddress of
-        Just (Address MP offset) -> op1 "ldl" offset
+        Just (Address MP offset) -> ldl offset
         Just (Address reg offset) -> ldr reg >> lda offset
         Nothing -> oops $ "Variable " <> id <> " address not available"
 
@@ -122,7 +122,8 @@ loadVarAddrToTopStack :: SSMVar -> SSMMonad ()
 loadVarAddrToTopStack var@(SSMVar id address _) = do
     annotate var
     case var ^. varAddress of
-        Just (Address reg offset) -> ldr MP >> ldc offset >> add
+        Just (Address MP offset) -> ldla offset 
+        Just (Address reg offset) -> ldr reg >> ldc offset >> add
         Nothing -> oops $ "Variable " <> id <> " address not available"
 
 
@@ -214,6 +215,9 @@ str = op1 "str"
 
 sta :: Int -> SSMMonad ()
 sta = op1 "sta"
+
+ldla :: Int -> SSMMonad ()
+ldla = op1 "ldla"
 
 lda :: Int -> SSMMonad ()
 lda = op1 "lda"

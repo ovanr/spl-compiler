@@ -20,6 +20,7 @@ import Data.Map (Map)
 import Data.Maybe (fromJust)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when)
+import Debug.Trace
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
@@ -173,7 +174,7 @@ declareGlobalVars varDecls = addVar voidVar >> declareGlobalVars' 1 varDecls
         declareGlobalVars' :: Int -> [CoreVarDecl] -> SSMMonad ()
         declareGlobalVars' n [] = pure ()
         declareGlobalVars' offset (CoreVarDecl _ _ (CoreIdentifier _ id) _:gs) = do
-            let var = SSMVar id (Just (Address GP offset)) SSM.Local
+            let var = SSMVar id (Just $ Address GP offset) SSM.Local
             addVar var
             declareGlobalVars' (offset + 1) gs
 
@@ -182,11 +183,11 @@ coreToSSM (Core varDecls funDecls) = do
     newBlock "__entry"
     SSM.ldrr GP HP
     declareGlobalVars varDecls
-    mapM_ coreVarDeclToSSM varDecls
     SSM.ldc (length varDecls + 1)
     SSM.ldr HP
     SSM.add
     SSM.str HP
+    mapM_ coreVarDeclToSSM varDecls
     when hasMain $ 
         SSM.bsr "main"
     SSM.halt
