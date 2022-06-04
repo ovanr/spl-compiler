@@ -9,5 +9,6 @@ id (x) {
 main () {
     var x = 3;
     var f = id(x);
+    print(f);
     return;
 }

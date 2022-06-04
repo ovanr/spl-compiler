@@ -202,10 +202,38 @@ produceSSM core@(Core _ funDecls) =
         identBlocks :: [[Text]] -> [Text]
         identBlocks = concatMap (_tail . traversed %~ ("   " <>))
 
-        mkFunArgSize :: Map Text Int
-        mkFunArgSize = M.fromList $ concatMap (map mkFunArgSizeHelper . unWrap) funDecls
-        mkFunArgSizeHelper (CoreFunDecl _ (CoreIdentifier _ id) args _ _) = (id, length args)
+        builtInsArgSize :: Map Text Int
+        builtInsArgSize = M.fromList
+            [("print", 2),
+             ("_eq_int", 2),
+             ("_eq_bool", 2),
+             ("_eq_char", 2),
+             ("_eq_void", 2),
+             ("_eq_list", 3),
+             ("_eq_tup", 4),
+             ("_ord_int", 2),
+             ("_ord_bool", 2),
+             ("_ord_char", 2),
+             ("_ord_void", 2),
+             ("_ord_list", 3),
+             ("_ord_tup", 4),
+             ("_print_int", 1),
+             ("_print_bool", 1),
+             ("_print_char", 1),
+             ("_print_void", 1),
+             ("_print_list", 2),
+             ("_print_tup", 3),
+             ("hd", 1),
+             ("tl", 1),
+             ("fst", 1),
+             ("snd", 1)]
 
+        userFunArgSize :: Map Text Int
+        userFunArgSize = M.fromList $ concatMap (map userFunArgSizeHelper . unWrap) funDecls
+        userFunArgSizeHelper (CoreFunDecl _ (CoreIdentifier _ id) args _ _) = (id, length args)
+
+        mkFunArgSize = userFunArgSize <> builtInsArgSize
+        
         unWrap :: SCC a -> [a]
         unWrap (AcyclicSCC a) = [a]
         unWrap (CyclicSCC as) = as

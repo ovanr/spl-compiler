@@ -116,27 +116,6 @@ genEqOrdTup = do
     SSM.str RR
     removeStackFrame
 
-genPrintTup = do 
-    failure <- newLabel "failure"
-    newBlock "_print_tup"
-    SSM.link 0
-    printChar '('
-    SSM.ldla (-4)
-    SSM.ldl (-2)
-    SSM.jsr
-    SSM.ajs (-1)
-    printChar ','
-    SSM.ldl (-5)
-    SSM.lda (-1)
-    SSM.ldl (-3)
-    SSM.jsr
-    SSM.ajs (-1)
-    printChar ')'
-    SSM.str RR
-    removeStackFrame
-
-printChar = undefined
-printString = undefined
 genOrdInt = do
     newBlock "_ord_int"
     SSM.link 0
@@ -183,14 +162,16 @@ genHd = do
 genTl = do
     newBlock "tl"
     SSM.link 0
-    SSM.ldla (-2)
+    SSM.ldl (-2)
+    SSM.lda 0
     SSM.str RR
     removeStackFrame
 
 genFst = do
     newBlock "fst"
     SSM.link 0
-    SSM.ldla (-2)
+    SSM.ldl (-2)
+    SSM.lda 0
     SSM.str RR
     removeStackFrame
 
@@ -237,6 +218,11 @@ genPrintBool = do
     SSM.printString "False"
     removeStackFrame
 
+genPrintVoid = do
+    newBlock "_print_void"
+    SSM.printString "Void"
+    removeStackFrame
+
 genPrintList = do
     end <- newLabel "end"
     loop <- newLabel "loop"
@@ -267,7 +253,25 @@ genPrintList = do
     SSM.printChar ']'
     removeStackFrame
 
-
+genPrintTup = do 
+    failure <- newLabel "failure"
+    newBlock "_print_tup"
+    SSM.link 0
+    SSM.printChar '('
+    SSM.ldl (-4)
+    SSM.lda 0
+    SSM.ldl (-2)
+    SSM.jsr
+    SSM.ajs (-1)
+    SSM.printChar ','
+    SSM.ldl (-5)
+    SSM.lda (-1)
+    SSM.ldl (-3)
+    SSM.jsr
+    SSM.ajs (-1)
+    SSM.printChar ')'
+    SSM.str RR
+    removeStackFrame
 
 genStoreThunkFun :: SSMMonad ()
 genStoreThunkFun = do
@@ -365,6 +369,11 @@ mkRuntimeSystem =
                    genOrdBool,
                    genOrdChar,
                    genOrdVoid,
+                   genPrintInt,
+                   genPrintBool,
+                   genPrintChar,
+                   genPrintVoid,
+                   genPrintList,
                    genPrintTup,
                    genHd,
                    genTl,
