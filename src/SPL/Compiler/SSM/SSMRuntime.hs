@@ -73,9 +73,11 @@ genEqOrdList = do
     SSM.ajs (-4)
     SSM.ldr RR
     SSM.brf failure
-    SSM.lda (-4)
+    SSM.ldl (-4)
+    SSM.lda 0
     SSM.stl (-4)
-    SSM.lda (-3)
+    SSM.ldl (-3)
+    SSM.lda 0
     SSM.stl (-3)
     SSM.bra startLoop
     newBlock failure

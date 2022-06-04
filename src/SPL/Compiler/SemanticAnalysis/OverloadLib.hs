@@ -150,7 +150,7 @@ ambiguousTConCheck t tcon = do
 
 tconError :: TCon -> TConMonad Error
 tconError tcon = do
-    let header = T.pack $ "Unable to find an instance for " <> show tcon
+    let header = T.pack $ "Unable to resolve ambiguous instance: " <> show tcon
     err <- definition (T.pack $ "'" <>
                        show tcon <>
                        "' instance has been inferred for: ") tcon
