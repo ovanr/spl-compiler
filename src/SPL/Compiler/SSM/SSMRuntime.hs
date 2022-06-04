@@ -243,18 +243,21 @@ genPrintList = do
     SSM.ldl (-2)    -- load print fun
     SSM.bsr "__call_thunk"
     SSM.ajs (-3)
-    SSM.ldl (-3)    -- load pointer to next list node
-    SSM.lda 0     
+    SSM.ldl (-3)    -- load pointer to first list node
+    SSM.lda 0       -- load pointer to next list node
     newBlock loop   -- expects pointer to next list node on top of stack
+    SSM.lds 0
+    SSM.lds 0
     SSM.ldc 0       -- check for null pointer
     SSM.eq
     SSM.brt end
     SSM.printChar ','
-    SSM.ldl (-3)    -- load list ptr
     SSM.lda (-1)    -- get element of list node
+    SSM.ldc 1
     SSM.ldl (-2)    -- load print fun
-    SSM.jsr         -- call print fun
-    SSM.ldl (-3)    -- load pointer to next list node
+    SSM.bsr "__call_thunk"         -- call print fun
+    SSM.ajs (-3)
+    SSM.lda 0
     SSM.bra loop
     newBlock end
     SSM.printChar ']'

@@ -1,4 +1,4 @@
 main () {
-    print(3);
+    print("right");
     return;
 }
