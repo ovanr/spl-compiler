@@ -77,7 +77,8 @@ tokens :-
 
     -- character
     <0> \'.\'                            { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
-    <0> \'\\.\'                          { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
+    <0> \'\\n\'                          { \ctx len -> return $ produceToken (\_ _ -> CharToken '\n') ctx len}
+    <0> \'\\t\'                          { \ctx len -> return $ produceToken (\_ _ -> CharToken '\t') ctx len}
 
     -- strings
     <0> \"([\x00-\x10ffff] # \")*\"      { token (produceToken (\ctx len -> StringToken . T.dropEnd 1 .  T.drop 1 $ getCurrentToken ctx len )) }
