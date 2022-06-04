@@ -104,7 +104,9 @@ coreStmtToSSM (IfElseStmt _ e taken ntaken) = do
     SSM.brf ifelse
     mapM_ coreStmtToSSM taken
     SSM.bra ifend
+    newBlock ifelse
     mapM_ coreStmtToSSM ntaken
+    newBlock ifend
 coreStmtToSSM (WhileStmt _ e stmts) = do
     start <- newLabel "while_start"
     end <- newLabel "while_end"

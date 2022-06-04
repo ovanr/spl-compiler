@@ -267,15 +267,17 @@ genPrintTup = do
     SSM.printChar '('
     SSM.ldl (-4)
     SSM.lda 0
+    SSM.ldc 1
     SSM.ldl (-2)
-    SSM.jsr
-    SSM.ajs (-1)
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-3)
     SSM.printChar ','
-    SSM.ldl (-5)
+    SSM.ldl (-4)
     SSM.lda (-1)
+    SSM.ldc 1
     SSM.ldl (-3)
-    SSM.jsr
-    SSM.ajs (-1)
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-3)
     SSM.printChar ')'
     SSM.str RR
     removeStackFrame

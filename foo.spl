@@ -1,4 +1,20 @@
+
+add(x,y) {
+    return x + y;
+}
+
+id (x) {
+    return x;
+}
+
 main () {
-    print(3);
+    var x = 3 + 3;
+    var s = [1,2,3];
+    var f = add(x);
+    if (s == [1,2,3]) {
+        print(8);
+    }
+    x = 4;
+    print((f(4), f(8)));
     return;
 }
