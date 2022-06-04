@@ -48,6 +48,7 @@ library
       SPL.Compiler.SemanticAnalysis.Unify
       SPL.Compiler.SSM.SSMGen
       SPL.Compiler.SSM.SSMGenLib
+      SPL.Compiler.SSM.SSMRuntime
   other-modules:
       Paths_spl_compiler
   hs-source-dirs:
@@ -106,8 +107,6 @@ test-suite spl-compiler-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      SPL.Compiler.CodeGen.Testable
-      SPL.Compiler.CodeGen.TestIRLangGen
       SPL.Compiler.Common.Testable
       SPL.Compiler.Lexer.Test
       SPL.Compiler.LexerParserComboTest

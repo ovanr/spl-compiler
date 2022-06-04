@@ -29,6 +29,7 @@ import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderAst)
 import SPL.Compiler.SemanticAnalysis.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.Unify
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
+import SPL.Compiler.Common.Misc (inSandboxState)
 
 
 typeCheckExpr :: AST.ASTExpr -> CoreType -> TCMonad CoreExpr

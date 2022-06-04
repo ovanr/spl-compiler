@@ -15,7 +15,7 @@ import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
-import SPL.Compiler.Common.Misc (wrapStateT)
+import SPL.Compiler.Common.Misc (wrapStateT, inSandboxState)
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (duplicateDefError)
@@ -39,11 +39,6 @@ ast2coreType (AST.ASTVoidType loc) = Just $ CoreVoidType loc
 getFunRetType :: CoreType -> CoreType
 getFunRetType (CoreFunType _ _ r) = getFunRetType r
 getFunRetType r = r
-
-inSandboxState :: Lens' TypeCheckState a -> a -> TCMonad b -> TCMonad b
-inSandboxState lens tcons = wrapStateT
-                               (lens .~ tcons)
-                               (\old new -> new & lens .~ (old ^. lens))
 
 sanitize :: CoreType -> TCMonad (CoreType, Subst)
 sanitize t = do

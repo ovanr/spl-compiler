@@ -21,6 +21,7 @@ import qualified Data.Map as M
 import Control.Monad.State
 
 import SPL.Compiler.Common.TypeFunc
+import SPL.Compiler.SemanticAnalysis.Core (CoreFunDecl(..), CoreIdentifier (..), CoreFunBody (..), CoreVarDecl (..))
 
 default (Int, Text)
 
@@ -115,6 +116,14 @@ loadVarToTopStack var@(SSMVar id address _) = do
         Just (Address reg offset) -> ldr reg >> lda offset
         Nothing -> oops $ "Variable " <> id <> " address not available"
 
+loadVarAddrToTopStack :: SSMVar -> SSMMonad ()
+loadVarAddrToTopStack var@(SSMVar id address _) = do
+    annotate var
+    case var ^. varAddress of
+        Just (Address reg offset) -> ldr MP >> ldc offset >> add
+        Nothing -> oops $ "Variable " <> id <> " address not available"
+
+
 addVar :: SSMVar -> SSMMonad ()
 addVar var@(SSMVar id _ _) = modify (\st -> st & vars %~ M.insertWith (++) id [var])
 
@@ -125,6 +134,23 @@ replaceVar fromVar@(SSMVar id _ _) toVar =
 removeVar :: SSMVar -> SSMMonad ()
 removeVar fromVar@(SSMVar id _ _) =
     vars %= (at id %~ fmap (^.. traversed.filtered (fromVar /=)))
+
+extractArgsVars :: CoreFunDecl -> [SSMVar]
+extractArgsVars (CoreFunDecl _ _ args _ _) = extractArgsVars' (-2) args
+    where
+        extractArgsVars' :: Int -> [CoreIdentifier] -> [SSMVar]
+        extractArgsVars' offset [] = []
+        extractArgsVars' offset (CoreIdentifier _ id:xs) =
+            SSMVar id (Just (Address MP offset)) Arg : extractArgsVars' (offset - 1) xs
+
+extractLocalVars :: CoreFunDecl -> [SSMVar]
+extractLocalVars (CoreFunDecl _ _ _ _ (CoreFunBody _ varDecls _)) = 
+    extractLocalVars' 1 varDecls
+    where
+        extractLocalVars' :: Int -> [CoreVarDecl] -> [SSMVar]
+        extractLocalVars' offset [] = []
+        extractLocalVars' offset (CoreVarDecl _ _ (CoreIdentifier _ id) _: xs) =
+            SSMVar id (Just (Address MP offset)) Local : extractLocalVars' (offset + 1) xs
 
 annotate :: SSMVar -> SSMMonad ()
 annotate (SSMVar _ Nothing _) = pure ()

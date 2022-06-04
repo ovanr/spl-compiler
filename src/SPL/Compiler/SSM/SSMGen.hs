@@ -1,21 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE GADTs #-}
-module SPL.Compiler.SSM.SMGen where
+module SPL.Compiler.SSM.SSMGen where
 
 import Data.Text (Text)
-import Data.Map (Map)
-import Data.Maybe ( mapMaybe )
-import Data.Char (ord)
-import Control.Lens ( _tail, view, (%~), traversed )
 import qualified Data.Text as T
 import qualified Data.Map as M
 import Control.Monad.State ( forM_, execStateT )
 
-import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SSM.SSMGenLib
 import qualified SPL.Compiler.SSM.SSMGenLib as SSM
-import SPL.Compiler.Common.TypeFunc
+import SPL.Compiler.SemanticAnalysis.Core
+import SPL.Compiler.Common.Misc (impossible, intercalateM, inSandboxState)
+import Data.Graph (SCC (..))
+import Control.Lens (use, traversed, _tail, (%~))
+import Control.Lens.Combinators (view)
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
@@ -25,13 +24,17 @@ coreExprToSSM :: CoreExpr -> SSMMonad ()
 coreExprToSSM (IntExpr loc n) = SSM.ldc (fromInteger n :: Int)
 coreExprToSSM (CharExpr loc c) = SSM.ldc c
 coreExprToSSM (BoolExpr loc b) = SSM.ldc b
-coreExprToSSM (FunCallExpr cfc) = _wd
+coreExprToSSM (FunCallExpr cfc) = undefined
 coreExprToSSM (VarIdentifierExpr (CoreIdentifier _ id)) = do
     var <- getVar id 
     loadVarToTopStack var
-coreExprToSSM (FunIdentifierExpr ct ci) = _
+coreExprToSSM (FunIdentifierExpr ct ci) = undefined
 coreExprToSSM (OpExpr loc UnMinus e) = coreExprToSSM e >> SSM.neg
 coreExprToSSM (OpExpr loc UnNeg e) = coreExprToSSM e >> SSM.not
+coreExprToSSM (Op2Expr loc e1 t1 Cons e2 t2) = do
+    coreExprToSSM e2
+    coreExprToSSM e1
+    SSM.stmh 2
 coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
     coreExprToSSM e1
     coreExprToSSM e2
@@ -49,12 +52,12 @@ coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
         Nequal -> SSM.ne
         LogAnd -> SSM.and
         LogOr -> SSM.or
-        Cons -> SSM.stmh 2
+        Cons -> impossible
         Pow -> error "pow not implemented"
 coreExprToSSM (EmptyListExpr loc ct) = SSM.ldc 0
 coreExprToSSM (TupExpr loc e1 e2) = do 
-    coreExprToSSM e1
     coreExprToSSM e2
+    coreExprToSSM e1
     SSM.stmh 2
 
 coreStmtToSSM :: CoreStmt -> SSMMonad ()
@@ -75,8 +78,21 @@ coreStmtToSSM (WhileStmt _ e stmts) = do
     mapM_ coreStmtToSSM stmts
     SSM.bra start
     newBlock end
-coreStmtToSSM (AssignStmt _ ci ct fis ce) = _wm
-coreStmtToSSM (FunCallStmt cfc) = _wn
+coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
+    coreExprToSSM e
+    var <- getVar id
+    loadVarAddrToTopStack var
+    intercalateM (SSM.lda 0) $ map traverseField fields
+    SSM.sta 0
+
+    where
+        traverseField :: Field -> SSMMonad ()
+        traverseField Hd{} = pure ()
+        traverseField Tl{} = SSM.ldc (-1) >> SSM.add
+        traverseField Fst{} = pure ()
+        traverseField Snd{} = SSM.ldc (-1) >> SSM.add
+
+coreStmtToSSM (FunCallStmt cfc) = undefined
 coreStmtToSSM (ReturnStmt _ Nothing) = do
     loadVarToTopStack voidVar
     SSM.str RR
@@ -86,84 +102,60 @@ coreStmtToSSM (ReturnStmt _ (Just e)) = do
     SSM.str RR
     removeStackFrame
 
-genStoreThunkFun :: SSMMonad ()
-genStoreThunkFun = do
-    newBlock "store_thunk"
-    SSM.link 1
-    SSM.ldl (-2)
-    SSM.ldc 4
-    SSM.add
-    SSM.stl 1
-    newBlock "store_thunk_loop"
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.eq
-    SSM.brt "end_store_thunk"
-    SSM.ldr MP
-    SSM.ldl 1
-    SSM.sub
-    SSM.lda 0
-    SSM.sth
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.sub
-    SSM.stl 1
-    SSM.bra "store_thunk_loop"
-    newBlock "end_store_thunk"
-    SSM.str RR
-    removeStackFrame
+coreVarDeclToSSM :: CoreVarDecl -> SSMMonad ()
+coreVarDeclToSSM (CoreVarDecl _ _ (CoreIdentifier _ id) e) = do
+    coreExprToSSM e
+    var <- getVar id
+    loadVarAddrToTopStack var
+    SSM.sta 0
 
-genCallThunkFun :: SSMMonad ()
-genCallThunkFun = do
-    newBlock "call_thunk"
-    SSM.link 1
-    SSM.ldl (-3)
-    SSM.stl 1
-    newBlock "load_args_loop"
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.ge
-    SSM.brf "load_thunk"
-    SSM.ldr MP 
-    SSM.ldl 1
-    SSM.sub 
-    SSM.lda (-3)
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.sub 
-    SSM.stl 1
-    SSM.bra "load_args_loop"
-    newBlock "load_thunk"
-    SSM.ldl (-2)
-    SSM.lda 0
-    SSM.ldc 3
-    SSM.add 
-    SSM.stl 1
-    newBlock "load_thunk_loop"
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.ge 
-    SSM.brf "eval_thunk"
-    SSM.ldl (-2)
-    SSM.ldl 1
-    SSM.sub 
-    SSM.lda 1
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.sub 
-    SSM.stl 1
-    SSM.bra "load_thunk_loop"
-    newBlock "eval_thunk"
-    SSM.ldl (-3)
-    SSM.add 
-    SSM.lds (-1)
-    SSM.lds (-1)
-    SSM.eq 
-    SSM.brt "eval_saturated_thunk"
-    SSM.bsr "store_thunk"
-    removeStackFrame
-    newBlock "eval_saturated_thunk"
-    SSM.stl 1
-    SSM.stl 1
-    SSM.jsr
-    removeStackFrame
+coreFunDeclToSSM :: CoreFunDecl -> SSMMonad ()
+coreFunDeclToSSM fun@(CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ varDecls stmts)) = do
+    newBlock id
+    let argVars = extractArgsVars fun
+    mapM_ addVar argVars
+    let locVars = extractLocalVars fun
+    SSM.link (length locVars)
+    mapM_ addVar locVars
+    mapM_ coreVarDeclToSSM varDecls
+    mapM_ coreStmtToSSM stmts
+    
+coreFunDeclsToSSM :: SCC CoreFunDecl -> SSMMonad ()
+coreFunDeclsToSSM (AcyclicSCC fun) = do 
+    initialEnv <- use vars
+    inSandboxState vars initialEnv (coreFunDeclToSSM fun)
+coreFunDeclsToSSM (CyclicSCC funs) = do
+    forM_ funs $ \fun -> do
+        initialEnv <- use vars
+        inSandboxState vars initialEnv (coreFunDeclToSSM fun)
+
+declareGlobalVars :: [CoreVarDecl] -> SSMMonad ()
+declareGlobalVars = declareGlobalVars' 0
+    where
+        declareGlobalVars' :: Int -> [CoreVarDecl] -> SSMMonad ()
+        declareGlobalVars' n [] = pure ()
+        declareGlobalVars' offset (CoreVarDecl _ _ (CoreIdentifier _ id) _:gs) = do
+            let var = SSMVar id (Just (Address GP offset)) SSM.Local
+            addVar var
+            declareGlobalVars' (offset + 1) gs
+
+coreToSSM :: Core -> SSMMonad ()
+coreToSSM (Core varDecls funDecls) = do
+    newBlock "_entry"
+    SSM.ldrr GP HP
+    declareGlobalVars varDecls
+    mapM_ coreVarDeclToSSM varDecls
+    SSM.ldc (length varDecls)
+    SSM.ldr HP
+    SSM.add
+    SSM.str HP
+    SSM.bra "_start"
+    forM_ funDecls coreFunDeclsToSSM
+
+produceSSM :: Core -> Either Text [Text]
+produceSSM core =
+    identBlocks . view output
+    <$> execStateT (coreToSSM core) (SSMGenState mempty 1 [])
+    where
+        identBlocks :: [[Text]] -> [Text]
+        identBlocks = concatMap (_tail . traversed %~ ("   " <>))

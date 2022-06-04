@@ -37,19 +37,6 @@ optionsParser = Options
             long "noOptimization" <>
             showDefault <>
             help "Do not perform constant folding and dead code elimination")
-    <*> switch (
-            long "irDump" <>
-            short 'i' <>
-            help "Parse, typecheck, transform to intermediate language, then pretty print result")
-    <*> switch (
-            long "emitSSM" <>
-            help "Compile to SSM assembly")
-    <*> option auto (
-            long "verbosity" <>
-            help "The level of verbosity" <>
-            showDefault <>
-            value 0 <>
-            metavar "INT")
 
 runner :: Options -> IO ()
 runner opt = do

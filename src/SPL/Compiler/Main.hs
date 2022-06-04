@@ -27,12 +27,7 @@ import qualified SPL.Compiler.Parser.ASTPrettyPrint as ASTPP (PrettyPrint(..))
 import qualified SPL.Compiler.SemanticAnalysis.CorePrettyPrint as CorePP (PrettyPrint(..))
 import SPL.Compiler.SemanticAnalysis.SemanticAnalysis
 
--- import SPL.Compiler.CodeGen.IRLang
--- import SPL.Compiler.CodeGen.IRLangGen
--- import SPL.Compiler.CodeGen.IRLangGenLib
--- import SPL.Compiler.CodeGen.IRLangPrinter
-
--- import SPL.Compiler.CodeGen.Backend.SSMGen
+import SPL.Compiler.SSM.SSMGen
 
 data Options = Options {
     filePath :: FilePath,
@@ -41,10 +36,7 @@ data Options = Options {
     lexerDump :: Bool,
     parserDump :: Bool,
     typeCheckDump :: Bool,
-    noOptimization :: Bool,
-    irLangDump :: Bool,
-    emitSSM :: Bool,
-    verbosity :: Int
+    noOptimization :: Bool
 }
 
 runCompilerMain :: Options -> IO ()
@@ -68,8 +60,6 @@ compilerMain = do
     parserDump' <- gets parserDump
     typeCheckDump' <- gets typeCheckDump
     noOptimization' <- gets noOptimization
-    irLangDump' <- gets irLangDump
-    emitSSM' <- gets emitSSM
 
     tokens <- liftEither $ tokenize path' content'
     let source = T.lines . decodeUtf8 . B.toStrict $ content'
@@ -80,17 +70,9 @@ compilerMain = do
         if parserDump' then
             pure . ASTPP.toCode 0 $ ast
         else do
-            tct <- lift $ performSemanticAnalysis noOptimization' ast path' source
+            core <- lift $ performSemanticAnalysis noOptimization' ast path' source
             if typeCheckDump' then
-                liftEither . Right . CorePP.toCode 0 $ tct
+                liftEither . Right . CorePP.toCode 0 $ core
             else do
-                undefined
-                -- Some2 core <- liftEither $ performIRLangGen tct
-                -- if irLangDump' then
-                --     liftEither . Right $ showCL 0 core
-                -- else do
-                --     if emitSSM' then do
-                --         ssm <- liftEither $ produceSSM core
-                --         pure $ T.unlines ssm
-                --     else
-                --         liftEither $ Left "Not implemented"
+                ssm <- liftEither $ produceSSM core
+                pure $ T.unlines ssm
