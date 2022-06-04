@@ -186,7 +186,7 @@ coreToSSM (Core varDecls funDecls) = do
     SSM.add
     SSM.str HP
     when hasMain $ 
-        SSM.bra "main"
+        SSM.bsr "main"
     SSM.halt
     genStoreThunkFun
     genCallThunkFun
