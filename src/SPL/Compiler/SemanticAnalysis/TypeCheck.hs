@@ -50,6 +50,10 @@ typeCheckExpr (AST.EmptyListExpr loc) tau = do
     expectedType <- CoreListType loc <$> freshVar loc "l"
     unify expectedType tau
     return (EmptyListExpr loc tau)
+typeCheckExpr (AST.EmptyCharListExpr loc) tau = do
+    let expectedType = CoreListType loc (CoreCharType loc)
+    unify expectedType tau
+    return (EmptyListExpr loc tau)
 typeCheckExpr (AST.IdentifierExpr id) tau = do
     (id', scheme) <- typeCheckVar id tau
     case scheme of

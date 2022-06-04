@@ -67,6 +67,7 @@ data ASTExpr =
     |   OpExpr EntityLoc OpUnary ASTExpr
     |   Op2Expr EntityLoc ASTExpr OpBin ASTExpr  
     |   EmptyListExpr EntityLoc
+    |   EmptyCharListExpr EntityLoc
     |   TupExpr EntityLoc ASTExpr ASTExpr
     deriving (Eq, Show)
 

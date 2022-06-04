@@ -390,7 +390,7 @@ pStringExpr = satisfyAs (\case
                             _ -> Nothing)
     where
         toConsCharExpr loc str = foldr (\c acc -> Op2Expr loc (CharExpr loc c) Cons acc)
-                                       (EmptyListExpr loc)
+                                       (EmptyCharListExpr loc)
                                        (T.unpack str)
 pBoolExpr :: SPLParser ASTExpr
 pBoolExpr = (\token@(MkToken loc (BoolToken b)) -> BoolExpr (getLoc token) b) <$>

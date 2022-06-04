@@ -37,6 +37,7 @@ instance Locatable ASTExpr where
     setLoc l (OpExpr _ o a) = OpExpr l o a 
     setLoc l (Op2Expr _ o a b) = Op2Expr l o a b
     setLoc l (EmptyListExpr _) = EmptyListExpr l
+    setLoc l (EmptyCharListExpr _) = EmptyCharListExpr l
     setLoc l (TupExpr _ a b) = TupExpr l a b
     getLoc (IdentifierExpr i) = getLoc i
     getLoc (FieldSelectExpr l _ _) = l
@@ -47,6 +48,7 @@ instance Locatable ASTExpr where
     getLoc (OpExpr l _ _) = l 
     getLoc (Op2Expr l _ _ _) = l  
     getLoc (EmptyListExpr l) = l
+    getLoc (EmptyCharListExpr l) = l
     getLoc (TupExpr l _ _) = l
 
 instance Locatable ASTStmt where

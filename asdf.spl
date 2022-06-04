@@ -1,0 +1,12 @@
+
+foo (xs) {
+    if (isEmpty(xs))
+        print("empty");
+    else
+        print(xs);
+}
+
+main () {
+    var x = "hello";
+    print(foo(x));
+}

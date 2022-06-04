@@ -221,6 +221,28 @@ genPrintChar = do
     SSM.trap 1
     removeStackFrame
 
+genPrintCharList = do
+    newBlock "_print_char_list"
+    end <- newLabel "end"
+    loop <- newLabel "loop"
+    SSM.link 0
+    SSM.printChar '"'
+    newBlock loop
+    SSM.ldl (-2)
+    SSM.ldc 0
+    SSM.eq
+    SSM.brt end
+    SSM.ldl (-2)
+    SSM.lda (-1)
+    SSM.trap 1
+    SSM.ldl (-2)    
+    SSM.lda 0
+    SSM.stl (-2)
+    SSM.bra loop
+    newBlock end
+    SSM.printChar '"'
+    removeStackFrame
+
 genPrintBool = do
     branchFalse <- newLabel "false" 
     newBlock "_print_bool"
@@ -397,6 +419,7 @@ mkRuntimeSystem =
                    genPrintChar,
                    genPrintVoid,
                    genPrintList,
+                   genPrintCharList,
                    genPrintTup,
                    genIsEmpty,
                    genHd,

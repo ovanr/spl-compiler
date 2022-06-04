@@ -95,6 +95,7 @@ mkTConName TPrint{} CoreIntType{} = "_print_int"
 mkTConName TPrint{} CoreBoolType{} = "_print_bool"
 mkTConName TPrint{} CoreCharType{} = "_print_char"
 mkTConName TPrint{} CoreVoidType{} = "_print_void"
+mkTConName TPrint{} (CoreListType _ CoreCharType{}) = "_print_char_list"
 mkTConName TPrint{} CoreListType{} = "_print_list"
 mkTConName TPrint{} CoreTupleType{} = "_print_tup"
 mkTConName _ t = error $ "no overloaded instance exists for: " <> show t
@@ -126,6 +127,9 @@ mkTConArgExpr (c, t@(CoreVarType _ v)) = do
         Just tconLocalArg -> do
             let typ = mkTConType c t
             pure (VarIdentifierExpr tconLocalArg, typ)
+mkTConArgExpr (c@TPrint{}, t@(CoreListType loc (CoreCharType _))) =
+    let typ = mkTConType c t
+    in pure (FunIdentifierExpr typ (CoreIdentifier (getLoc c) (mkTConName c t)), typ)
 mkTConArgExpr (c, t@(CoreListType loc elemT)) = do
     (baseExpr, baseTyp) <- mkTConArgExpr (c, elemT)
     let typ = mkTConType c t

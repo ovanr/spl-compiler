@@ -228,6 +228,27 @@ __end6:
    trap 1
    unlink
    ret
+_print_char_list:
+   link 0
+   ldc 34
+   trap 1
+__loop9:
+   ldl -2
+   ldc 0
+   eq
+   brt __end8
+   ldl -2
+   lda -1
+   trap 1
+   ldl -2
+   lda 0
+   stl -2
+   bra __loop9
+__end8:
+   ldc 34
+   trap 1
+   unlink
+   ret
 _print_tup:
    link 0
    ldc 40
@@ -376,82 +397,86 @@ __end_store_thunk:
    str 4
    unlink
    ret
-plus:
+foo:
    link 0
-   annote MP -2 -2 red "x"
-   ldl -2
-   annote MP -3 -3 red "y"
-   ldl -3
-   add
-   str 4
-   unlink
-   ret
-map:
-   link 0
-   annote MP -3 -3 red "list"
+   annote MP -3 -3 red "xs"
    ldl -3
    bsr isEmpty
    ajs -1
    ldr 4
-   brf __if_else9
+   brf __if_else11
+   ldc 101
+   ldc 109
+   ldc 112
+   ldc 116
+   ldc 121
    ldc 0
-   str 4
-   unlink
-   ret
-   bra __if_end10
-__if_else9:
-   annote MP -3 -3 red "list"
-   ldl -3
-   bsr hd
-   ajs -1
-   ldr 4
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   ldc _print_char_list
    ldc 1
-   annote MP -2 -2 red "f"
-   ldl -2
-   bsr __call_thunk
+   ldc 0
+   bsr __store_thunk
    ajs -3
    ldr 4
-   annote MP -3 -3 red "list"
-   ldl -3
-   bsr tl
-   ajs -1
-   ldr 4
-   annote MP -2 -2 red "f"
-   ldl -2
-   bsr map
+   bsr print
    ajs -2
    ldr 4
-   stmh 2
+   ajs -1
+   bra __if_end12
+__if_else11:
+   annote MP -3 -3 red "xs"
+   ldl -3
+   annote MP -2 -2 red "_tprint_a4"
+   ldl -2
+   ldc _print_list
+   ldc 2
+   ldc 1
+   bsr __store_thunk
+   ajs -4
+   ldr 4
+   bsr print
+   ajs -2
+   ldr 4
+   ajs -1
+__if_end12:
+   annote GP 0 0 blue "_void_var"
+   ldr 5
+   lda 0
    str 4
    unlink
    ret
-__if_end10:
 main:
    link 1
+   ldc 104
+   ldc 101
+   ldc 108
+   ldc 108
+   ldc 111
    ldc 0
-   ldc 1
-   stmh 2
-   ldc -1
-   ldc 5
-   stmh 2
-   ldc 0
    stmh 2
    stmh 2
-   annote MP 1 1 blue "xs"
+   stmh 2
+   stmh 2
+   stmh 2
+   annote MP 1 1 blue "x"
    ldla 1
    sta 0
-   annote MP 1 1 blue "xs"
+   annote MP 1 1 blue "x"
    ldl 1
-   bsr tl
-   ajs -1
+   ldc _print_char
+   ldc 1
+   ldc 0
+   bsr __store_thunk
+   ajs -3
    ldr 4
-   bsr hd
-   ajs -1
+   bsr foo
+   ajs -2
    ldr 4
-   bsr snd
-   ajs -1
-   ldr 4
-   ldc _print_bool
+   ldc _print_void
    ldc 1
    ldc 0
    bsr __store_thunk
@@ -464,104 +489,6 @@ main:
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0
-   str 4
-   unlink
-   ret
-ge18:
-   link 0
-   ldc 18
-   annote MP -2 -2 red "x"
-   ldl -2
-   bsr _ord_int
-   ajs -2
-   ldr 4
-   not
-   str 4
-   unlink
-   ret
-foldl:
-   link 0
-   annote MP -4 -4 red "list"
-   ldl -4
-   bsr isEmpty
-   ajs -1
-   ldr 4
-   brf __if_else11
-   annote MP -3 -3 red "z"
-   ldl -3
-   str 4
-   unlink
-   ret
-   bra __if_end12
-__if_else11:
-   annote MP -4 -4 red "list"
-   ldl -4
-   bsr tl
-   ajs -1
-   ldr 4
-   annote MP -4 -4 red "list"
-   ldl -4
-   bsr hd
-   ajs -1
-   ldr 4
-   annote MP -3 -3 red "z"
-   ldl -3
-   ldc 2
-   annote MP -2 -2 red "f"
-   ldl -2
-   bsr __call_thunk
-   ajs -4
-   ldr 4
-   annote MP -2 -2 red "f"
-   ldl -2
-   bsr foldl
-   ajs -3
-   ldr 4
-   str 4
-   unlink
-   ret
-__if_end12:
-sum:
-   link 0
-   annote MP -2 -2 red "list"
-   ldl -2
-   ldc 0
-   ldc plus
-   ldc 2
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr foldl
-   ajs -3
-   ldr 4
-   str 4
-   unlink
-   ret
-and:
-   link 0
-   annote MP -2 -2 red "b"
-   ldl -2
-   annote MP -3 -3 red "c"
-   ldl -3
-   and
-   str 4
-   unlink
-   ret
-all:
-   link 0
-   annote MP -2 -2 red "list"
-   ldl -2
-   ldc -1
-   ldc and
-   ldc 2
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr foldl
-   ajs -3
-   ldr 4
    str 4
    unlink
    ret

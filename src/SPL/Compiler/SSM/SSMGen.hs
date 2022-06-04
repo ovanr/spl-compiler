@@ -223,6 +223,7 @@ produceSSM core@(Core _ funDecls) =
              ("_print_int", 1),
              ("_print_bool", 1),
              ("_print_char", 1),
+             ("_print_char_list", 1),
              ("_print_void", 1),
              ("_print_list", 2),
              ("_print_tup", 3),

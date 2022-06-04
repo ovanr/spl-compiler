@@ -24,6 +24,6 @@ all(list) { return foldl(and, True, list); }
 /* allOlderThan18(list) { return all(map(ge18, list)); } */
 
 main() { 
-    var xs = [1,2,3,4,5];
-    print(sum(xs));
+    var xs = [(1, False),(5, True)];
+    print(xs.tl.hd.snd);
 }

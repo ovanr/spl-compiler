@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module SPL.Compiler.SemanticAnalysis.Overload where
 
 import qualified Data.Map as M
@@ -139,6 +138,23 @@ rewriteTConExpr e@(Op2Expr loc e1 t1 op e2 t2) = do
 rewriteTConExpr e = pure e
 
 rewriteTConFunCall :: CoreFunCall -> TConMonad CoreFunCall
+rewriteTConFunCall (CoreFunCall loc e@FunIdentifierExpr{} t args) = do
+    e' <- rewriteTConExpr e 
+    case e' of
+        FunCallExpr (CoreFunCall loc baseExpr funCallType instanceArgs) -> do
+            args' <- mapM rewriteTConExpr args
+            pure $ CoreFunCall loc 
+                               baseExpr 
+                               (replaceResultType (length instanceArgs) funCallType) 
+                               (instanceArgs ++ args')
+        _ -> CoreFunCall loc e' t <$> mapM rewriteTConExpr args
+
+    where
+        replaceResultType :: Int -> CoreType -> CoreType
+        replaceResultType 0 _ = t
+        replaceResultType n (CoreFunType loc a b) = CoreFunType loc a (replaceResultType (n-1) b)
+        replaceResultType _ _ = impossible
+
 rewriteTConFunCall (CoreFunCall loc e t args) =
     CoreFunCall loc <$> rewriteTConExpr e <*> pure t <*> mapM rewriteTConExpr args
 
