@@ -18,6 +18,8 @@ import Control.Lens (use, traversed, _tail, (%~))
 import Control.Lens.Combinators (view)
 import Data.Map (Map)
 import Data.Maybe (fromJust)
+import Control.Lens.Getter ((^.))
+import Control.Monad (when)
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
@@ -175,9 +177,7 @@ declareGlobalVars varDecls = addVar voidVar >> declareGlobalVars' 1 varDecls
 
 coreToSSM :: Core -> SSMMonad ()
 coreToSSM (Core varDecls funDecls) = do
-    genStoreThunkFun
-    genCallThunkFun
-    newBlock "_entry"
+    newBlock "__entry"
     SSM.ldrr GP HP
     declareGlobalVars varDecls
     mapM_ coreVarDeclToSSM varDecls
@@ -185,8 +185,15 @@ coreToSSM (Core varDecls funDecls) = do
     SSM.ldr HP
     SSM.add
     SSM.str HP
-    SSM.bra "main" -- TODO: what if main doesn't exist
+    when hasMain $ 
+        SSM.bra "main"
+    SSM.halt
+    genStoreThunkFun
+    genCallThunkFun
     forM_ funDecls coreFunDeclsToSSM
+
+    where
+        hasMain = "main" `elem` map (^. traversed.funId.idName) funDecls
 
 produceSSM :: Core -> Either Text [Text]
 produceSSM core@(Core _ funDecls) =

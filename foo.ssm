@@ -86,19 +86,16 @@ _entry:
    add
    str 3
    bra main
-add:
+id:
    link 0
    annote MP -2 -2 red "x"
    ldl -2
-   annote MP -3 -3 red "y"
-   ldl -3
-   add
    str 4
    unlink
    ret
 main:
    link 2
-   ldc 6
+   ldc 3
    annote MP 1 1 blue "x"
    ldr 2
    ldc 1
@@ -106,28 +103,27 @@ main:
    sta 0
    annote MP 1 1 blue "x"
    ldl 1
-   ldc add
-   ldc 2
-   ldc 1
-   bsr __store_thunk
-   ajs -4
+   bsr id
+   ajs -1
    ldr 4
    annote MP 2 2 blue "f"
    ldr 2
    ldc 2
    add
    sta 0
-   ldc 3
-   ldc 1
-   annote MP 2 2 blue "f"
-   ldl 2
-   bsr __call_thunk
-   ajs -3
-   ldr 4
-   ajs -1
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0
+   str 4
+   unlink
+   ret
+add:
+   link 0
+   annote MP -2 -2 red "x"
+   ldl -2
+   annote MP -3 -3 red "y"
+   ldl -3
+   add
    str 4
    unlink
    ret

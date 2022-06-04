@@ -9,10 +9,40 @@ import qualified SPL.Compiler.SSM.SSMGenLib as SSM
 
 default (Int, Text) 
 
--- "_eq_int"
--- "_eq_bool"
--- "_eq_char"
--- "_eq_void"
+genEqInt = do
+    newBlock "_eq_int"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.eq
+    SSM.str RR
+    removeStackFrame
+
+genEqBool = do
+    newBlock "_eq_bool"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.eq
+    SSM.str RR
+    removeStackFrame
+
+genEqChar = do
+    newBlock "_eq_char"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.eq
+    SSM.str RR
+    removeStackFrame
+
+genEqVoid = do
+    newBlock "_eq_void"
+    SSM.link 0
+    ldc True
+    SSM.str RR
+    removeStackFrame
+
 -- "_eq_list"
 -- "_eq_tup"
 -- "_ord_int"
