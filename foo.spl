@@ -1,14 +1,4 @@
-
-add(x,y) {
-    return x + y;
-}
-id (x) {
-    return x;
-}
-
 main () {
-    var x = 3;
-    var f = id(x);
-    print(f);
+    print(3);
     return;
 }

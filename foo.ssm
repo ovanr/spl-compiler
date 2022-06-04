@@ -354,33 +354,9 @@ __end_store_thunk:
    str 4
    unlink
    ret
-id:
-   link 0
-   annote MP -2 -2 red "x"
-   ldl -2
-   str 4
-   unlink
-   ret
 main:
-   link 2
+   link 0
    ldc 3
-   annote MP 1 1 blue "x"
-   ldr 2
-   ldc 1
-   add
-   sta 0
-   annote MP 1 1 blue "x"
-   ldl 1
-   bsr id
-   ajs -1
-   ldr 4
-   annote MP 2 2 blue "f"
-   ldr 2
-   ldc 2
-   add
-   sta 0
-   annote MP 2 2 blue "f"
-   ldl 2
    ldc 1
    ldc _print_int
    ldc 1
@@ -401,16 +377,6 @@ main:
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0
-   str 4
-   unlink
-   ret
-add:
-   link 0
-   annote MP -2 -2 red "x"
-   ldl -2
-   annote MP -3 -3 red "y"
-   ldl -3
-   add
    str 4
    unlink
    ret

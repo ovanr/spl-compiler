@@ -65,10 +65,12 @@ genEqOrdList = do
     SSM.brt failure
     SSM.ldl (-4) 
     SSM.lda (-1) 
-    SSM.lda (-3)
-    SSM.lda (-1) 
-    SSM.jsr
-    SSM.ajs (-2)
+    SSM.ldl (-3) 
+    SSM.lda (-1)
+    SSM.ldc 2
+    SSM.ldl (-2)
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-4)
     SSM.ldr RR
     SSM.brf failure
     SSM.lda (-4)
@@ -94,18 +96,20 @@ genEqOrdTup = do
     SSM.lda 0
     SSM.ldl (-4)
     SSM.lda 0
+    SSM.ldc 2
     SSM.ldl (-2)
-    SSM.jsr
-    SSM.ajs (-2)
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-4)
     SSM.ldr RR
     SSM.brf failure
     SSM.ldl (-5)
     SSM.lda (-1)
     SSM.ldl (-4)
     SSM.lda (-1)
+    SSM.ldc 2
     SSM.ldl (-3)
-    SSM.jsr
-    SSM.ajs (-2)
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-4)
     SSM.ldr RR
     SSM.brf failure
     ldc True
@@ -187,9 +191,9 @@ genPrint = do
     newBlock "print"
     SSM.link 0
     SSM.ldl (-3)
+    SSM.ldc 1
     SSM.ldl (-2)
-    SSM.jsr
-    SSM.ajs (-2)
+    SSM.bsr "__call_thunk"
     removeStackFrame
 
 genPrintInt = do
@@ -235,9 +239,12 @@ genPrintList = do
     SSM.brt end     -- print first element without prepended comma
     SSM.ldl (-3)    -- load list ptr
     SSM.lda (-1)    -- get element of list node
+    SSM.ldc 1
     SSM.ldl (-2)    -- load print fun
-    SSM.jsr         -- call print fun
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-3)
     SSM.ldl (-3)    -- load pointer to next list node
+    SSM.lda 0     
     newBlock loop   -- expects pointer to next list node on top of stack
     SSM.ldc 0       -- check for null pointer
     SSM.eq
