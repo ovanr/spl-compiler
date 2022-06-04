@@ -146,7 +146,7 @@ extractArgsVars (CoreFunDecl _ _ args _ _) = extractArgsVars' (-2) args
             SSMVar id (Just (Address MP offset)) Arg : extractArgsVars' (offset - 1) xs
 
 extractLocalVars :: CoreFunDecl -> [SSMVar]
-extractLocalVars (CoreFunDecl _ _ _ _ (CoreFunBody _ varDecls _)) = 
+extractLocalVars (CoreFunDecl _ _ _ _ (CoreFunBody _ varDecls _)) =
     extractLocalVars' 1 varDecls
     where
         extractLocalVars' :: Int -> [CoreVarDecl] -> [SSMVar]
@@ -270,3 +270,11 @@ ldl = op1 "ldl"
 
 lds :: Int -> SSMMonad ()
 lds = op1 "lds"
+
+printChar :: Char -> SSMMonad()
+printChar c = do
+    ldc c
+    trap 1
+
+printString :: String -> SSMMonad()
+printString = mapM_ printChar
