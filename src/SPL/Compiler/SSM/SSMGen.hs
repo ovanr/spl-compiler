@@ -188,8 +188,7 @@ coreToSSM (Core varDecls funDecls) = do
     when hasMain $ 
         SSM.bra "main"
     SSM.halt
-    genStoreThunkFun
-    genCallThunkFun
+    mkRuntimeSystem
     forM_ funDecls coreFunDeclsToSSM
 
     where

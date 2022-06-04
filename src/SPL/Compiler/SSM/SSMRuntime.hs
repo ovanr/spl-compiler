@@ -43,8 +43,86 @@ genEqVoid = do
     SSM.str RR
     removeStackFrame
 
--- "_eq_list"
--- "_eq_tup"
+genEqList = do
+    startLoop <- newLabel "loop_start" 
+    success <- newLabel "success" 
+    failure <- newLabel "failure" 
+    newBlock "_eq_list"
+    SSM.link 0
+    newBlock startLoop
+    SSM.ldl (-4)
+    SSM.ldl (-3)
+    SSM.eq
+    SSM.brt success
+    SSM.ldc 0
+    SSM.ldl (-4)
+    SSM.eq
+    SSM.brt failure
+    SSM.ldc 0
+    SSM.ldl (-3)
+    SSM.eq
+    SSM.brt failure
+    SSM.ldl (-4)
+    SSM.lda 0 
+    SSM.ldl (-3)
+    SSM.lda 0 
+    SSM.ldl (-2)
+    SSM.jsr
+    SSM.ajs (-2)
+    SSM.ldr RR
+    SSM.brf failure
+    SSM.ldl (-4)
+    SSM.ldc 1
+    SSM.sub
+    SSM.stl (-4)
+    SSM.ldl (-3)
+    SSM.ldc 1
+    SSM.sub
+    SSM.stl (-3)
+    SSM.bra startLoop
+    newBlock failure
+    ldc False
+    SSM.str RR
+    removeStackFrame
+    newBlock success
+    ldc True
+    SSM.str RR
+    removeStackFrame
+
+genEqTup = do 
+    failure <- newLabel "failure"
+    newBlock "_eq_tup"
+    SSM.link 0
+    SSM.ldl (-5)
+    SSM.lda 0
+    SSM.ldl (-4)
+    SSM.lda 0
+    SSM.ldl (-2)
+    SSM.jsr
+    SSM.ajs (-2)
+    SSM.ldr RR
+    SSM.brf failure
+    SSM.ldl (-5)
+    SSM.ldc 1
+    SSM.sub
+    SSM.lda 0
+    SSM.ldl (-4)
+    SSM.ldc 1
+    SSM.sub
+    SSM.lda 0
+    SSM.ldl (-3)
+    SSM.jsr
+    SSM.ajs (-2)
+    SSM.ldr RR
+    SSM.brf failure
+    ldc True
+    SSM.str RR
+    removeStackFrame
+    newBlock failure
+    ldc False
+    SSM.str RR
+    removeStackFrame
+
 -- "_ord_int"
 -- "_ord_bool"
 -- "_ord_char"
@@ -141,3 +219,15 @@ genCallThunkFun = do
     SSM.stl 1
     SSM.jsr
     removeStackFrame
+
+mkRuntimeSystem :: SSMMonad ()
+mkRuntimeSystem = 
+    let actions = [genEqInt,
+                   genEqBool,
+                   genEqChar,
+                   genEqVoid,
+                   genEqList,
+                   genEqTup,
+                   genCallThunkFun,
+                   genStoreThunkFun] 
+    in sequence_ actions
