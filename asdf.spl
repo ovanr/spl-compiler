@@ -8,5 +8,7 @@ foo (xs) {
 
 main () {
     var x = "hello";
+    var y = (-3);
     print(foo(x));
+    print (2 ^ y);
 }

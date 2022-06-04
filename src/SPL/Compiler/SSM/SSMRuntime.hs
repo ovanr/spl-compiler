@@ -9,6 +9,42 @@ import qualified SPL.Compiler.SSM.SSMGenLib as SSM
 
 default (Int, Text) 
 
+genPowFun = do
+    newBlock "_pow"
+    end <- newLabel "end"
+    loop <- newLabel "loop"
+    exception <- newLabel "exception"
+    SSM.link 2
+    SSM.ldl (-3)
+    SSM.stl 2
+    SSM.ldc 1
+    SSM.stl 1
+    newBlock loop
+    SSM.ldl (-2)
+    SSM.ldc 0
+    SSM.lt
+    SSM.brt exception
+    SSM.ldl (-2)
+    SSM.ldc 0
+    SSM.le
+    SSM.brt end
+    SSM.ldl 1
+    SSM.ldl 2
+    SSM.mul
+    SSM.stl 1
+    SSM.ldl (-2)
+    SSM.ldc 1
+    SSM.sub
+    SSM.stl (-2)
+    SSM.bra loop
+    newBlock end
+    SSM.ldl 1
+    SSM.str RR
+    removeStackFrame
+    newBlock exception
+    SSM.printString "\n**Exception: negative exponent**"
+    SSM.halt
+    
 genEqInt = do
     newBlock "_eq_int"
     SSM.link 0
@@ -404,7 +440,8 @@ genCallThunkFun = do
 
 mkRuntimeSystem :: SSMMonad ()
 mkRuntimeSystem = 
-    let actions = [genEqInt,
+    let actions = [genPowFun,
+                   genEqInt,
                    genEqBool,
                    genEqChar,
                    genEqVoid,

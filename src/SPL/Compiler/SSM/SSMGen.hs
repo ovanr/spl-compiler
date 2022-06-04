@@ -90,7 +90,10 @@ coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
         LogAnd -> SSM.and
         LogOr -> SSM.or
         Cons -> impossible
-        Pow -> error "pow not implemented"
+        Pow -> do
+            SSM.bsr "_pow"
+            SSM.ajs (-2)
+            SSM.ldr RR
 coreExprToSSM (EmptyListExpr loc ct) = SSM.ldc 0
 coreExprToSSM (TupExpr loc e1 e2) = do 
     coreExprToSSM e2
@@ -208,6 +211,7 @@ produceSSM core@(Core _ funDecls) =
         builtInsArgSize :: Map Text Int
         builtInsArgSize = M.fromList
             [("print", 2),
+             ("_pow", 2),
              ("_eq_int", 2),
              ("_eq_bool", 2),
              ("_eq_char", 2),
