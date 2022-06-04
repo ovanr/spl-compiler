@@ -136,6 +136,64 @@ genEqTup = do
 -- "_print_list"
 -- "_print_tup"
 
+genPrintInt = do
+    newBlock "_print_int"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.trap 0
+    removeStackFrame
+
+genPrintChar = do
+    newBlock "_print_char"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.trap 1
+    removeStackFrame
+
+genPrintBool = do
+    branchFalse <- newLabel "false" 
+    newBlock "_print_bool"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.brf branchFalse
+    SSM.printString "True"
+    removeStackFrame
+    newBlock branchFalse
+    SSM.printString "False"
+    removeStackFrame
+
+genPrintList = do
+    end <- newLabel "end"
+    loop <- newLabel "loop"
+    newBlock "_print_list"
+    SSM.link 0
+    SSM.printChar '['
+    SSM.ldl (-3)    -- load pointer to fst list node
+    SSM.ldc 0       -- check for null pointer
+    SSM.eq
+    SSM.brt end     -- print first element without prepended comma
+    SSM.ldl (-3)    -- load list ptr
+    SSM.lda (-1)    -- get element of list node
+    SSM.ldl (-2)    -- load print fun
+    SSM.jsr         -- call print fun
+    SSM.ldl (-3)    -- load pointer to next list node
+    newBlock loop   -- expects pointer to next list node on top of stack
+    SSM.ldc 0       -- check for null pointer
+    SSM.eq
+    SSM.brt end
+    SSM.printChar ','
+    SSM.ldl (-3)    -- load list ptr
+    SSM.lda (-1)    -- get element of list node
+    SSM.ldl (-2)    -- load print fun
+    SSM.jsr         -- call print fun
+    SSM.ldl (-3)    -- load pointer to next list node
+    SSM.bra loop
+    newBlock end
+    SSM.printChar ']'
+    removeStackFrame
+
+
+
 genStoreThunkFun :: SSMMonad ()
 genStoreThunkFun = do
     newBlock "__store_thunk"
