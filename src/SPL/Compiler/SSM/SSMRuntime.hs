@@ -170,6 +170,10 @@ genHd = do
     newBlock "hd"
     SSM.link 0
     SSM.ldl (-2)
+    SSM.ldc 0       -- check for null pointer -> empty list
+    SSM.eq
+    SSM.brt "__get_hd_exception"
+    SSM.ldl (-2)
     SSM.lda (-1)
     SSM.str RR
     removeStackFrame
@@ -177,6 +181,10 @@ genHd = do
 genTl = do
     newBlock "tl"
     SSM.link 0
+    SSM.ldl (-2)
+    SSM.ldc 0       -- check for null pointer -> empty list
+    SSM.eq
+    SSM.brt "__get_tl_exception"
     SSM.ldl (-2)
     SSM.lda 0
     SSM.str RR
@@ -402,6 +410,26 @@ genCallThunkFun = do
     SSM.jsr
     removeStackFrame
 
+genAssignTailEmptyListException = do
+    newBlock "__assign_tl_exception"
+    SSM.printString "Exception: Cannot assign to tail of empty list!"
+    SSM.halt
+
+genAssignHeadEmptyListException = do
+    newBlock "__assign_hd_exception"
+    SSM.printString "Exception: Cannot assign to head of empty list!"
+    SSM.halt
+
+genGetHeadEmptyListException = do
+    newBlock "__get_hd_exception"
+    SSM.printString "Exception: Cannot get head of empty list!"
+    SSM.halt
+
+genGetTailEmptyListException = do
+    newBlock "__get_tl_exception"
+    SSM.printString "Exception: Cannot get tail of empty list!"
+    SSM.halt
+
 mkRuntimeSystem :: SSMMonad ()
 mkRuntimeSystem = 
     let actions = [genEqInt,
@@ -428,5 +456,9 @@ mkRuntimeSystem =
                    genSnd,
                    genPrint,
                    genCallThunkFun,
-                   genStoreThunkFun] 
+                   genStoreThunkFun,
+                   genGetHeadEmptyListException,
+                   genGetTailEmptyListException,
+                   genAssignHeadEmptyListException,
+                   genAssignTailEmptyListException] 
     in sequence_ actions

@@ -126,8 +126,8 @@ coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
 
     where
         traverseField :: Field -> SSMMonad ()
-        traverseField Hd{} = SSM.lda 0 >> SSM.ldc 1 >> SSM.sub
-        traverseField Tl{} = SSM.lda 0
+        traverseField Hd{} = SSM.lda 0 >> SSM.lds 0 >> SSM.ldc 0 >> SSM.eq >> SSM.brt "__assign_hd_exception" >> SSM.ldc 1 >> SSM.sub
+        traverseField Tl{} = SSM.lda 0 >> SSM.lds 0 >> SSM.ldc 0 >> SSM.eq >> SSM.brt "__assign_tl_exception"
         traverseField Fst{} = SSM.lda 0
         traverseField Snd{} = SSM.lda 0 >> SSM.ldc 1 >> SSM.sub
 
