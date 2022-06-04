@@ -76,8 +76,10 @@ instance PrettyPrint CoreStmt where
         mkIdent n <> "while (" <> toCode n cond <> ") {" <>
             T.unlines ("": map (toCode (n+1)) body) <>
         mkIdent n <> "}"
+    toCode n (AssignStmt _ id t [] expr) = 
+        mkIdent n <> toCode n id <> " = " <> toCode n expr <> ";"
     toCode n (AssignStmt _ id t fd expr) = 
-        mkIdent n <> toCode n id <> T.intercalate "." (map (toCode n) fd) <> " = " <> toCode n expr <> ";"
+        mkIdent n <> toCode n id <> "." <>  T.intercalate "." (map (toCode n) fd) <> " = " <> toCode n expr <> ";"
     toCode n (FunCallStmt fCall) = mkIdent n <> toCode n fCall <> ";"
     toCode n (ReturnStmt _ Nothing) = mkIdent n <> "return;"
     toCode n (ReturnStmt _ (Just expr)) = mkIdent n <> "return " <> toCode n expr <> ";"

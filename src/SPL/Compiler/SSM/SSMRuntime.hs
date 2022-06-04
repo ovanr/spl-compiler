@@ -157,6 +157,15 @@ genOrdVoid = do
     SSM.str RR
     removeStackFrame
 
+genIsEmpty = do
+    newBlock "isEmpty"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.ldc 0
+    SSM.eq
+    SSM.str RR
+    removeStackFrame
+
 genHd = do
     newBlock "hd"
     SSM.link 0
@@ -389,6 +398,7 @@ mkRuntimeSystem =
                    genPrintVoid,
                    genPrintList,
                    genPrintTup,
+                   genIsEmpty,
                    genHd,
                    genTl,
                    genFst,

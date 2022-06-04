@@ -121,15 +121,15 @@ coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
     coreExprToSSM e
     var <- getVar id
     loadVarAddrToTopStack var
-    intercalateM (SSM.lda 0) $ map traverseField fields
+    mapM_ traverseField fields
     SSM.sta 0
 
     where
         traverseField :: Field -> SSMMonad ()
-        traverseField Hd{} = SSM.ldc 1 >> SSM.sub
-        traverseField Tl{} = pure ()
-        traverseField Fst{} = pure ()
-        traverseField Snd{} = SSM.ldc 1 >> SSM.sub
+        traverseField Hd{} = SSM.lda 0 >> SSM.ldc 1 >> SSM.sub
+        traverseField Tl{} = SSM.lda 0
+        traverseField Fst{} = SSM.lda 0
+        traverseField Snd{} = SSM.lda 0 >> SSM.ldc 1 >> SSM.sub
 
 coreStmtToSSM (FunCallStmt funCall) = coreFunCallToSSM funCall >> SSM.ajs (-1)
 coreStmtToSSM (ReturnStmt _ Nothing) = do
@@ -226,6 +226,7 @@ produceSSM core@(Core _ funDecls) =
              ("_print_void", 1),
              ("_print_list", 2),
              ("_print_tup", 3),
+             ("isEmpty", 1),
              ("hd", 1),
              ("tl", 1),
              ("fst", 1),

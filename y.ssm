@@ -386,16 +386,6 @@ plus:
    str 4
    unlink
    ret
-or:
-   link 0
-   annote MP -2 -2 red "b"
-   ldl -2
-   annote MP -3 -3 red "c"
-   ldl -3
-   or
-   str 4
-   unlink
-   ret
 map:
    link 0
    annote MP -3 -3 red "list"
@@ -507,58 +497,12 @@ sum:
    str 4
    unlink
    ret
-any:
-   link 0
-   annote MP -2 -2 red "list"
-   ldl -2
-   ldc 0
-   ldc or
-   ldc 2
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr foldl
-   ajs -3
-   ldr 4
-   str 4
-   unlink
-   ret
-and:
-   link 0
-   annote MP -2 -2 red "b"
-   ldl -2
-   annote MP -3 -3 red "c"
-   ldl -3
-   and
-   str 4
-   unlink
-   ret
-allOlderThan18:
-   link 0
-   annote MP -2 -2 red "list"
-   ldl -2
-   ldc ge18
-   ldc 1
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr map
-   ajs -2
-   ldr 4
-   bsr any
-   ajs -1
-   ldr 4
-   str 4
-   unlink
-   ret
 main:
-   link 0
-   ldc 18
+   link 1
+   ldc 1
    ldc 2
-   ldc 30
-   ldc 48
+   ldc 3
+   ldc 4
    ldc 5
    ldc 0
    stmh 2
@@ -566,11 +510,16 @@ main:
    stmh 2
    stmh 2
    stmh 2
-   bsr allOlderThan18
+   annote MP 1 1 blue "xs"
+   ldla 1
+   sta 0
+   annote MP 1 1 blue "xs"
+   ldl 1
+   bsr sum
    ajs -1
    ldr 4
    ldc 1
-   ldc _print_bool
+   ldc _print_int
    ldc 1
    ldc 0
    bsr __store_thunk
@@ -589,6 +538,16 @@ main:
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0
+   str 4
+   unlink
+   ret
+and:
+   link 0
+   annote MP -2 -2 red "b"
+   ldl -2
+   annote MP -3 -3 red "c"
+   ldl -3
+   and
    str 4
    unlink
    ret

@@ -90,6 +90,7 @@ voidVar = SSMVar "_void_var" (Just (Address GP 0)) Local
 newLabel :: Text -> SSMMonad Text
 newLabel prefix = do
     c <- T.pack . show <$> use counter
+    counter += 1
     let label = "__" <> prefix <> c
     pure label
 
