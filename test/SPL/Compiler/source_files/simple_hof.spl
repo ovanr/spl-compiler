@@ -1,0 +1,10 @@
+add(x, y, z){
+    return x + y + z;
+}
+
+main()
+{
+    var a = add(3);
+    var b = a(4);
+    return b(2);
+}
