@@ -207,16 +207,19 @@ _print_list:
    ldl -3
    lda 0
 __loop1:
+   lds 0
+   lds 0
    ldc 0
    eq
    brt __end1
    ldc 44
    trap 1
-   ldl -3
    lda -1
+   ldc 1
    ldl -2
-   jsr
-   ldl -3
+   bsr __call_thunk
+   ajs -3
+   lda 0
    bra __loop1
 __end1:
    ldc 93
@@ -365,6 +368,7 @@ __end_store_thunk:
    ret
 id:
    link 0
+<<<<<<< HEAD
    annote MP -2 -2 red "x"
    ldl -2
    str 4
@@ -391,10 +395,18 @@ main:
    ldc 1
    ldc 2
    ldc 3
+=======
+   ldc 114
+   ldc 105
+   ldc 103
+   ldc 104
+   ldc 116
+>>>>>>> b4da3183e70e7a0e6791dd494f493c03719f090c
    ldc 0
    stmh 2
    stmh 2
    stmh 2
+<<<<<<< HEAD
    annote MP 2 2 blue "s"
    ldr 2
    ldc 2
@@ -440,12 +452,22 @@ main:
    ldr 4
    brf __if_else1
    ldc 8
+=======
+   stmh 2
+   stmh 2
+>>>>>>> b4da3183e70e7a0e6791dd494f493c03719f090c
    ldc 1
-   ldc _print_int
+   ldc _print_char
    ldc 1
    ldc 0
    bsr __store_thunk
    ajs -3
+   ldr 4
+   ldc _print_list
+   ldc 2
+   ldc 1
+   bsr __store_thunk
+   ajs -4
    ldr 4
    ldc print
    ldc 2
@@ -516,3 +538,4 @@ __if_end1:
    str 4
    unlink
    ret
+

@@ -8,6 +8,7 @@ id (x) {
 }
 
 main () {
+<<<<<<< HEAD
     var x = 3 + 3;
     var s = [1,2,3];
     var f = add(x);
@@ -16,5 +17,8 @@ main () {
     }
     x = 4;
     print((f(4), f(8)));
+=======
+    print("right");
+>>>>>>> b4da3183e70e7a0e6791dd494f493c03719f090c
     return;
 }
