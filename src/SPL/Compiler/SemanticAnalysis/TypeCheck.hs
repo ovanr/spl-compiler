@@ -30,6 +30,7 @@ import SPL.Compiler.SemanticAnalysis.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.Unify
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
 import SPL.Compiler.Common.Misc (inSandboxState)
+import Debug.Trace (traceM)
 
 
 typeCheckExpr :: AST.ASTExpr -> CoreType -> TCMonad CoreExpr
@@ -346,9 +347,9 @@ sanityCheck (Core varDecls funDecls) = do
                 "[" <> T.intercalate ", " (S.toList ftv) <> "] " <>
                 "found in type " <> T.pack (show t) <> ":") t
             >>= throwErr
-
-    when (isNothing main) $
+    
+    unless hasMain $
         throwWarning "No 'main' function found. Program will not execute"
 
     where
-        main = mapM (^? traversed.funId.idName.filtered (== "main")) funDecls
+        hasMain = "main" `elem` map (^. traversed.funId.idName) funDecls

@@ -9,19 +9,40 @@ import qualified SPL.Compiler.SSM.SSMGenLib as SSM
 
 default (Int, Text) 
 
+-- "_eq_int"
+-- "_eq_bool"
+-- "_eq_char"
+-- "_eq_void"
+-- "_eq_list"
+-- "_eq_tup"
+-- "_ord_int"
+-- "_ord_bool"
+-- "_ord_char"
+-- "_ord_void"
+-- "_ord_list"
+-- "_ord_tup"
+-- "_print_int"
+-- "_print_bool"
+-- "_print_char"
+-- "_print_void"
+-- "_print_list"
+-- "_print_tup"
+
 genStoreThunkFun :: SSMMonad ()
 genStoreThunkFun = do
-    newBlock "store_thunk"
-    SSM.link 1
-    SSM.ldl (-2)
-    SSM.ldc 4
-    SSM.add
-    SSM.stl 1
-    newBlock "store_thunk_loop"
+    newBlock "__store_thunk"
+    SSM.link 1 
+    SSM.ldl (-2) -- load first arg = actual num of arguments passed to thunk
+    SSM.ldc 4 
+    SSM.add 
+    SSM.stl 1 -- local variable stores offset from MP to the head of the thunk
+    SSM.ldc 0
+    newBlock "__store_thunk_loop"
     SSM.ldl 1
     SSM.ldc 1
     SSM.eq
-    SSM.brt "end_store_thunk"
+    SSM.brt "__end_store_thunk"
+    SSM.ajs (-1)
     SSM.ldr MP
     SSM.ldl 1
     SSM.sub
@@ -31,22 +52,22 @@ genStoreThunkFun = do
     SSM.ldc 1
     SSM.sub
     SSM.stl 1
-    SSM.bra "store_thunk_loop"
-    newBlock "end_store_thunk"
+    SSM.bra "__store_thunk_loop"
+    newBlock "__end_store_thunk"
     SSM.str RR
     removeStackFrame
 
 genCallThunkFun :: SSMMonad ()
 genCallThunkFun = do
-    newBlock "call_thunk"
+    newBlock "__call_thunk"
     SSM.link 1
-    SSM.ldl (-3)
-    SSM.stl 1
-    newBlock "load_args_loop"
+    SSM.ldl (-3) -- number of new arguments given to the existing thunk
+    SSM.stl 1 
+    newBlock "__load_args_loop"
     SSM.ldl 1
     SSM.ldc 1
     SSM.ge
-    SSM.brf "load_thunk"
+    SSM.brf "__load_thunk"
     SSM.ldr MP 
     SSM.ldl 1
     SSM.sub 
@@ -55,18 +76,18 @@ genCallThunkFun = do
     SSM.ldc 1
     SSM.sub 
     SSM.stl 1
-    SSM.bra "load_args_loop"
-    newBlock "load_thunk"
+    SSM.bra "__load_args_loop"
+    newBlock "__load_thunk"
     SSM.ldl (-2)
     SSM.lda 0
     SSM.ldc 3
     SSM.add 
     SSM.stl 1
-    newBlock "load_thunk_loop"
+    newBlock "__load_thunk_loop"
     SSM.ldl 1
     SSM.ldc 1
     SSM.ge 
-    SSM.brf "eval_thunk"
+    SSM.brf "__eval_thunk"
     SSM.ldl (-2)
     SSM.ldl 1
     SSM.sub 
@@ -75,17 +96,17 @@ genCallThunkFun = do
     SSM.ldc 1
     SSM.sub 
     SSM.stl 1
-    SSM.bra "load_thunk_loop"
-    newBlock "eval_thunk"
+    SSM.bra "__load_thunk_loop"
+    newBlock "__eval_thunk"
     SSM.ldl (-3)
     SSM.add 
     SSM.lds (-1)
     SSM.lds (-1)
     SSM.eq 
-    SSM.brt "eval_saturated_thunk"
-    SSM.bsr "store_thunk"
+    SSM.brt "__eval_saturated_thunk"
+    SSM.bsr "__store_thunk"
     removeStackFrame
-    newBlock "eval_saturated_thunk"
+    newBlock "__eval_saturated_thunk"
     SSM.stl 1
     SSM.stl 1
     SSM.jsr

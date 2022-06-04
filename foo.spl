@@ -1,0 +1,11 @@
+
+add(x,y) {
+    return x + y;
+}
+
+main () {
+    var x = 3 + 3;
+    var f = add(x);
+    f(3);
+    return;
+}

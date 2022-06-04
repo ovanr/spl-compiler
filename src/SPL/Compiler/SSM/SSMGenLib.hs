@@ -22,6 +22,7 @@ import Control.Monad.State
 
 import SPL.Compiler.Common.TypeFunc
 import SPL.Compiler.SemanticAnalysis.Core (CoreFunDecl(..), CoreIdentifier (..), CoreFunBody (..), CoreVarDecl (..))
+import SPL.Compiler.Common.Error
 
 default (Int, Text)
 
@@ -50,6 +51,7 @@ makeLenses 'SSMVar
 data SSMGenState = SSMGenState {
     _vars :: Map Text [SSMVar],
     _counter :: Int,
+    _funArgSize :: Map Text Int,
     _output :: [[Text]]
 }
 

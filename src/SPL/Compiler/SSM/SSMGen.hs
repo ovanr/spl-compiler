@@ -9,26 +9,60 @@ import qualified Data.Map as M
 import Control.Monad.State ( forM_, execStateT )
 
 import SPL.Compiler.SSM.SSMGenLib
+import SPL.Compiler.SSM.SSMRuntime
 import qualified SPL.Compiler.SSM.SSMGenLib as SSM
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.Common.Misc (impossible, intercalateM, inSandboxState)
 import Data.Graph (SCC (..))
 import Control.Lens (use, traversed, _tail, (%~))
 import Control.Lens.Combinators (view)
+import Data.Map (Map)
+import Data.Maybe (fromJust)
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
 default (Int, Text) 
 
+coreFunCallToSSM :: CoreFunCall -> SSMMonad ()
+coreFunCallToSSM (CoreFunCall _ (FunIdentifierExpr _ (CoreIdentifier _ id)) _ args) = do
+    argSize <- fromJust . M.lookup id <$> use funArgSize 
+    if length args == argSize then do
+            mapM_ coreExprToSSM (reverse args) 
+            SSM.bsr id
+            SSM.ajs (-argSize)
+            SSM.ldr RR
+    else do
+        mapM_ coreExprToSSM (reverse args) 
+        SSM.ldc id
+        SSM.ldc argSize
+        SSM.ldc (length args)
+        SSM.bsr "__store_thunk"
+        SSM.ajs (-(length args + 3))
+        SSM.ldr RR
+coreFunCallToSSM (CoreFunCall _ e _ args) = do
+    mapM_ coreExprToSSM (reverse args) 
+    SSM.ldc (length args)
+    coreExprToSSM e
+    SSM.bsr "__call_thunk"
+    SSM.ajs (-(length args + 2))
+    SSM.ldr RR
+
 coreExprToSSM :: CoreExpr -> SSMMonad ()
 coreExprToSSM (IntExpr loc n) = SSM.ldc (fromInteger n :: Int)
 coreExprToSSM (CharExpr loc c) = SSM.ldc c
 coreExprToSSM (BoolExpr loc b) = SSM.ldc b
-coreExprToSSM (FunCallExpr cfc) = undefined
+coreExprToSSM (FunCallExpr funCall) = coreFunCallToSSM funCall
 coreExprToSSM (VarIdentifierExpr (CoreIdentifier _ id)) = do
     var <- getVar id 
     loadVarToTopStack var
-coreExprToSSM (FunIdentifierExpr ct ci) = undefined
+coreExprToSSM (FunIdentifierExpr _ (CoreIdentifier _ id)) = do
+    argSize <- fromJust . M.lookup id <$> use funArgSize 
+    SSM.ldc id
+    SSM.ldc argSize
+    SSM.ldc 0
+    SSM.bsr "__store_thunk"
+    SSM.ajs (-3)
+    SSM.ldr RR
 coreExprToSSM (OpExpr loc UnMinus e) = coreExprToSSM e >> SSM.neg
 coreExprToSSM (OpExpr loc UnNeg e) = coreExprToSSM e >> SSM.not
 coreExprToSSM (Op2Expr loc e1 t1 Cons e2 t2) = do
@@ -92,7 +126,7 @@ coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
         traverseField Fst{} = pure ()
         traverseField Snd{} = SSM.ldc (-1) >> SSM.add
 
-coreStmtToSSM (FunCallStmt cfc) = undefined
+coreStmtToSSM (FunCallStmt funCall) = coreFunCallToSSM funCall >> SSM.ajs (-1)
 coreStmtToSSM (ReturnStmt _ Nothing) = do
     loadVarToTopStack voidVar
     SSM.str RR
@@ -130,7 +164,7 @@ coreFunDeclsToSSM (CyclicSCC funs) = do
         inSandboxState vars initialEnv (coreFunDeclToSSM fun)
 
 declareGlobalVars :: [CoreVarDecl] -> SSMMonad ()
-declareGlobalVars = declareGlobalVars' 0
+declareGlobalVars varDecls = addVar voidVar >> declareGlobalVars' 1 varDecls
     where
         declareGlobalVars' :: Int -> [CoreVarDecl] -> SSMMonad ()
         declareGlobalVars' n [] = pure ()
@@ -141,6 +175,8 @@ declareGlobalVars = declareGlobalVars' 0
 
 coreToSSM :: Core -> SSMMonad ()
 coreToSSM (Core varDecls funDecls) = do
+    genStoreThunkFun
+    genCallThunkFun
     newBlock "_entry"
     SSM.ldrr GP HP
     declareGlobalVars varDecls
@@ -149,13 +185,21 @@ coreToSSM (Core varDecls funDecls) = do
     SSM.ldr HP
     SSM.add
     SSM.str HP
-    SSM.bra "_start"
+    SSM.bra "main" -- TODO: what if main doesn't exist
     forM_ funDecls coreFunDeclsToSSM
 
 produceSSM :: Core -> Either Text [Text]
-produceSSM core =
+produceSSM core@(Core _ funDecls) =
     identBlocks . view output
-    <$> execStateT (coreToSSM core) (SSMGenState mempty 1 [])
+    <$> execStateT (coreToSSM core) (SSMGenState mempty 1 mkFunArgSize [])
     where
         identBlocks :: [[Text]] -> [Text]
         identBlocks = concatMap (_tail . traversed %~ ("   " <>))
+
+        mkFunArgSize :: Map Text Int
+        mkFunArgSize = M.fromList $ concatMap (map mkFunArgSizeHelper . unWrap) funDecls
+        mkFunArgSizeHelper (CoreFunDecl _ (CoreIdentifier _ id) args _ _) = (id, length args)
+
+        unWrap :: SCC a -> [a]
+        unWrap (AcyclicSCC a) = [a]
+        unWrap (CyclicSCC as) = as
