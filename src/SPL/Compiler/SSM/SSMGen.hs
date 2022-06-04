@@ -68,8 +68,8 @@ coreExprToSSM (FunIdentifierExpr _ (CoreIdentifier _ id)) = do
 coreExprToSSM (OpExpr loc UnMinus e) = coreExprToSSM e >> SSM.neg
 coreExprToSSM (OpExpr loc UnNeg e) = coreExprToSSM e >> SSM.not
 coreExprToSSM (Op2Expr loc e1 t1 Cons e2 t2) = do
-    coreExprToSSM e2
     coreExprToSSM e1
+    coreExprToSSM e2
     SSM.stmh 2
 coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
     coreExprToSSM e1
@@ -123,10 +123,10 @@ coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
 
     where
         traverseField :: Field -> SSMMonad ()
-        traverseField Hd{} = pure ()
-        traverseField Tl{} = SSM.ldc (-1) >> SSM.add
+        traverseField Hd{} = SSM.ldc 1 >> SSM.sub
+        traverseField Tl{} = pure ()
         traverseField Fst{} = pure ()
-        traverseField Snd{} = SSM.ldc (-1) >> SSM.add
+        traverseField Snd{} = SSM.ldc 1 >> SSM.sub
 
 coreStmtToSSM (FunCallStmt funCall) = coreFunCallToSSM funCall >> SSM.ajs (-1)
 coreStmtToSSM (ReturnStmt _ Nothing) = do
@@ -181,7 +181,7 @@ coreToSSM (Core varDecls funDecls) = do
     SSM.ldrr GP HP
     declareGlobalVars varDecls
     mapM_ coreVarDeclToSSM varDecls
-    SSM.ldc (length varDecls)
+    SSM.ldc (length varDecls + 1)
     SSM.ldr HP
     SSM.add
     SSM.str HP

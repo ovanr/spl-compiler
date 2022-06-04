@@ -43,11 +43,12 @@ genEqVoid = do
     SSM.str RR
     removeStackFrame
 
-genEqList = do
+genEqOrdList = do
     startLoop <- newLabel "loop_start" 
     success <- newLabel "success" 
     failure <- newLabel "failure" 
     newBlock "_eq_list"
+    newBlock "_ord_list"
     SSM.link 0
     newBlock startLoop
     SSM.ldl (-4)
@@ -62,22 +63,17 @@ genEqList = do
     SSM.ldl (-3)
     SSM.eq
     SSM.brt failure
-    SSM.ldl (-4)
-    SSM.lda 0 
-    SSM.ldl (-3)
-    SSM.lda 0 
-    SSM.ldl (-2)
+    SSM.ldl (-4) 
+    SSM.lda (-1) 
+    SSM.lda (-3)
+    SSM.lda (-1) 
     SSM.jsr
     SSM.ajs (-2)
     SSM.ldr RR
     SSM.brf failure
-    SSM.ldl (-4)
-    SSM.ldc 1
-    SSM.sub
+    SSM.lda (-4)
     SSM.stl (-4)
-    SSM.ldl (-3)
-    SSM.ldc 1
-    SSM.sub
+    SSM.lda (-3)
     SSM.stl (-3)
     SSM.bra startLoop
     newBlock failure
@@ -89,9 +85,10 @@ genEqList = do
     SSM.str RR
     removeStackFrame
 
-genEqTup = do 
+genEqOrdTup = do 
     failure <- newLabel "failure"
     newBlock "_eq_tup"
+    newBlock "_ord_tup"
     SSM.link 0
     SSM.ldl (-5)
     SSM.lda 0
@@ -103,13 +100,9 @@ genEqTup = do
     SSM.ldr RR
     SSM.brf failure
     SSM.ldl (-5)
-    SSM.ldc 1
-    SSM.sub
-    SSM.lda 0
+    SSM.lda (-1)
     SSM.ldl (-4)
-    SSM.ldc 1
-    SSM.sub
-    SSM.lda 0
+    SSM.lda (-1)
     SSM.ldl (-3)
     SSM.jsr
     SSM.ajs (-2)
@@ -123,18 +116,100 @@ genEqTup = do
     SSM.str RR
     removeStackFrame
 
--- "_ord_int"
--- "_ord_bool"
--- "_ord_char"
--- "_ord_void"
--- "_ord_list"
--- "_ord_tup"
--- "_print_int"
--- "_print_bool"
--- "_print_char"
--- "_print_void"
--- "_print_list"
--- "_print_tup"
+genPrintTup = do 
+    failure <- newLabel "failure"
+    newBlock "_print_tup"
+    SSM.link 0
+    printChar '('
+    SSM.ldla (-4)
+    SSM.ldl (-2)
+    SSM.jsr
+    SSM.ajs (-1)
+    printChar ','
+    SSM.ldl (-5)
+    SSM.lda (-1)
+    SSM.ldl (-3)
+    SSM.jsr
+    SSM.ajs (-1)
+    printChar ')'
+    SSM.str RR
+    removeStackFrame
+
+printChar = undefined
+printString = undefined
+genOrdInt = do
+    newBlock "_ord_int"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.lt
+    SSM.str RR
+    removeStackFrame
+
+genOrdBool = do
+    newBlock "_ord_bool"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.not
+    SSM.ldl (-3)
+    SSM.and
+    SSM.str RR
+    removeStackFrame
+
+genOrdChar = do
+    newBlock "_ord_char"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.lt
+    SSM.str RR
+    removeStackFrame
+
+genOrdVoid = do
+    newBlock "_ord_void"
+    SSM.link 0
+    ldc False
+    SSM.str RR
+    removeStackFrame
+
+genHd = do
+    newBlock "hd"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.lda (-1)
+    SSM.str RR
+    removeStackFrame
+
+genTl = do
+    newBlock "tl"
+    SSM.link 0
+    SSM.ldla (-2)
+    SSM.str RR
+    removeStackFrame
+
+genFst = do
+    newBlock "fst"
+    SSM.link 0
+    SSM.ldla (-2)
+    SSM.str RR
+    removeStackFrame
+
+genSnd = do
+    newBlock "snd"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.lda (-1)
+    SSM.str RR
+    removeStackFrame
+
+genPrint = do
+    newBlock "print"
+    SSM.link 0
+    SSM.ldl (-3)
+    SSM.ldl (-2)
+    SSM.jsr
+    SSM.ajs (-2)
+    removeStackFrame
 
 genStoreThunkFun :: SSMMonad ()
 genStoreThunkFun = do
@@ -226,8 +301,18 @@ mkRuntimeSystem =
                    genEqBool,
                    genEqChar,
                    genEqVoid,
-                   genEqList,
-                   genEqTup,
+                   genEqOrdList,
+                   genEqOrdTup,
+                   genOrdInt,
+                   genOrdBool,
+                   genOrdChar,
+                   genOrdVoid,
+                   genPrintTup,
+                   genHd,
+                   genTl,
+                   genFst,
+                   genSnd,
+                   genPrint,
                    genCallThunkFun,
                    genStoreThunkFun] 
     in sequence_ actions

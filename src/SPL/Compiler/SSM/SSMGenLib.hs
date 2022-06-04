@@ -218,6 +218,9 @@ sta = op1 "sta"
 lda :: Int -> SSMMonad ()
 lda = op1 "lda"
 
+ldla :: Int -> SSMMonad ()
+ldla = op1 "ldla"
+
 add = op0 "add"
 sub = op0 "sub"
 mul = op0 "mul"
