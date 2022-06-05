@@ -20,7 +20,6 @@ import Data.Map (Map)
 import Data.Maybe (fromJust)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when)
-import Debug.Trace
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
@@ -221,33 +220,24 @@ produceSSM core@(Core _ funDecls) =
         identBlocks = concatMap (_tail . traversed %~ ("   " <>))
 
         builtInsArgSize :: Map Text Int
-        builtInsArgSize = M.fromList
+        builtInsArgSize = M.fromList $
             [("print", 2),
              ("_pow", 2),
-             ("_eq_int", 2),
-             ("_eq_bool", 2),
-             ("_eq_char", 2),
-             ("_eq_void", 2),
-             ("_eq_list", 3),
-             ("_eq_tup", 4),
-             ("_ord_int", 2),
-             ("_ord_bool", 2),
-             ("_ord_char", 2),
-             ("_ord_void", 2),
-             ("_ord_list", 3),
-             ("_ord_tup", 4),
+             ("isEmpty", 1),
+             ("hd", 1),
+             ("tl", 1),
+             ("fst", 1),
+             ("snd", 1),
              ("_print_int", 1),
              ("_print_bool", 1),
              ("_print_char", 1),
              ("_print_char_list", 1),
              ("_print_void", 1),
              ("_print_list", 2),
-             ("_print_tup", 3),
-             ("isEmpty", 1),
-             ("hd", 1),
-             ("tl", 1),
-             ("fst", 1),
-             ("snd", 1)]
+             ("_print_tup", 3)] ++
+             [ ("_" <> tcon <> "_" <> typ, numArgs) 
+                | tcon <- ["eq", "lt", "le", "gt", "ge"], 
+                  (typ, numArgs) <- [("int", 2), ("bool", 2), ("char", 2), ("void", 2), ("list", 3), ("tup", 4)] ]
 
         userFunArgSize :: Map Text Int
         userFunArgSize = M.fromList $ concatMap (map userFunArgSizeHelper . unWrap) funDecls

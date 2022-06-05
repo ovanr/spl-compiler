@@ -1,0 +1,13 @@
+
+
+apply (f, x) {
+    return f(x);
+}
+
+add(x, y) {
+    return x + y;
+}
+main() {
+    var y = apply(add);
+    print(y(4, 6));
+}

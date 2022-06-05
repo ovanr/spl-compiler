@@ -109,32 +109,29 @@ rewriteTConExpr e@(FunIdentifierExpr typ (CoreIdentifier loc id)) = do
         [] -> e
         xs -> let funCallType = foldr (CoreFunType loc . (Just . snd)) typ instances
               in FunCallExpr $ CoreFunCall loc e funCallType (map fst instances)
+rewriteTConExpr e@(Op2Expr loc e1 t1 Nequal e2 t2) = do
+    rewriteTConExpr $ OpExpr loc UnNeg (Op2Expr loc e1 t1 Equal e2 t2)
 rewriteTConExpr e@(Op2Expr loc e1 t1 op e2 t2) = do
+    e1' <- rewriteTConExpr e1
+    e2' <- rewriteTConExpr e2
     case op of
         Equal -> do
-            e1' <- rewriteTConExpr e1
-            e2' <- rewriteTConExpr e2
             (expr, typ) <- mkTConArgExpr (TEq loc mempty, t1)
             pure . FunCallExpr $ CoreFunCall loc expr typ [e1', e2']
+        Nequal -> impossible
         Less -> do
-            e1' <- rewriteTConExpr e1
-            e2' <- rewriteTConExpr e2
-            (expr, typ) <- mkTConArgExpr (TOrd loc mempty, t1)
+            (expr, typ) <- mkTConArgExpr (TLt loc mempty, t1)
             pure . FunCallExpr $ CoreFunCall loc expr typ [e1', e2']
-        Greater -> OpExpr loc UnNeg <$> rewriteTConExpr (Op2Expr loc e1 t1 LessEq e2 t2)
         LessEq -> do
-            rewriteTConExpr $ 
-                Op2Expr loc (Op2Expr loc e1 t1 Less e2 t2) 
-                            (CoreBoolType loc)
-                             LogOr
-                            (Op2Expr loc e1 t1 Equal e2 t2) 
-                            (CoreBoolType loc)
-        GreaterEq -> OpExpr loc UnNeg <$> rewriteTConExpr (Op2Expr loc e1 t1 Less e2 t2)
-        Nequal -> OpExpr loc UnNeg <$> rewriteTConExpr (Op2Expr loc e1 t1 Equal e2 t2)
-        _ -> do
-            e1' <- rewriteTConExpr e1
-            e2' <- rewriteTConExpr e2
-            pure $ Op2Expr loc e1' t1 op e2' t2
+            (expr, typ) <- mkTConArgExpr (TLe loc mempty, t1)
+            pure . FunCallExpr $ CoreFunCall loc expr typ [e1', e2']
+        Greater -> do 
+            (expr, typ) <- mkTConArgExpr (TGt loc mempty, t1)
+            pure . FunCallExpr $ CoreFunCall loc expr typ [e1', e2']
+        GreaterEq -> do
+            (expr, typ) <- mkTConArgExpr (TGe loc mempty, t1)
+            pure . FunCallExpr $ CoreFunCall loc expr typ [e1', e2']
+        _ -> pure $ Op2Expr loc e1' t1 op e2' t2
 rewriteTConExpr e = pure e
 
 rewriteTConFunCall :: CoreFunCall -> TConMonad CoreFunCall
@@ -205,10 +202,10 @@ gatherTConExpr (Op2Expr loc e1 t1 op e2 t2) = do
     let freeTV = S.toList $ freeVars t1
     case op of
         Equal -> addTConToEnv $ map (TEq loc) freeTV
-        Less -> addTConToEnv $ map (TOrd loc) freeTV
-        Greater -> addTConToEnv $ map (TEq loc)  freeTV
-        LessEq -> addTConToEnv $ concatMap (\tv -> [TEq loc tv, TOrd loc tv]) freeTV
-        GreaterEq -> addTConToEnv $ concatMap (\tv -> [TEq loc tv, TOrd loc tv]) freeTV
+        Less -> addTConToEnv $ map (TLt loc) freeTV
+        Greater -> addTConToEnv $ map (TGt loc)  freeTV
+        LessEq -> addTConToEnv $ concatMap (\tv -> [TLe loc tv]) freeTV
+        GreaterEq -> addTConToEnv $ concatMap (\tv -> [TGe loc tv]) freeTV
         Nequal -> addTConToEnv $ map (TEq loc) freeTV
         _ -> pure ()
 gatherTConExpr e = pure ()

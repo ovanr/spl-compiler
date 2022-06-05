@@ -45,25 +45,9 @@ genPowFun = do
     SSM.printString "\n**Exception: negative exponent**"
     SSM.halt
     
-genEqInt = do
+genEq = do
     newBlock "_eq_int"
-    SSM.link 0
-    SSM.ldl (-3)
-    SSM.ldl (-2)
-    SSM.eq
-    SSM.str RR
-    removeStackFrame
-
-genEqBool = do
     newBlock "_eq_bool"
-    SSM.link 0
-    SSM.ldl (-3)
-    SSM.ldl (-2)
-    SSM.eq
-    SSM.str RR
-    removeStackFrame
-
-genEqChar = do
     newBlock "_eq_char"
     SSM.link 0
     SSM.ldl (-3)
@@ -72,19 +56,24 @@ genEqChar = do
     SSM.str RR
     removeStackFrame
 
-genEqVoid = do
+genTrueVoid = do
     newBlock "_eq_void"
+    newBlock "_le_void"
+    newBlock "_ge_void"
     SSM.link 0
     ldc True
     SSM.str RR
     removeStackFrame
 
-genEqOrdList = do
+genListCombinator = do
     startLoop <- newLabel "loop_start" 
     success <- newLabel "success" 
     failure <- newLabel "failure" 
     newBlock "_eq_list"
-    newBlock "_ord_list"
+    newBlock "_lt_list"
+    newBlock "_le_list"
+    newBlock "_gt_list"
+    newBlock "_ge_list"
     SSM.link 0
     newBlock startLoop
     SSM.ldl (-4)
@@ -125,10 +114,13 @@ genEqOrdList = do
     SSM.str RR
     removeStackFrame
 
-genEqOrdTup = do 
+genTupCombinator = do 
     failure <- newLabel "failure"
     newBlock "_eq_tup"
-    newBlock "_ord_tup"
+    newBlock "_lt_tup"
+    newBlock "_le_tup"
+    newBlock "_gt_tup"
+    newBlock "_ge_tup"
     SSM.link 0
     SSM.ldl (-5)
     SSM.lda 0
@@ -158,8 +150,10 @@ genEqOrdTup = do
     SSM.str RR
     removeStackFrame
 
-genOrdInt = do
-    newBlock "_ord_int"
+genLt = do
+    newBlock "_lt_int"
+    newBlock "_lt_bool"
+    newBlock "_lt_char"
     SSM.link 0
     SSM.ldl (-2)
     SSM.ldl (-3)
@@ -167,29 +161,44 @@ genOrdInt = do
     SSM.str RR
     removeStackFrame
 
-genOrdBool = do
-    newBlock "_ord_bool"
-    SSM.link 0
-    SSM.ldl (-2)
-    SSM.not
-    SSM.ldl (-3)
-    SSM.and
-    SSM.str RR
-    removeStackFrame
-
-genOrdChar = do
-    newBlock "_ord_char"
-    SSM.link 0
-    SSM.ldl (-2)
-    SSM.ldl (-3)
-    SSM.lt
-    SSM.str RR
-    removeStackFrame
-
-genOrdVoid = do
-    newBlock "_ord_void"
+genFalseVoid = do
+    newBlock "_lt_void"
+    newBlock "_gt_void"
     SSM.link 0
     ldc False
+    SSM.str RR
+    removeStackFrame
+
+genLe = do
+    newBlock "_le_int"
+    newBlock "_le_bool"
+    newBlock "_le_char"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.ldl (-3)
+    SSM.le
+    SSM.str RR
+    removeStackFrame
+
+genGt = do
+    newBlock "_gt_int"
+    newBlock "_gt_bool"
+    newBlock "_gt_char"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.ldl (-3)
+    SSM.gt
+    SSM.str RR
+    removeStackFrame
+
+genGe = do
+    newBlock "_ge_int"
+    newBlock "_ge_bool"
+    newBlock "_ge_char"
+    SSM.link 0
+    SSM.ldl (-2)
+    SSM.ldl (-3)
+    SSM.ge
     SSM.str RR
     removeStackFrame
 
@@ -469,16 +478,15 @@ genGetTailEmptyListException = do
 mkRuntimeSystem :: SSMMonad ()
 mkRuntimeSystem = 
     let actions = [genPowFun,
-                   genEqInt,
-                   genEqBool,
-                   genEqChar,
-                   genEqVoid,
-                   genEqOrdList,
-                   genEqOrdTup,
-                   genOrdInt,
-                   genOrdBool,
-                   genOrdChar,
-                   genOrdVoid,
+                   genEq,
+                   genTrueVoid,
+                   genFalseVoid,
+                   genListCombinator,
+                   genTupCombinator,
+                   genLt,
+                   genLe,
+                   genGt,
+                   genGe,
                    genPrintInt,
                    genPrintBool,
                    genPrintChar,

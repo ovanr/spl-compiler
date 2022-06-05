@@ -34,7 +34,7 @@ instance Arbitrary CoreType where
             listGen = CoreListType def <$> arbitrary
 
 instance Arbitrary Text where
-    arbitrary = oneof $ return <$> ["a1", "b1", "c1", "d1"]
+    arbitrary = oneof $ return <$> ["a", "b", "c", "d"]
 
 instance Arbitrary Subst where
     arbitrary = Subst <$> arbitrary

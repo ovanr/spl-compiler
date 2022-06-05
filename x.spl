@@ -1,39 +1,37 @@
 
-bar () :: -> -> -> Void {
-    return x;
-}
 apply (f, x) {
     return f(x);
 }
 
-add (x,y) {
-    if ([x] == [y])
+add (x,y) :: (Int,Int) -> ((Int,Int) -> Bool) {
+    if ([x] != [y]) {
+        print(x);
         return True;
-    else
+    } else
         return False;
 }
 
-f (x, y, z) {
-    print(x);
-    g(x,y,z);
-}
+/* f (x, y, z) { */
+/*     print(x); */
+/*     g(x,y,z); */
+/* } */
 
-g (x, y, z) {
-    print(y);
-    h(x,y,z);
-    i(x,y,z);
-}
+/* g (x, y, z) { */
+/*     print(y); */
+/*     h(x,y,z); */
+/*     i(x,y,z); */
+/* } */
 
-h (x, y, z) {
-    print(z);
-    f(x,y,z);
-}
+/* h (x, y, z) { */
+/*     print(z); */
+/*     f(x,y,z); */
+/* } */
 
-i (x, y, z) {
-    print([x]);
-    print([y]);
-    print([z]);
-}
+/* i (x, y, z) { */
+/*     print([x]); */
+/*     print([y]); */
+/*     print([z]); */
+/* } */
 
 id (x) {
     print(x);
@@ -42,10 +40,9 @@ id (x) {
 
 main () {
     var x = apply(add);
-    x([32], [23,43]);
-    /* (a -> a) y = apply(id); */
-    h(3, True, "ho");
-    id(3);
+    x((32,34), (23,43));
+    /* h(3, True, "ho"); */
+    /* id(3); */
 }
 
 

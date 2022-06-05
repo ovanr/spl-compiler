@@ -10,7 +10,6 @@ module SPL.Compiler.SemanticAnalysis.Unify (
     occursError,
     liftToScheme,
     typeMismatchError,
-    minimizeSubst,
     unify,
     unify'
     ) where
@@ -47,32 +46,26 @@ infixr 1 $*
 
 addSubst :: TypeVar -> CoreType -> TCMonad ()
 addSubst tv t = modify $
-    \st -> let newSubst = Subst . M.insert tv t . unSubst $ st ^. getSubst
+    \st -> let newSubst = (st ^. getSubst) <> newMapping
             in st & getSubst .~ newSubst
                   & getEnv %~ (newSubst $*)
 
+    where
+        newMapping = Subst $ M.singleton tv t
+
 instance Semigroup Subst where
-    -- Subst stores the substitutions in a lazy manner
-    -- (i.e. need to traverse the substitutions to get the final type)
-    -- Example subst: s = [ b |-> a, a |-> Int ]
-    -- then s $* b == Int,
-    -- so first b == a, a == Int
-    (Subst s1') <> (Subst s2') = Subst (s1' `M.union` s2')
+    s1@(Subst s1') <> s2@(Subst s2') = Subst (((s2 $*) <$> s1') `M.union` s2')
 
 instance Monoid Subst where
     mempty = Subst mempty
     mappend = (<>)
-
-minimizeSubst :: Subst -> Subst
-minimizeSubst s@(Subst s') = Subst $ (s $*) <$> s'
 
 instance Types CoreType where
     s $* (CoreIntType l) = CoreIntType l
     s $* (CoreCharType l) = CoreCharType l
     s $* (CoreBoolType l) = CoreBoolType l
     s $* (CoreVoidType l) = CoreVoidType l
-    s@(Subst s') $* v@(CoreVarType l a) =
-        if M.member a s' then s $* setLoc l (M.findWithDefault v a s') else v
+    s@(Subst s') $* v@(CoreVarType l a) = if M.member a s' then M.findWithDefault v a s' else v
     s $* (CoreListType l a) = CoreListType l (s $* a)
     s $* (CoreTupleType l a b) = CoreTupleType l (s $* a) (s $* b)
     s $* (CoreFunType l a b) = CoreFunType l (s $* a) (s $* b)

@@ -25,7 +25,10 @@ import Control.Monad.Extra (unlessM)
 
 data TCon =
         TEq EntityLoc TypeVar
-    |   TOrd EntityLoc TypeVar
+    |   TLt EntityLoc TypeVar
+    |   TLe EntityLoc TypeVar
+    |   TGt EntityLoc TypeVar
+    |   TGe EntityLoc TypeVar
     |   TPrint EntityLoc TypeVar
 
 data TConState = TConState {
@@ -46,59 +49,70 @@ type TConMonad a = StateT TConState (Either Error) a
 
 unTCon :: TCon -> TypeVar
 unTCon (TEq _ t) = t
-unTCon (TOrd _ t) = t
+unTCon (TLt _ t) = t
+unTCon (TLe _ t) = t
+unTCon (TGt _ t) = t
+unTCon (TGe _ t) = t
 unTCon (TPrint _ t) = t
 
 type TConConstructor = EntityLoc -> TypeVar -> TCon
 
 constructTConFrom :: TCon -> TConConstructor
-constructTConFrom (TEq _ _) = TEq
-constructTConFrom (TOrd _ _) = TOrd
-constructTConFrom (TPrint _ _) = TPrint
+constructTConFrom TEq{} = TEq
+constructTConFrom TLt{} = TLt
+constructTConFrom TLe{} = TLe
+constructTConFrom TGt{} = TGt
+constructTConFrom TGe{} = TGe
+constructTConFrom TPrint{} = TPrint
 
 areTConSameKind :: TCon -> TCon -> Bool
-areTConSameKind (TEq _ _) (TEq _ _) = True
-areTConSameKind (TOrd _ _) (TOrd _ _) = True
-areTConSameKind (TPrint _ _) (TPrint _ _) = True
+areTConSameKind TEq{} TEq{} = True
+areTConSameKind TLt{} TLt{} = True
+areTConSameKind TLe{} TLe{} = True
+areTConSameKind TGt{} TGt{} = True
+areTConSameKind TGe{} TGe{} = True
+areTConSameKind TPrint{} TPrint{} = True
 areTConSameKind _ _ = False
 
 mkArg :: TCon -> CoreIdentifier
 mkArg (TEq l t) = CoreIdentifier l ("_teq_" <> t)
-mkArg (TOrd l t) = CoreIdentifier l ("_tord_" <> t)
+mkArg (TLt l t) = CoreIdentifier l ("_tlt_" <> t)
+mkArg (TLe l t) = CoreIdentifier l ("_tle_" <> t)
+mkArg (TGt l t) = CoreIdentifier l ("_tgt_" <> t)
+mkArg (TGe l t) = CoreIdentifier l ("_tge_" <> t)
 mkArg (TPrint l t) = CoreIdentifier l ("_tprint_" <> t)
 
 mkTConType :: TCon -> CoreType -> CoreType
-mkTConType (TEq l _) argType =
-    CoreFunType l (Just argType) (CoreFunType l (Just argType) (CoreBoolType l))
-mkTConType (TOrd l _) argType =
-    CoreFunType l (Just argType) (CoreFunType l (Just argType) (CoreBoolType l))
-mkTConType (TPrint l _) argType =
-    CoreFunType l (Just argType) (CoreVoidType l)
+mkTConType tcon argType =
+    let loc = getLoc tcon
+    in case tcon of
+            TPrint{} -> CoreFunType loc (Just argType) (CoreVoidType loc)
+            _ -> CoreFunType loc (Just argType) (CoreFunType loc (Just argType) (CoreBoolType loc))
 
 mkTConVarType :: TCon -> CoreType
 mkTConVarType tcon = mkTConType tcon $ CoreVarType (getLoc tcon) (unTCon tcon)
 
 mkTConName :: TCon -> CoreType -> Text
-mkTConName TEq{} CoreIntType{} = "_eq_int"
-mkTConName TEq{} CoreBoolType{} = "_eq_bool"
-mkTConName TEq{} CoreCharType{} = "_eq_char"
-mkTConName TEq{} CoreVoidType{} = "_eq_void"
-mkTConName TEq{} CoreListType{} = "_eq_list"
-mkTConName TEq{} CoreTupleType{} = "_eq_tup"
-mkTConName TOrd{} CoreIntType{} = "_ord_int"
-mkTConName TOrd{} CoreBoolType{} = "_ord_bool"
-mkTConName TOrd{} CoreCharType{} = "_ord_char"
-mkTConName TOrd{} CoreVoidType{} = "_ord_void"
-mkTConName TOrd{} CoreListType{} = "_ord_list"
-mkTConName TOrd{} CoreTupleType{} = "_ord_tup"
-mkTConName TPrint{} CoreIntType{} = "_print_int"
-mkTConName TPrint{} CoreBoolType{} = "_print_bool"
-mkTConName TPrint{} CoreCharType{} = "_print_char"
-mkTConName TPrint{} CoreVoidType{} = "_print_void"
-mkTConName TPrint{} (CoreListType _ CoreCharType{}) = "_print_char_list"
-mkTConName TPrint{} CoreListType{} = "_print_list"
-mkTConName TPrint{} CoreTupleType{} = "_print_tup"
-mkTConName _ t = error $ "no overloaded instance exists for: " <> show t
+mkTConName tcon typ = 
+    let prefix =  
+            case tcon of
+                TEq{} -> "eq"
+                TLt{} -> "lt"
+                TLe{} -> "le"
+                TGt{} -> "gt"
+                TGe{} -> "ge"
+                TPrint{} -> "print"
+        suffix =
+            case typ of
+                CoreIntType{} -> "int"
+                CoreBoolType{} -> "bool"
+                CoreCharType{} -> "char"
+                CoreVoidType{} -> "void"
+                CoreListType{} -> "list"
+                CoreTupleType{} -> "tup"
+                _ -> error $ "no overloaded instance exists for: " <> show typ
+    in "_" <> prefix <> "_" <> suffix
+            
 
 -- given a TEQ/TORD/TPrint and the type t we want to TEQ/TORD/TPRINT
 -- we need to generate the expression which is a (partially) applied
@@ -165,22 +179,33 @@ instance Eq TCon where
 
 instance Hashable TCon where
     hashWithSalt seed (TEq _ t) = hashWithSalt (hashWithSalt seed t) (1 :: Int)
-    hashWithSalt seed (TOrd _ t) = hashWithSalt (hashWithSalt seed t) (2 :: Int)
-    hashWithSalt seed (TPrint _ t) = hashWithSalt (hashWithSalt seed t) (3 :: Int)
+    hashWithSalt seed (TLt _ t) = hashWithSalt (hashWithSalt seed t) (2 :: Int)
+    hashWithSalt seed (TLe _ t) = hashWithSalt (hashWithSalt seed t) (3 :: Int)
+    hashWithSalt seed (TGt _ t) = hashWithSalt (hashWithSalt seed t) (4 :: Int)
+    hashWithSalt seed (TGe _ t) = hashWithSalt (hashWithSalt seed t) (5 :: Int)
+    hashWithSalt seed (TPrint _ t) = hashWithSalt (hashWithSalt seed t) (6 :: Int)
 
 instance Ord TCon where
     compare x y = compare (hash x) (hash y)
 
 instance Show TCon where
-    show (TEq _ t) = "Equality " <> show t
-    show (TOrd _ t) = "Ordered " <> show t
+    show (TEq _ t) = "Equal " <> show t
+    show (TLt _ t) = "LessThan " <> show t
+    show (TLe _ t) = "LessEqual " <> show t
+    show (TGt _ t) = "GreaterThan " <> show t
+    show (TGe _ t) = "GreaterEqual " <> show t
     show (TPrint _ t) = "Printable " <> show t
 
 instance Locatable TCon where
     setLoc l (TEq _ t) = TEq l t
-    setLoc l (TOrd _ t) = TOrd l t
+    setLoc l (TLt _ t) = TLt l t
+    setLoc l (TLe _ t) = TLe l t
+    setLoc l (TGt _ t) = TGt l t
+    setLoc l (TGe _ t) = TGe l t
     setLoc l (TPrint _ t) = TPrint l t
     getLoc (TEq l t) = l
-    getLoc (TOrd l t) = l
+    getLoc (TLt l t) = l
+    getLoc (TLe l t) = l
+    getLoc (TGt l t) = l
+    getLoc (TGe l t) = l
     getLoc (TPrint l t) = l
-

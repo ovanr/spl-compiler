@@ -31,7 +31,6 @@ module SPL.Compiler.SemanticAnalysis.Core
      funBody,
      funCallLoc,
      funCallExpr,
-     isConcreteType,
      funCallType,
      funCallArgs,
      Scope(..),
@@ -158,14 +157,6 @@ data CoreType =
     |   CoreTupleType EntityLoc CoreType CoreType
     |   CoreListType EntityLoc CoreType
     |   CoreFunType EntityLoc (Maybe CoreType) CoreType
-
-isConcreteType :: CoreType -> Bool
-isConcreteType CoreVarType{} = False
-isConcreteType (CoreTupleType _ t1 t2) =
-    isConcreteType t1 && isConcreteType t2
-isConcreteType (CoreListType _ t) = isConcreteType t
-isConcreteType (CoreFunType _ a b) = maybe True isConcreteType a && isConcreteType b
-isConcreteType _ = True
 
 alphaEq :: CoreType -> CoreType -> Bool
 alphaEq t1 t2 = evalState (alphaEq' t1 t2) []

@@ -7,6 +7,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# HLINT ignore "Redundant bracket" #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module SPL.Compiler.SemanticAnalysis.TestTypeUnify (htf_thisModulesTests) where
 
@@ -40,7 +41,7 @@ executeUnifyTests tests =
         let st = TypeCheckState 0 mempty mempty mempty mempty mempty
         let actual = (_getSubst.snd) <$> runStateT (unify t1 t2) st
         case expected of
-            Just subst -> assertEqual (Right subst) (toTestForm (minimizeSubst <$> actual)) 
+            Just subst -> assertEqual (Right subst) (toTestForm actual) 
             Nothing -> print actual >> void (assertLeft actual)
 
 executeSubstTests :: [UnifyTest] -> IO ()
@@ -119,5 +120,6 @@ test_unify_9 = do
 
 
 prop_substitution_law = 
-    withQCArgs (\a -> a{maxSuccess = 100, chatty = True}) 
-        (\s2 s1 t -> (s2 <> s1 $* (t :: CoreType)) == (s2 $* s1 $* t))
+    withQCArgs (\a -> a{maxSuccess = 1000, chatty = True}) 
+        (\s2 s1 (t :: CoreType) -> ((s2 <> s1) $* t) == (s1 $* (s2 $* t)))
+            

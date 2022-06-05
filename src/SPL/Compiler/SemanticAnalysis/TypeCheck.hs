@@ -7,30 +7,63 @@ module SPL.Compiler.SemanticAnalysis.TypeCheck where
 import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Graph
+import Data.Graph ( SCC(..) )
 import Data.Either.Extra (maybeToEither)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.List as L
-import Data.Bifunctor
-import Data.Foldable
-import Data.Maybe
-import Control.Monad.State
-import Control.Applicative
-import Control.Lens
+import Data.Bifunctor ()
+import Data.Foldable ( forM_ )
+import Data.Maybe ()
+import Control.Monad.State ( foldM, unless, zipWithM, forM )
+import Control.Applicative ()
+import Control.Lens ( (^.), use, (.=), traversed )
 
-import SPL.Compiler.Common.EntityLocation
-import SPL.Compiler.Common.Error
-import SPL.Compiler.Common.Misc (wrapStateT, impossible)
+import SPL.Compiler.Common.EntityLocation ( Locatable(getLoc) )
+import SPL.Compiler.Common.Error ( definition, throwErr )
+import SPL.Compiler.Common.Misc
+    ( wrapStateT, impossible, inSandboxState )
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
+    ( Field,
+      OpBin(Cons, Plus, Minus, Mul, Div, Mod, Pow, LogAnd, LogOr),
+      OpUnary(UnMinus, UnNeg),
+      CoreType(CoreCharType, CoreTupleType, CoreIntType, CoreListType,
+               CoreFunType, CoreBoolType, CoreVoidType),
+      CoreExpr(..),
+      CoreStmt(..),
+      CoreFunCall(CoreFunCall),
+      CoreFunBody(..),
+      CoreIdentifier(CoreIdentifier),
+      CoreVarDecl(CoreVarDecl),
+      CoreFunDecl(CoreFunDecl),
+      Core(..),
+      TCMonad,
+      TypeEnv(TypeEnv),
+      Scope(GlobalVar, GlobalFun, Local),
+      getEnv,
+      getSubst,
+      idName,
+      varDeclType,
+      funId )
 import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderAst)
 import SPL.Compiler.SemanticAnalysis.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.Unify
+    ( generalise, liftToScheme, unify, Types(freeVars, ($*)) )
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
-import SPL.Compiler.Common.Misc (inSandboxState)
-import Debug.Trace (traceM)
+    ( (<=*),
+      addArgsToEnv,
+      addToEnv,
+      addToEnvWithoutGen,
+      adjustForMissingReturn,
+      ast2coreType,
+      freshVar,
+      getFunRetType,
+      instantiate,
+      makeAbstractFunType,
+      throwWarning,
+      variableNotFoundErr )
 
 
 typeCheckExpr :: AST.ASTExpr -> CoreType -> TCMonad CoreExpr
@@ -165,7 +198,7 @@ typeCheckFunCall (AST.ASTFunCall loc e args) tau = do
 
     let expectedFunType =
             case argTypes of
-                [] -> CoreFunType loc Nothing tau 
+                [] -> CoreFunType loc Nothing tau
                 _  -> foldr (CoreFunType loc) tau (Just <$> argTypes)
     unify a expectedFunType
 
@@ -351,7 +384,7 @@ sanityCheck (Core varDecls funDecls) = do
                 "[" <> T.intercalate ", " (S.toList ftv) <> "] " <>
                 "found in type " <> T.pack (show t) <> ":") t
             >>= throwErr
-    
+
     unless hasMain $
         throwWarning "No 'main' function found. Program will not execute"
 
