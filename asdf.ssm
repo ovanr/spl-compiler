@@ -380,12 +380,20 @@ isEmpty:
 hd:
    link 0
    ldl -2
+   ldc 0
+   eq
+   brt __get_hd_exception
+   ldl -2
    lda -1
    str 4
    unlink
    ret
 tl:
    link 0
+   ldl -2
+   ldc 0
+   eq
+   brt __get_tl_exception
    ldl -2
    lda 0
    str 4
@@ -494,6 +502,447 @@ __end_store_thunk:
    str 4
    unlink
    ret
+__get_hd_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 103
+   trap 1
+   ldc 101
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 104
+   trap 1
+   ldc 101
+   trap 1
+   ldc 97
+   trap 1
+   ldc 100
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__get_tl_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 103
+   trap 1
+   ldc 101
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 97
+   trap 1
+   ldc 105
+   trap 1
+   ldc 108
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__assign_hd_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 97
+   trap 1
+   ldc 115
+   trap 1
+   ldc 115
+   trap 1
+   ldc 105
+   trap 1
+   ldc 103
+   trap 1
+   ldc 110
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 111
+   trap 1
+   ldc 32
+   trap 1
+   ldc 104
+   trap 1
+   ldc 101
+   trap 1
+   ldc 97
+   trap 1
+   ldc 100
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__assign_tl_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 97
+   trap 1
+   ldc 115
+   trap 1
+   ldc 115
+   trap 1
+   ldc 105
+   trap 1
+   ldc 103
+   trap 1
+   ldc 110
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 111
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 97
+   trap 1
+   ldc 105
+   trap 1
+   ldc 108
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+main:
+   link 2
+   ldc 0
+   annote MP 1 1 blue "y"
+   ldla 1
+   sta 0
+   ldc 104
+   ldc 101
+   ldc 108
+   ldc 108
+   ldc 111
+   ldc 0
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   annote MP 2 2 blue "x"
+   ldla 2
+   sta 0
+   ldc 10
+   ldc 104
+   ldc 101
+   ldc 108
+   ldc 108
+   ldc 111
+   ldc 0
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   ldc _print_char_list
+   ldc 1
+   ldc 0
+   bsr __store_thunk
+   ajs -3
+   ldr 4
+   bsr print
+   ajs -2
+   ldr 4
+   ajs -1
+   annote GP 0 0 blue "_void_var"
+   ldr 5
+   lda 0
+   str 4
+   unlink
+   ret
 foo:
    link 0
    annote MP -3 -3 red "xs"
@@ -527,7 +976,7 @@ foo:
 __if_else14:
    annote MP -3 -3 red "xs"
    ldl -3
-   annote MP -2 -2 red "_tprint_a4"
+   annote MP -2 -2 red "_tprint_a23"
    ldl -2
    ldc _print_list
    ldc 2
@@ -540,59 +989,10 @@ __if_else14:
    ldr 4
    ajs -1
 __if_end15:
-   annote GP 0 0 blue "_void_var"
-   ldr 5
-   lda 0
-   str 4
-   unlink
-   ret
-main:
-   link 2
-   ldc 104
-   ldc 101
-   ldc 108
-   ldc 108
-   ldc 111
-   ldc 0
-   stmh 2
-   stmh 2
-   stmh 2
-   stmh 2
-   stmh 2
-   annote MP 1 1 blue "x"
-   ldla 1
-   sta 0
-   ldc -3
-   annote MP 2 2 blue "y"
-   ldla 2
-   sta 0
-   annote MP 1 1 blue "x"
-   ldl 1
-   ldc _print_char
-   ldc 1
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr foo
-   ajs -2
-   ldr 4
-   ldc _print_void
-   ldc 1
-   ldc 0
-   bsr __store_thunk
-   ajs -3
-   ldr 4
-   bsr print
-   ajs -2
-   ldr 4
-   ajs -1
-   ldc 2
-   annote MP 2 2 blue "y"
-   ldl 2
-   bsr _pow
-   ajs -2
-   ldr 4
+__while_start16:
+   ldc -1
+   brt __while_end17
+   ldc 3
    ldc _print_int
    ldc 1
    ldc 0
@@ -603,6 +1003,8 @@ main:
    ajs -2
    ldr 4
    ajs -1
+   bra __while_start16
+__while_end17:
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0

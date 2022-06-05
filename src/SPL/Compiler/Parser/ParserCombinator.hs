@@ -165,6 +165,19 @@ pReplaceError err = pWrapErrors (\st _ -> err st)
 sepBy1 :: Parser s e a -> Parser s e b -> Parser s e [a]
 sepBy1 p sep = liftA2 (:) p (many' (sep *> p))
 
+-- Not Parser -- succeeds if the given parser fails
+pNot :: Parser s e a -> (ParserState s -> e) -> Parser s e ()
+pNot p err = pReplaceError err (p *> pError err) <<|> pure ()
+
+-- Parse non-associative operators.
+-- Thus Sentences of the following format: 
+-- p (`op` p)? and not: p `op` p `op` ...
+pNonAssocOp :: (ParserState s -> e) -> Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
+pNonAssocOp err op p = joinResult <$> p <*> (pMaybe ((,) <$> op <*> p <* pNot op err) <<|> (Nothing <$ pNot op err))
+    where
+        joinResult p Nothing = p
+        joinResult p1 (Just (gen, p2)) = gen p1 p2
+
 -- Parse sentences of the following format in a left associative way: 
 -- p (`op` p)* => (((p `op` p) `op` p) `op` p)
 pChainl :: Parser s e (a -> a -> a) -> Parser s e a -> Parser s e a
