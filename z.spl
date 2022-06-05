@@ -1,9 +1,0 @@
-
-foobar (x,y) :: a -> (b -> Int) {
-    return 3;
-}
-
-
-main () {
-    var x = 23 > 23 > 32;
-}

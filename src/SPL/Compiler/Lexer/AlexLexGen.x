@@ -34,57 +34,57 @@ tokens :-
     -- e.g. if we see */ then we enter the mlc state
     -- and only rules that start with mlc are taken into account
     -- otherwise we are at the default 0 state
-    <mlc> "*/"             { \c l -> decMLCDepth >> getMLCDepth >>= (\d -> if d == 0 then begin 0 c l else alexMonadScan) }
-    -- <mlc> (. # \*)+        { skip } */
-    <mlc> .                { skip }
-    <mlc> \n               { skip }
-    <mlc> "/*"             { \c l -> incMLCDepth >> skip c l }
+    <mlc> "*/"                           { \c l -> decMLCDepth >> getMLCDepth >>= (\d -> if d == 0 then begin 0 c l else alexMonadScan) }
+    -- <mlc> (. # \*)+                      { skip } */
+    <mlc> .                              { skip }
+    <mlc> \n                             { skip }
+    <mlc> "/*"                           { \c l -> incMLCDepth >> skip c l }
 
     
-    <0> "/*"               { \c l -> startMLCDepth >> begin mlc c l }
-    <0> $white+            { skip }
-    <0> "//".*             { skip }
+    <0> "/*"                             { \c l -> startMLCDepth >> begin mlc c l }
+    <0> $white+                          { skip }
+    <0> "//".*                           { skip }
 
     -- keywords
-    <0> "var"              { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Var) ctx len}
-    <0> "if"               { \ctx len -> return $ produceToken (\_ _ -> KeywordToken If) ctx len}
-    <0> "else"             { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Else) ctx len}
-    <0> "while"            { \ctx len -> return $ produceToken (\_ _ -> KeywordToken While) ctx len}
-    <0> "return"           { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Return)ctx len}
+    <0> "var"                            { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Var) ctx len}
+    <0> "if"                             { \ctx len -> return $ produceToken (\_ _ -> KeywordToken If) ctx len}
+    <0> "else"                           { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Else) ctx len}
+    <0> "while"                          { \ctx len -> return $ produceToken (\_ _ -> KeywordToken While) ctx len}
+    <0> "return"                         { \ctx len -> return $ produceToken (\_ _ -> KeywordToken Return)ctx len}
 
     -- types
-    <0> "Void"             { \ctx len -> return $ produceToken (\_ _ -> TypeToken VoidType) ctx len}
-    <0> "Char"             { \ctx len -> return $ produceToken (\_ _ -> TypeToken CharType) ctx len}
-    <0> "Bool"             { \ctx len -> return $ produceToken (\_ _ -> TypeToken BoolType) ctx len}
-    <0> "Int"              { \ctx len -> return $ produceToken (\_ _ -> TypeToken IntType) ctx len}
+    <0> "Void"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken VoidType) ctx len}
+    <0> "Char"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken CharType) ctx len}
+    <0> "Bool"                           { \ctx len -> return $ produceToken (\_ _ -> TypeToken BoolType) ctx len}
+    <0> "Int"                            { \ctx len -> return $ produceToken (\_ _ -> TypeToken IntType) ctx len}
 
     -- `token` function simply takes passes the lexer context and token length
     -- to the function given and liftes the result to AlexAction
 
     -- symbols
-    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\^\-\(\)\[\]\/]  
-                           { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
+    <0> [\!\:\|\&\=\>\<\%\*\-\+\{\}\;\.\,\^\-\(\)\[\]\/]  { token (produceToken (\ctx len -> SymbolToken . T.head $ getCurrentToken ctx len )) }
 
 
     -- Bool
-    <0> "True"             { \ctx len -> return $ produceToken (\_ _ -> BoolToken True) ctx len}
-    <0> "False"            { \ctx len -> return $ produceToken (\_ _ -> BoolToken False) ctx len}
+    <0> "True"                            { \ctx len -> return $ produceToken (\_ _ -> BoolToken True) ctx len}
+    <0> "False"                           { \ctx len -> return $ produceToken (\_ _ -> BoolToken False) ctx len}
 
     -- int
-    <0> $digit+            { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
+    <0> $digit+                          { token (produceToken (\ctx len -> IntToken . read . T.unpack $ getCurrentToken ctx len)) }
 
     -- id
     <0> $alpha [$alpha $digit \_ \']*    { token (produceToken (\ctx len -> IdentifierToken $ getCurrentToken ctx len )) }
 
     -- character
-    <0> \'.\'              { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
-    <0> \'\\n\'            { \ctx len -> return $ produceToken (\_ _ -> CharToken '\n') ctx len}
-    <0> \'\\t\'            { \ctx len -> return $ produceToken (\_ _ -> CharToken '\t') ctx len}
+    <0> \'.\'                            { token (produceToken (\ctx len -> CharToken $ flip T.index 1 $ getCurrentToken ctx len )) }
+    <0> \'\\n\'                          { \ctx len -> return $ produceToken (\_ _ -> CharToken '\n') ctx len}
+    <0> \'\\t\'                          { \ctx len -> return $ produceToken (\_ _ -> CharToken '\t') ctx len}
 
     -- strings
-    <0> \"([\x00-\x10ffff] # \")*\"      
-                           { token (produceToken (\ctx len -> StringToken . T.dropEnd 1 .  T.drop 1 $ getCurrentToken ctx len )) }
+    <0> \"([\x00-\x10ffff] # \")*\"      { token (produceToken (\ctx len -> StringToken . T.dropEnd 1 .  T.drop 1 $ getCurrentToken ctx len )) }
 {
+
+-- token :: (AlexInput -> Int64 -> token) -> AlexAction token
 
 getAlexUserState :: Alex AlexUserState
 getAlexUserState = Alex $ \s@(AlexState _ _ _ _ _ u) -> Right (s,u)

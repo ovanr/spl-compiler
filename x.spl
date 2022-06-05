@@ -1,7 +1,5 @@
 
-bar () :: -> -> -> Void {
-    return x;
-}
+
 apply (f, x) {
     return f(x);
 }

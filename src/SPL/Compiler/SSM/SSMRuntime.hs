@@ -448,22 +448,22 @@ genCallThunkFun = do
 
 genAssignTailEmptyListException = do
     newBlock "__assign_tl_exception"
-    SSM.printString "**Exception: Cannot assign to tail of empty list!**"
+    SSM.printString "Exception: Cannot assign to tail of empty list!"
     SSM.halt
 
 genAssignHeadEmptyListException = do
     newBlock "__assign_hd_exception"
-    SSM.printString "**Exception: Cannot assign to head of empty list!**"
+    SSM.printString "Exception: Cannot assign to head of empty list!"
     SSM.halt
 
 genGetHeadEmptyListException = do
     newBlock "__get_hd_exception"
-    SSM.printString "**Exception: Cannot get head of empty list!**"
+    SSM.printString "Exception: Cannot get head of empty list!"
     SSM.halt
 
 genGetTailEmptyListException = do
     newBlock "__get_tl_exception"
-    SSM.printString "**Exception: Cannot get tail of empty list!**"
+    SSM.printString "Exception: Cannot get tail of empty list!"
     SSM.halt
 
 mkRuntimeSystem :: SSMMonad ()
