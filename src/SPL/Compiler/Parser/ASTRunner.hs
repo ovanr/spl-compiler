@@ -28,6 +28,6 @@ performParsing :: [Token] -> FilePath -> [Text] -> Either Text AST
 performParsing tokens path source = do
     let state = ParserState 0 tokens path source
     case runParser pAST state of
-        [] -> Left "Internal parser error: Parser did not return any results"
-        xs | null (rights xs) -> Left . printParserError . errMsg . fromJust $ maximumOf (folded._Left) xs
-           | otherwise -> Right . fst . head $ rights xs
+        (Nothing, Nothing) -> Left "Internal parser failure." 
+        (Nothing, Just err) -> Left . printParserError . errMsg $ err
+        (Just (res, _), _) -> Right res

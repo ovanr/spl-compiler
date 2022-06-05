@@ -1,6 +1,8 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module SPL.Compiler.Parser.ParserCombinator where
 
@@ -9,7 +11,7 @@ import SPL.Compiler.Parser.AST
 import SPL.Compiler.Common.Error hiding (Error)
 
 import Control.Applicative
-import Control.Lens ((%~), _1, _2, _Left, _Right, traversed, folded, maximumOf)
+import Control.Lens ((%~), _1, _2, _Left, _Right, _Just, traversed, folded, maximumOf)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Function ((&))
@@ -18,7 +20,7 @@ import Data.Either (isRight, isLeft, rights, lefts)
 import Data.Maybe (maybeToList, isJust, fromJust)
 
 newtype Parser s e a = Parser {
-    runParser :: ParserState s -> [Either (Error e) (a, ParserState s)]
+    runParser :: Monoid e => ParserState s -> (Maybe (a, ParserState s), Maybe (Error e))
 }
 
 data ParserState s = ParserState {
@@ -48,14 +50,23 @@ instance Ord (Error e) where
 instance Show e => Show (Error e) where
     show (Error _ e) = show e
 
-getLongestError xs = maybeToList $ Left <$> maximumOf (folded._Left) xs
+instance Semigroup e => Semigroup (Error e) where
+    err1@(Error d1 _) <> err2@(Error d2 _) = 
+        if d1 > d2 then 
+            err1
+        else 
+            err2
+
+instance Monoid e => Monoid (Error e) where
+    mempty = Error 0 mempty
+    mappend = (<>)
 
 instance Functor (Parser s e) where
     fmap :: (a -> b) -> Parser s e a -> Parser s e b
-    fmap ab p = Parser $ \s -> traversed._Right._1 %~ ab $ runParser p s
+    fmap ab p = Parser $ \s -> runParser p s & _1._Just._1 %~ ab 
 
 instance Applicative (Parser s e) where
-    pure a = Parser $ \s -> [Right (a, s)]
+    pure a = Parser $ \s -> (Just (a, s), Nothing)
 
     -- The <*> operator selectively chooses which errors to keep
     -- if the `pab` parser returns only errors then it will return all those errors
@@ -64,12 +75,12 @@ instance Applicative (Parser s e) where
     (<*>) :: Parser s e (a -> b) -> Parser s e a -> Parser s e b
     pab <*> pa =
         Parser $ \s ->
-            let  abs = runParser pab s in
-                if null (rights abs) then
-                    -- useless map needed for typechecking
-                    map (\(Left e) -> Left e) abs
-                else
-                    concat [ runParser (ab <$> pa) s' | ( ab,  s') <- rights abs ] ++ getLongestError abs
+            let abs = runParser pab s in
+            case abs of
+                (Nothing, err) -> (Nothing, err)
+                (Just (ab, s'), err) -> 
+                    let (res, err2) = runParser (ab <$> pa) s' 
+                    in (res, max err err2)
 
 infixr 3 <:>
 (<:>) :: (Applicative f) => f a -> f [a] -> f [a]
@@ -84,10 +95,10 @@ infixr 1 <<|>
 x <<|> y =
     Parser $ \s ->
         case runParser x s of
-             xs | not $ null (rights xs) -> filter isRight xs ++ getLongestError xs
-                | otherwise ->
-                    case runParser y s of
-                         ys -> filter isRight ys ++ getLongestError (ys ++ xs)
+             (Nothing, err1) -> 
+                case runParser y s of
+                    (res, err2) -> (res, max err1 err2)
+             res -> res
 
 pAlternative :: Parser s e a -> Parser s e b -> Parser s e (Either a b)
 pAlternative pl pr = (Left <$> pl) <<|> (Right <$> pr)
@@ -96,8 +107,8 @@ pAlternative pl pr = (Left <$> pl) <<|> (Right <$> pr)
 peek :: Parser s e s
 peek =
     Parser $ \case
-                (ParserState cnt st@(a:_) fp con) -> [Right (a, ParserState cnt st fp con)]
-                _ -> []
+        (ParserState cnt st@(a:_) fp con) -> (Just (a, ParserState cnt st fp con), Nothing)
+        _ -> (Nothing, Nothing)
 
 -- Create a parser that returns the current
 -- token if `f` predicate is true
@@ -105,8 +116,8 @@ satisfy :: (s -> Bool) -> Parser s e s
 satisfy f =
     Parser $ \case
                 (ParserState cnt (a:rest) fp con) | f a ->
-                    [Right (a, ParserState (cnt + 1) rest fp con)]
-                _ -> []
+                    (Just (a, ParserState (cnt + 1) rest fp con), Nothing)
+                _ -> (Nothing, Nothing)
 
 -- Create a parser that returns the result of applying `f` 
 -- to the current token. If Nothing is returned
@@ -145,18 +156,18 @@ pList pElement pDelimiter =
 
 -- Parser that simply throws an error 
 pError :: (ParserState s -> e) -> Parser s e a
-pError err = Parser $ \s@(ParserState cnt _ fp con) -> [Left (Error cnt (err s))]
+pError err = Parser $ \s@(ParserState cnt _ fp con) -> (Nothing, Just (Error cnt (err s)))
 
 -- Parser that simply throws an error 
 pErrorMax :: (ParserState s -> e) -> Parser s e a
-pErrorMax err = Parser $ \s@(ParserState cnt _ fp con) -> [Left (Error (cnt + 2) (err s))]
+pErrorMax err = Parser $ \s@(ParserState cnt _ fp con) -> (Nothing, Just $ Error (cnt + 2) (err s))
 
 -- Modify errors produced by the parser `p` using the function `err`
 pWrapErrors :: (ParserState s -> e -> e) -> Parser s e a -> Parser s e a
 pWrapErrors err p =
     Parser $ \s ->
         let xs = runParser p s in
-            traversed . _Left %~ (\(Error i e) -> Error i $ err s e) $ xs
+            xs & _2._Just %~ (\(Error i e) -> Error i $ err s e)
 
 -- Replace errors produced by the parser `p` using the function `err`
 pReplaceError :: (ParserState s -> e) -> Parser s e a -> Parser s e a

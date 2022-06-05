@@ -49,7 +49,7 @@ mkError err state@(ParserState _ (s@(MkToken _ t):_) _ _) =
 mkError err ParserState{} = [err]
 
 pAST :: SPLParser AST
-pAST = ASTUnordered <$> (many' pASTLeaf <* pEnd)
+pAST = ASTUnordered <$> (some' pASTLeaf <* pEnd)
     where
         pASTLeaf = (Left <$> pVarDecl) <<|> (Right <$> pFunDecl)
         pEnd = pReplaceError (mkError "Expected end of file here") $
