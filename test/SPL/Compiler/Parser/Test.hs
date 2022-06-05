@@ -10,7 +10,7 @@ import Test.Framework hiding (Testable)
 import qualified Data.ByteString.Lazy as B
 import Data.Text (Text)
 import Data.Default
-import Control.Monad (forM_, void)
+import Control.Monad (forM_)
 import Control.Applicative ((<|>))
 import Control.Lens ((^..), (^?), _Right, ix, _1, folded)
 
@@ -29,11 +29,9 @@ executeMultipleTests parser tests =
         let actual = runParser parser (ParserState 0 tokens mempty mempty)
         case expected of
             Just value -> do
-                let a = toTestForm <$> actual ^? _Right._1
+                let a = toTestForm <$> actual ^? folded._Right._1
                 assertEqual (Just $ toTestForm value) a
-            Nothing -> 
-                let res = runParser parser (ParserState 0 tokens mempty mempty)
-                in void $ print res >> assertLeft res
+            _ -> mapM_ (\e -> print e >> assertLeft e) (runParser parser (ParserState 0 tokens mempty mempty))
 
 -- Shorthand operator to create an (input, expected output) pair
 infixl 1 -->

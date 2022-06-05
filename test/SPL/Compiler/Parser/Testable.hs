@@ -40,7 +40,6 @@ instance Testable ASTExpr where
     toTestForm (OpExpr _ o e) = OpExpr def o (toTestForm e)
     toTestForm (Op2Expr _ e1 o e2) = Op2Expr def (toTestForm e1) o (toTestForm e2)
     toTestForm (EmptyListExpr _ ) = EmptyListExpr def
-    toTestForm (EmptyCharListExpr _) = EmptyCharListExpr def
 
 instance Testable ASTVarDecl where
     toTestForm (ASTVarDecl _ t i e) = ASTVarDecl def (toTestForm t) (toTestForm i) (toTestForm e)

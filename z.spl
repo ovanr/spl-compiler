@@ -5,5 +5,5 @@ foobar (x,y) :: a -> (b -> Int) {
 
 
 main () {
-    var x = 23 > 23 > 32;
+    var x = 23 == 23 > 32;
 }
