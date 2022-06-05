@@ -1,14 +1,33 @@
+map(f, xs) {
+    if (isEmpty(xs))
+        return [];
+    else
+        return f (xs.hd) : map(f, xs.tl);
+}
+
+bar (x,y) {
+    if (x)
+        print(3);
+    else
+    if (y)
+        print(4);
+    else
+        print(5);
+}
 
 foo (xs) {
     if (isEmpty(xs))
         print("empty");
     else
         print(xs);
+
+    while (True)
+        print([1,2].hd);
 }
 
 main () {
+    [Int] y = [];
     var x = "hello";
-    var y = (-3);
-    print(foo(x));
-    print (2 ^ y);
+    print('\n': "hello");
+
 }

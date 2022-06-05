@@ -208,11 +208,10 @@ pIfElseStmt =
 pWhileStmt :: SPLParser ASTStmt
 pWhileStmt =
     pWrapErrors (\_ -> (<>) ["While statement"]) $
-    (\kWhile cond body rParen -> WhileStmt (kWhile |-| rParen) cond body)
+    (\kWhile cond body -> WhileStmt (kWhile |-| body) cond body)
         <$> pWhile
-        <*> pExpr <* pIsSymbol '{'
-        <*> pBody
-        <*> pIsSymbol '}'
+        <*> pExpr 
+        <*> (pIsSymbol '{' *> pBody <* pIsSymbol '}' <<|> pure <$> pStmt)
     where
         pWhile = satisfy (\case
                             (MkToken _ (KeywordToken Lex.While)) -> True
@@ -287,8 +286,9 @@ _pExpr =
         [
           pChainl (pBinOp "||")
         , pChainl (pBinOp "&&")
-        , pChainl (pBinOp "==" <<|> pBinOp "!=")
-        , pChainl (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
+        , pNonAssocOp (mkError "Unable to parse non-associative operator") (pBinOp "==" <<|> pBinOp "!=")
+        , pNonAssocOp (mkError "Unable to parse non-associative operator") 
+            (pBinOp "<=" <<|> pBinOp ">=" <<|> pBinOp "<" <<|> pBinOp ">")
         , pChainr (pBinOp ":")
         , pChainl (pBinOp "+" <<|> pBinOp "-")
         , pChainl (pBinOp "*" <<|> pBinOp "/" <<|> pBinOp "^" <<|> pBinOp "%")
@@ -403,7 +403,8 @@ pListExpr =
     toASTExpr <$> pIsSymbol '['
               <*> pList _pExpr (pIsSymbol ',')
               <*> pIsSymbol ']'
+              <*> pFunOrFieldFollowUp
     where
-        toASTExpr lParens [] rParens = EmptyListExpr (lParens |-| rParens)
-        toASTExpr lParens exprs rParens =
-            foldr (\e acc -> Op2Expr (getLoc e) e Cons acc) (EmptyListExpr $ getLoc rParens) exprs
+        toASTExpr lParens [] rParens exprGen = exprGen $ EmptyListExpr (lParens |-| rParens)
+        toASTExpr lParens exprs rParens exprGen =
+            exprGen $ foldr (\e acc -> Op2Expr (getLoc e) e Cons acc) (EmptyListExpr $ getLoc rParens) exprs
