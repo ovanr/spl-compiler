@@ -35,11 +35,6 @@ instance Testable CoreType where
     toTestForm (CoreCharType _) = CoreCharType def
     toTestForm (CoreVoidType _) = CoreVoidType def
 
-instance Testable TCon where
-    toTestForm (TEq _ tt) = TEq def tt
-    toTestForm (TOrd _ tt) = TOrd def tt
-    toTestForm (TPrint _ tt) = TPrint def tt
-
 instance Testable Subst where
     toTestForm (Subst var) = Subst $ toTestForm <$> var
 
