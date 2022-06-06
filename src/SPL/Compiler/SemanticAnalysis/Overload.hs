@@ -24,10 +24,12 @@ resolveOverloading (Core varDecls funDecls) = do
     pure $ Core varDecls funDecls'
 
 rewriteTConFunDecls :: SCC CoreFunDecl -> TConMonad (SCC CoreFunDecl)
-rewriteTConFunDecls (AcyclicSCC fun@(CoreFunDecl _ (CoreIdentifier _ id) _ t _)) = do
+rewriteTConFunDecls (AcyclicSCC fun@(CoreFunDecl _ (CoreIdentifier _ id) args t _)) = do
     gatherTConFunDecl fun
     tcons <- S.toList <$> use newTCon
     mapM_ (ambiguousTConCheck t) tcons
+    when (null args && not (null tcons)) $
+        noArgFunTConErr (head tcons)
     env %= M.insert id (tcons,t)
     AcyclicSCC <$> rewriteTConFunDecl fun
 rewriteTConFunDecls (CyclicSCC funDecls) = do
@@ -38,10 +40,12 @@ rewriteTConFunDecls (CyclicSCC funDecls) = do
     where
         gatherTCon :: [CoreFunDecl] -> TConMonad Int
         gatherTCon funcs = do 
-            sum <$> forM funcs (\f@(CoreFunDecl _ (CoreIdentifier _ id) _ t _) -> do
+            sum <$> forM funcs (\f@(CoreFunDecl _ (CoreIdentifier _ id) args t _) -> do
                 gatherTConFunDecl f
                 tcons <- S.toList <$> use newTCon
                 mapM_ (ambiguousTConCheck t) tcons
+                when (null args && not (null tcons)) $
+                    noArgFunTConErr (head tcons)
                 env %= M.insert id (tcons,t)
                 pure $ length tcons)
         findFixPoint :: Monad m => m Int -> m Int

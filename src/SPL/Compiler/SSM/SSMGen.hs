@@ -71,6 +71,21 @@ coreExprToSSM (Op2Expr loc e1 t1 Cons e2 t2) = do
     coreExprToSSM e1
     coreExprToSSM e2
     SSM.stmh 2
+coreExprToSSM (Op2Expr loc e1 t1 LogAnd e2 t2) = do 
+    lazyAndFalse <- newLabel "lazy_and_false"
+    coreExprToSSM e1
+    SSM.lds 0
+    SSM.brf lazyAndFalse
+    coreExprToSSM e2
+    SSM.and
+    newBlock lazyAndFalse
+coreExprToSSM (Op2Expr loc e1 t1 LogOr e2 t2) = do 
+    lazyOrTrue <- newLabel "lazy_or_true"
+    coreExprToSSM e1
+    SSM.lds 0
+    SSM.brt lazyOrTrue
+    coreExprToSSM e2
+    newBlock lazyOrTrue
 coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
     coreExprToSSM e1
     coreExprToSSM e2
@@ -86,8 +101,8 @@ coreExprToSSM (Op2Expr loc e1 t1 op e2 t2) = do
         LessEq -> SSM.le
         GreaterEq -> SSM.ge
         Nequal -> SSM.ne
-        LogAnd -> SSM.and
-        LogOr -> SSM.or
+        LogAnd -> impossible
+        LogOr -> impossible
         Cons -> impossible
         Pow -> do
             SSM.bsr "_pow"

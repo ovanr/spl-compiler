@@ -93,8 +93,8 @@ mkTConVarType :: TCon -> CoreType
 mkTConVarType tcon = mkTConType tcon $ CoreVarType (getLoc tcon) (unTCon tcon)
 
 mkTConName :: TCon -> CoreType -> Text
-mkTConName tcon typ = 
-    let prefix =  
+mkTConName tcon typ =
+    let prefix =
             case tcon of
                 TEq{} -> "eq"
                 TLt{} -> "lt"
@@ -112,7 +112,7 @@ mkTConName tcon typ =
                 CoreTupleType{} -> "tup"
                 _ -> error $ "no overloaded instance exists for: " <> show typ
     in "_" <> prefix <> "_" <> suffix
-            
+
 
 -- given a TEQ/TORD/TPrint and the type t we want to TEQ/TORD/TPRINT
 -- we need to generate the expression which is a (partially) applied
@@ -164,15 +164,28 @@ ambiguousTConCheck t tcon = do
     let freeTV = freeVars t
         tv = unTCon tcon
     unless (tv `S.member` freeTV) $
-        tconError tcon >>= throwErr
+        ambiguousTConErr tcon >>= throwErr
 
-tconError :: TCon -> TConMonad Error
-tconError tcon = do
+ambiguousTConErr :: TCon -> TConMonad Error
+ambiguousTConErr tcon = do
     let header = T.pack $ "Unable to resolve ambiguous instance: " <> show tcon
     err <- definition (T.pack $ "'" <>
                        show tcon <>
                        "' instance has been inferred for: ") tcon
     return $ header : err
+
+noArgFunTConErr :: TCon -> TConMonad ()
+noArgFunTConErr tcon = err >>= throwErr
+    where 
+        err = do
+            let header = T.unlines [
+                    "Unable to create constraint " <> T.pack (show tcon),
+                    "Enclosing function takes no arguments"]
+            err <- definition (T.pack $ "'" <>
+                               show tcon <>
+                               "' instance has been inferred for: ") tcon
+            return $ header : err
+
 
 instance Eq TCon where
     t1 == t2 = areTConSameKind t1 t2 && unTCon t1 == unTCon t2

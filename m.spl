@@ -1,0 +1,14 @@
+
+
+
+
+foo (x) {
+    print(x);
+    return True;
+}
+
+main() {
+    /* if (foo(3) || foo(4)) { */
+        print("okay");
+    /* } */
+}

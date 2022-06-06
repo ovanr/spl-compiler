@@ -65,7 +65,8 @@ instance Types CoreType where
     s $* (CoreCharType l) = CoreCharType l
     s $* (CoreBoolType l) = CoreBoolType l
     s $* (CoreVoidType l) = CoreVoidType l
-    s@(Subst s') $* v@(CoreVarType l a) = if M.member a s' then M.findWithDefault v a s' else v
+    s@(Subst s') $* v@(CoreVarType l a) = 
+        if M.member a s' then setLoc l (M.findWithDefault v a s') else v
     s $* (CoreListType l a) = CoreListType l (s $* a)
     s $* (CoreTupleType l a b) = CoreTupleType l (s $* a) (s $* b)
     s $* (CoreFunType l a b) = CoreFunType l (s $* a) (s $* b)
