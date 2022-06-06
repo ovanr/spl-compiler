@@ -904,8 +904,47 @@ __assign_tl_exception:
    ldc 42
    trap 1
    halt
+foo:
+   link 0
+   annote MP -3 -3 red "x"
+   ldl -3
+   annote MP -2 -2 red "_tprint_a3"
+   ldl -2
+   bsr print
+   ajs -2
+   ldr 4
+   ajs -1
+   ldc 0
+   str 4
+   unlink
+   ret
 main:
    link 0
+   ldc 3
+   ldc _print_int
+   ldc 1
+   ldc 0
+   bsr __store_thunk
+   ajs -3
+   ldr 4
+   bsr foo
+   ajs -2
+   ldr 4
+   lds 0
+   brf __lazy_and_false16
+   ldc 4
+   ldc _print_int
+   ldc 1
+   ldc 0
+   bsr __store_thunk
+   ajs -3
+   ldr 4
+   bsr foo
+   ajs -2
+   ldr 4
+   and
+__lazy_and_false16:
+   brf __if_else14
    ldc 111
    ldc 107
    ldc 97
@@ -915,8 +954,8 @@ main:
    stmh 2
    stmh 2
    stmh 2
-   ldc _print_list
-   ldc 2
+   ldc _print_char_list
+   ldc 1
    ldc 0
    bsr __store_thunk
    ajs -3
@@ -925,23 +964,12 @@ main:
    ajs -2
    ldr 4
    ajs -1
+   bra __if_end15
+__if_else14:
+__if_end15:
    annote GP 0 0 blue "_void_var"
    ldr 5
    lda 0
-   str 4
-   unlink
-   ret
-foo:
-   link 0
-   annote MP -3 -3 red "x"
-   ldl -3
-   annote MP -2 -2 red "_tprint_a12"
-   ldl -2
-   bsr print
-   ajs -2
-   ldr 4
-   ajs -1
-   ldc -1
    str 4
    unlink
    ret

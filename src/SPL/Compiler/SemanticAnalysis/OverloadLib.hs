@@ -93,6 +93,7 @@ mkTConVarType :: TCon -> CoreType
 mkTConVarType tcon = mkTConType tcon $ CoreVarType (getLoc tcon) (unTCon tcon)
 
 mkTConName :: TCon -> CoreType -> Text
+mkTConName TPrint{} (CoreListType _ CoreCharType{}) = "_print_char_list"
 mkTConName tcon typ =
     let prefix =
             case tcon of

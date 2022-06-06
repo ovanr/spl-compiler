@@ -4,11 +4,11 @@
 
 foo (x) {
     print(x);
-    return True;
+    return False;
 }
 
 main() {
-    /* if (foo(3) || foo(4)) { */
+    if (foo(3) && foo(4)) {
         print("okay");
-    /* } */
+    }
 }
