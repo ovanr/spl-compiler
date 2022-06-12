@@ -15,7 +15,6 @@ SPL-compiler
 
 Usage: spl-compiler FILENAME [-o|--output FILENAME] [-l|--lexerDump]
                     [-p|--parserDump] [-t|--typeCheckerDump] [--noOptimization]
-                    [-i|--irDump] [--emitSSM] [--verbosity INT]
   Compiler for the SPL Language
 
 Available options:
@@ -24,12 +23,7 @@ Available options:
   -l,--lexerDump           Only lex file and print the result
   -p,--parserDump          Only parse file and pretty print the result
   -t,--typeCheckerDump     Parse and typecheck, then pretty print the result
-  --noOptimization         Do not perform constant folding and dead code
-                           elimination
-  -i,--irDump              Parse, typecheck, transform to intermediate language,
-                           then pretty print result
-  --emitSSM                Compile to SSM assembly
-  --verbosity INT          The level of verbosity (default: 0)
+  --noOptimization         Do not perform constant folding and dead code elimination
   -h,--help                Show this help text
 ```
 
