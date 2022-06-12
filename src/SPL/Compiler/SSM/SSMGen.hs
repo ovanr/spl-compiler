@@ -125,6 +125,7 @@ coreStmtToSSM (IfElseStmt _ e taken ntaken) = do
     newBlock ifelse
     mapM_ coreStmtToSSM ntaken
     newBlock ifend
+    SSM.nop
 coreStmtToSSM (WhileStmt _ e stmts) = do
     start <- newLabel "while_start"
     end <- newLabel "while_end"
@@ -134,6 +135,7 @@ coreStmtToSSM (WhileStmt _ e stmts) = do
     mapM_ coreStmtToSSM stmts
     SSM.bra start
     newBlock end
+    SSM.nop
 coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
     coreExprToSSM e
     var <- getVar id
@@ -180,6 +182,7 @@ coreVarDeclToSSM (CoreVarDecl _ _ (CoreIdentifier _ id) e) = do
 coreFunDeclToSSM :: CoreFunDecl -> SSMMonad ()
 coreFunDeclToSSM fun@(CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ varDecls stmts)) = do
     newBlock id
+    SSM.nop
     let argVars = extractArgsVars fun
     mapM_ addVar argVars
     let locVars = extractLocalVars fun
@@ -210,6 +213,10 @@ declareGlobalVars varDecls = addVar voidVar >> declareGlobalVars' 1 varDecls
 coreToSSM :: Core -> SSMMonad ()
 coreToSSM (Core varDecls funDecls) = do
     newBlock "__entry"
+    SSM.ldc 1000
+    SSM.ldr HP
+    SSM.add
+    SSM.str HP
     SSM.ldrr GP HP
     declareGlobalVars varDecls
     SSM.ldc (length varDecls + 1)

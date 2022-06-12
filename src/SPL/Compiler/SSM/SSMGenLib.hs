@@ -264,6 +264,10 @@ trap = op1 "trap"
 
 halt = op0 "halt"
 
+swp = op0 "swp"
+
+nop = op0 "nop"
+
 stl :: Int -> SSMMonad ()
 stl = op1 "stl"
 

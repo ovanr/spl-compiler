@@ -371,6 +371,9 @@ genPrintTup = do
     SSM.str RR
     removeStackFrame
 
+-- arg1
+-- expected args
+-- actual args
 genStoreThunkFun :: SSMMonad ()
 genStoreThunkFun = do
     newBlock "__store_thunk"
@@ -400,59 +403,99 @@ genStoreThunkFun = do
     SSM.str RR
     removeStackFrame
 
+-- arg2 (mp -5)
+-- arg1 (mp -4)
+-- num args passed (e.g. 2) (mp -3)
+-- thunk location (mp -2)
+-- ret addr
+-- mp
 genCallThunkFun :: SSMMonad ()
 genCallThunkFun = do
     newBlock "__call_thunk"
-    SSM.link 1
-    SSM.ldl (-3) -- number of new arguments given to the existing thunk
-    SSM.stl 1 
+    SSM.link 1 -- local counter `c`
+    SSM.ldl (-3) -- number of new arguments given to the existing thunk, `nargs`
+    SSM.stl 1 -- c = num args passed
     newBlock "__load_args_loop"
     SSM.ldl 1
     SSM.ldc 1
-    SSM.ge
+    SSM.ge -- c >= 1
     SSM.brf "__load_thunk"
-    SSM.ldr MP 
+    -- here c >= 1
+    SSM.ldr MP
     SSM.ldl 1
-    SSM.sub 
-    SSM.lda (-3)
-    SSM.ldl 1
-    SSM.ldc 1
-    SSM.sub 
-    SSM.stl 1
+    SSM.sub -- sp: mp - c
+    SSM.lda (-3) -- sp = *(mp - c - 3)
+    SSM.ldl 1 -- sp: c
+    SSM.ldc 1 -- sp: 1
+    SSM.sub -- sp: c - 1
+    SSM.stl 1 -- c = c - 1
     SSM.bra "__load_args_loop"
     newBlock "__load_thunk"
-    SSM.ldl (-2)
-    SSM.lda 0
+    -- here c == 0
+    -- stack contains arguments
+    -- arg2
+    -- arg1
+    SSM.ldl (-2) -- thunk
+    SSM.lda 0 -- load thunk
     SSM.ldc 3
     SSM.add 
-    SSM.stl 1
+    SSM.stl 1 -- c = 3 + num args present already in thunk
     newBlock "__load_thunk_loop"
-    SSM.ldl 1
+    SSM.ldl 1 -- load c
     SSM.ldc 1
-    SSM.ge 
+    SSM.ge -- is c >= 1
     SSM.brf "__eval_thunk"
-    SSM.ldl (-2)
-    SSM.ldl 1
-    SSM.sub 
-    SSM.lda 1
+    -- c >= 1
+    SSM.ldl (-2) -- thunk location
+    SSM.ldl 1 -- c
+    SSM.sub -- sp: thunk location - c
+    SSM.lda 1 -- load topmost thunk argument
     SSM.ldl 1
     SSM.ldc 1
     SSM.sub 
-    SSM.stl 1
+    SSM.stl 1 -- c = c - 1
     SSM.bra "__load_thunk_loop"
     newBlock "__eval_thunk"
+    -- at this point appended version of thunk is in stack
     SSM.ldl (-3)
-    SSM.add 
-    SSM.lds (-1)
-    SSM.lds (-1)
+    SSM.add -- adjust number of given arguments in thunk 
+    SSM.lds (-1) -- num args thunk takes
+    SSM.lds (-1) -- num args given to thunk
     SSM.eq 
     SSM.brt "__eval_saturated_thunk"
+    SSM.lds (-1) -- num args thunk takes
+    SSM.lds (-1) -- num args given to thunk
+    SSM.lt 
+    SSM.brt "__eval_nested_saturated_thunk"
     SSM.bsr "__store_thunk"
     removeStackFrame
     newBlock "__eval_saturated_thunk"
-    SSM.stl 1
+    SSM.ajs (-2)
+    SSM.jsr
+    removeStackFrame
+    newBlock "__eval_nested_saturated_thunk"
+    SSM.swp
+    SSM.sub
     SSM.stl 1
     SSM.jsr
+    SSM.ldl (-2) -- thunk
+    SSM.lda (-1) -- num args the previous thunk took (var `m`)
+    SSM.stl (-2) -- thunk location arg now stores our counter `m`
+    newBlock "__pop_prev_args"
+    SSM.ldl (-2)
+    SSM.ldc 0
+    SSM.eq
+    SSM.brt "__call_nested_thunk"
+    SSM.ajs (-1)
+    SSM.ldl (-2)
+    SSM.ldc 1
+    SSM.sub
+    SSM.stl (-2)
+    SSM.bra "__pop_prev_args"
+    newBlock "__call_nested_thunk"
+    SSM.ldl 1 -- load num new args
+    SSM.ldr RR
+    SSM.bsr "__call_thunk"
     removeStackFrame
 
 genAssignTailEmptyListException = do

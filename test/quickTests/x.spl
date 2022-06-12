@@ -1,14 +1,45 @@
 
-apply (f, x) :: (a -> a) a -> a {
+apply (f, x) {
     return f(x);
 }
 
-id (x) :: a -> a {
+add (x,y) :: (Int,Int) -> ((Int,Int) -> Bool) {
+    if ([x] != [y]) {
+        print(x);
+        return True;
+    } else
+        return False;
+}
+
+f (x, y) :: [a] [b] -> Void {
+    print(x);
+    g(x,y);
+}
+
+g (x, y) :: [a] [b] -> Void {
+    print(y);
+    f(x,y);
+}
+
+h (x, y, z) {
+    print(z);
+}
+
+i (x, y, z) {
+    print([x]);
+    print([y]);
+    print([z]);
+}
+
+id (x) {
+    print(x);
     return x;
 }
 
-main() {
-    a f = id;
-    var x = (id(main))();
-    return;
+main () {
+    var x = apply(add);
+    x((32,34), (23,43));
+    print('\n');
+    h(3, True, "ho");
+    id(3);
 }

@@ -1,34 +1,29 @@
-apply (f, x) {
-    return f(x);
+
+map(f, list) {
+  if( isEmpty(list) )
+    return [];
+  else
+    return f(list.hd) : map(f, list.tl);
 }
 
-idPrint (x) {
-    print(x);
-    return x;
+foldl(f, z, list) {
+  if( isEmpty(list) )
+    return z;
+  else
+    return foldl(f, f(z, list.hd), list.tl);
 }
 
-id (x) {
-    return x;
-}
+plus(x, y) { return x + y; }
+and(b, c) { return b && c; }
+ge18(x) { return x >= 18; }
 
-add (x,y) {
-    return x + y;
-}
+sum(list) { return foldl(plus, 0, list); }
 
-fact (x) :: Int -> Int { 
-    var r = x * fact(x - 1); 
-    return r; 
-} 
+all(list) { return foldl(and, True, list); }
 
-nada () :: -> Int {
-    return 3;
-}
-test (x,y) :: [Int] (Bool, [Int]) -> Void {
-    print(x);
-    print(y);
-}
-main () {
-    var z = [];
-    /* print(z); */
-    ((idPrint, idPrint).fst)(3);
+allOlderThan18(list) { return all(map(ge18, list)); }
+
+main() { 
+    var xs = [(1, False),(5, True)];
+    print(xs.tl.hd.snd);
 }
