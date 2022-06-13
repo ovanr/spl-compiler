@@ -281,6 +281,25 @@ typeCheckVarDecl (AST.ASTVarDecl loc tau (AST.ASTIdentifier l i) e) = do
 
 
 typeCheckFunDecl :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
+typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc "main") args tau body) abstractType = do
+    let expectedType = CoreFunType (getLoc abstractType) Nothing (CoreVoidType $ getLoc (getFunRetType abstractType))
+    unify expectedType abstractType
+
+    body' <- do { b <- typeCheckFunBody body (getFunRetType expectedType);
+                       adjustForMissingReturn expectedType b }
+
+    case ast2coreType tau of
+        Nothing -> pure ()
+        Just userType -> unify expectedType userType
+
+    return $ CoreFunDecl loc (CoreIdentifier idLoc "main")
+                             args'
+                             expectedType
+                             body'
+
+    where
+        args' = map (\(AST.ASTIdentifier l nm) -> CoreIdentifier l nm) args
+
 typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args tau body) abstractType = do
     initEnv <- (\(TypeEnv env) -> TypeEnv (M.delete idName env)) <$> use getEnv
 
