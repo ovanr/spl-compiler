@@ -478,20 +478,13 @@ genCallThunkFun = do
     SSM.sub
     SSM.stl 1
     SSM.jsr
+                 -- adjust SP to remove used args from the stack
+    SSM.ldr SP
     SSM.ldl (-2) -- thunk
     SSM.lda (-1) -- num args the previous thunk took (var `m`)
-    SSM.stl (-2) -- thunk location arg now stores our counter `m`
-    newBlock "__pop_prev_args"
-    SSM.ldl (-2)
-    SSM.ldc 0
-    SSM.eq
-    SSM.brt "__call_nested_thunk"
-    SSM.ajs (-1)
-    SSM.ldl (-2)
-    SSM.ldc 1
     SSM.sub
-    SSM.stl (-2)
-    SSM.bra "__pop_prev_args"
+    SSM.str SP
+
     newBlock "__call_nested_thunk"
     SSM.ldl 1 -- load num new args
     SSM.ldr RR
