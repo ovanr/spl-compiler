@@ -131,7 +131,7 @@ coreStmtToSSM (WhileStmt _ e stmts) = do
     end <- newLabel "while_end"
     newBlock start
     coreExprToSSM e
-    SSM.brt end
+    SSM.brf end
     mapM_ coreStmtToSSM stmts
     SSM.bra start
     newBlock end

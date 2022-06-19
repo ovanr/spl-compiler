@@ -10,6 +10,7 @@ getIndex (idx, list) :: Int [a] -> a
 {
 	while (idx > 0) {
 		list = list.tl;
+        idx = idx - 1;
 	}
 	return list.hd;
 }
@@ -22,7 +23,6 @@ month(dayOfYear)::Int -> Int{Int tempDay = dayOfYear;Int month = 0;
 
 	
     			 // unuseful comment
-	
     while(month < 12)
     {
 						if(tempDay > getIndex(month, dcLengthOfMonth))
@@ -30,8 +30,11 @@ month(dayOfYear)::Int -> Int{Int tempDay = dayOfYear;Int month = 0;
     	                tempDay = tempDay - - - - - getIndex(month, dcLengthOfMonth);
         }
 	else {return month + 1;}
-
        month = month + 1;
 	}
 return month + 1;
+}
+
+main() {
+    print(month(200));
 }

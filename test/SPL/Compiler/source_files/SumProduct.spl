@@ -5,15 +5,11 @@ sum(list) :: [Int] -> Int {
 
 product(list) :: [Int] -> Int {
 	if (isEmpty(list)) {return 1;	}
-	return list.hd * sum(list.tl);
+	return list.hd * product(list.tl);
 }
 
-sum(list) :: [Bool] -> Bool {
-	if (isEmpty(list)) { return False;	}
-	return list.hd || sum(list.tl);
-}
-
-product(list) :: [Bool] -> Bool {
-	if (isEmpty(list)) { return True;	}
-	return list.hd && sum(list.tl);
+main() {
+    print(sum([1,2,3]));
+    print('\n');
+    print(product([2,3,4]));
 }

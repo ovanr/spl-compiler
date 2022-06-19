@@ -2,7 +2,7 @@
 
 flip(n, l)
 {
-  if( True )
+  if( n <= 0 )
     return l;
   else
     return flop(n-1, 0:l);
@@ -13,10 +13,13 @@ flop(n, l)
   return flip(n, 1:l);
 }
 
-rec(a) {
-	return flip(1, []):rec(a);
+rec(n) {
+    if (n == 0)
+        return [];
+	return flip(1, []):rec(n-1);
 }
 
 main() {
-    print();
+    print(rec(10));
 }
+

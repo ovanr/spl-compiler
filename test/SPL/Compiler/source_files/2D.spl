@@ -8,6 +8,7 @@ transpose (p1, p2)
 	return ((p1.fst + p2.fst), (p1.snd + p2.snd));
 }
 
-scale(p, scalar) :: (Int, Int) Int -> (Int, Int) {
-	return (p.fst * scalar, p.snd * scalar);
+main() :: -> Void {
+    print(transpose((3,4), (6,7)));
+    print(foo([23,32]));
 }

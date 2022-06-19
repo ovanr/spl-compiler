@@ -8,7 +8,7 @@ doing_just_a_funCall() :: -> Void
     print(4 - -deducting_a_minus_id());
 }
 
-main() :: -> Int
+main() :: -> Void
 {
     doing_just_a_funCall();
 }

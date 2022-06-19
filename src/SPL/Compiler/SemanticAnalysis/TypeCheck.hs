@@ -54,6 +54,7 @@ import SPL.Compiler.SemanticAnalysis.Unify
 import SPL.Compiler.SemanticAnalysis.TypeCheckLib
     ( (<=*),
       addArgsToEnv,
+      checkNotAssignToBuiltIn,
       addToEnv,
       addToEnvWithoutGen,
       adjustForMissingReturn,
@@ -246,8 +247,9 @@ typeCheckStmt (AST.WhileStmt loc cond bodyStmts) tau = do
     bodyStmts' <- mapM (`typeCheckStmt` tau) bodyStmts
     return $ WhileStmt loc cond' bodyStmts'
 
-typeCheckStmt (AST.AssignStmt loc id fields expr) tau = do
+typeCheckStmt (AST.AssignStmt loc id@(AST.ASTIdentifier idLoc idName) fields expr) tau = do
     resultT <- freshVar (getLoc id) "f"
+    checkNotAssignToBuiltIn (CoreIdentifier idLoc idName)
     id' <- typeCheckFieldSelector id fields resultT
     expr' <- typeCheckExpr expr resultT
     return $ AssignStmt loc id' resultT fields expr'
@@ -275,7 +277,7 @@ typeCheckVarDecl (AST.ASTVarDecl loc tau (AST.ASTIdentifier l i) e) = do
         Nothing -> -- use of Var keyword
             return $ CoreVarDecl loc varT (CoreIdentifier l i) e'
         Just expectedType -> do
-            let scheme = liftToScheme varT
+            scheme <- generalise varT
             expectedType <=* scheme
             return $ CoreVarDecl loc varT (CoreIdentifier l i) e'
 

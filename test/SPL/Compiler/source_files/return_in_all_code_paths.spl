@@ -40,4 +40,5 @@ whileAndIfCombined(x)
       return 10;
     }
   }
+  return 3;
 }

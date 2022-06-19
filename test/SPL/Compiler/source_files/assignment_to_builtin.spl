@@ -9,5 +9,5 @@ f()
 {
   // This tries to assign to the built-in function isEmpty.
   // Adapt this line if your isEmpty is called differently.
-  isEmpty = blaat;
+  var hd = blaat;
 }

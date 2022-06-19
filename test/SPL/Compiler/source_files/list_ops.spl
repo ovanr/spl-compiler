@@ -31,6 +31,16 @@ len (x) {
 
 main() {
 	var slashes = "/////////////////////////////////////////////////////";
+	var nested = (1, "number 1"):(2, "number 2"):[];
+	var suml = 1:2:3:4:5:[];
+	var large = range(0, 10000, 3);
+	var x = "Reverse this string";
+	var input_l = 9:-3:5:2:6:8:-6:1:3:[];
+	var deep = ("lorem", ((True:[]):(False:[]):(True:[]):[], "Other text"))
+		: ("ipsum", ((True:[]):[], "More text"))
+			: ("test", ([], "string")) : [];
+
+	var p = 1:2:3:[];
 	print(slashes);
 	print('\n');
 	print(slashes);
@@ -39,13 +49,11 @@ main() {
 	print('\n');
 	print("******* REVERSE *********");
 	print('\n');
-	var x = "Reverse this string";
-	print(x);
+    print(x);
 	print('\n');
 	print(reverse(x, []));
 	print('\n');
 
-	var nested = (1, "number 1"):(2, "number 2"):[];
 	print(nested);
 	print('\n');
 	print(reverse(nested, []));
@@ -71,42 +79,37 @@ main() {
 	print('\n');
 	print('\n');
 
-	print("******* CONTAINS *********");
-	print('\n');
-	print("Is 867 prime? ");
-	print(contains(primes, 867));
-	print('\n');
-	print("Is 7477 prime? ");
-	print(contains(primes, 7477));
-	print('\n');
-	print('\n');
+	/* print("******* CONTAINS *********"); */
+	/* print('\n'); */
+	/* print("Is 867 prime? "); */
+	/* print(contains(primes, 867)); */
+	/* print('\n'); */
+	/* print("Is 7477 prime? "); */
+	/* print(contains(primes, 7477)); */
+	/* print('\n'); */
+	/* print('\n'); */
 
-	print("******* SUM *********");
-	print('\n');
-	var suml = 1:2:3:4:5:[];
-	print("Sum [1,2,3,4,5]: ");
-	print(sum(suml));
-	print('\n');
-	print('\n');
+	/* print("******* SUM *********"); */
+	/* print('\n'); */
+	/* print("Sum [1,2,3,4,5]: "); */
+	/* print(sum(suml)); */
+	/* print('\n'); */
+	/* print('\n'); */
 
 	print("******* GENERATE LIST *********");
 	print('\n');
 	print("Generate list with range [0, 10,000) ints and step size 3");
 	print('\n');
-	var large = range(0, 10000, 3);
 	print("Length: ");
 	print(len(large));
 	print('\n');
 	print("Print first 50 elements using take function");
 	print('\n');
-	print(take(50, large));
+	/* print(take(50, large)); */
 	print('\n');
 	print('\n');
 
 	print("******* NESTED LIST *********\n");
-	var deep = ("lorem", ((True:[]):(False:[]):(True:[]):[], "Other text"))
-		: ("ipsum", ((True:[]):[], "More text"))
-			: ("test", ([], "string")) : [];
 	print("Print nested list:");
 	print('\n');
 	print(deep);
@@ -116,35 +119,29 @@ main() {
 	print('\n');
 	print('\n');
 
-	print("******* LIST INDEX *********");
-	print('\n');
-	print("100th prime: ");
-	print(get_index(100, primes));
-	print('\n');
-	print('\n');
+	/* print("******* LIST INDEX *********"); */
+	/* print('\n'); */
+	/* print("100th prime: "); */
+	/* print(get_index(100, primes)); */
+	/* print('\n'); */
+	/* print('\n'); */
 
-	print("******* LIST SORTING *********");
-	print('\n');
-	var input_l = 9:-3:5:2:6:8:-6:1:3:[];
-	print("Sort list: ");
-	print(input_l);
-	print('\n');
-	quickSort(input_l, 0, len(input_l) - 1);
-	print("Output: ");
-	print(input_l);
-	print('\n');
-	print('\n');
+	/* print("******* LIST SORTING *********"); */
+	/* print('\n'); */
+	/* print("Sort list: "); */
+	/* print(input_l); */
+	/* print('\n'); */
+	/* quickSort(input_l, 0, len(input_l) - 1); */
+	/* print("Output: "); */
+	/* print(input_l); */
+	/* print('\n'); */
+	/* print('\n'); */
 
-	print("******* PERMUTATIONS *********");
-	print('\n');
-	var p = 1:2:3:[];
-	/*or if you support overloading/polymorph functions
-	  printPermutations(p);
-	  printPermutations("text");
-	 */
-	printPermutationsInt(p);
-	printPermutationsChar("text");
-	print('\n');
+	/* print("******* PERMUTATIONS *********"); */
+	/* print('\n'); */
+	/*   printPermutations(p); */
+	/*   printPermutations("text"); */
+	/* print('\n'); */
 }
 
 // Reverse list xs
@@ -156,46 +153,46 @@ reverse(xs, acc) :: [a] [a] -> [a] {
 	}
 }
 
-// Does xs contain element x?
-contains(xs, x) :: [Int] Int -> Bool {
-	if(len(xs) > 0) {
-		if(xs.hd == x) {
-			return True;
-		}
-		return contains(xs.tl, x);
-	}
-	return False;
-}
+/* // Does xs contain element x? */
+/* contains(xs, x) :: [Int] Int -> Bool { */
+/* 	if(len(xs) > 0) { */
+/* 		if(xs.hd == x) { */
+/* 			return True; */
+/* 		} */
+/* 		return contains(xs.tl, x); */
+/* 	} */
+/* 	return False; */
+/* } */
 
-// Sum of all elements of xs
-sum(xs) {
-	if(len(xs) == 0){
-		return 0;
-	} else {
-		return xs.hd + sum(xs.tl);
-	}
-}
+/* // Sum of all elements of xs */
+/* sum(xs) { */
+/* 	if(len(xs) == 0){ */
+/* 		return 0; */
+/* 	} else { */
+/* 		return xs.hd + sum(xs.tl); */
+/* 	} */
+/* } */
 
 // Take first n elements of xs
-take(n, xs) {
-	if(len(xs) > 0 && n > 0) {
-		return xs.hd : take(n-1, xs.tl);
-	} else {
-		return [];
-	}
-}
+/* take(n, xs) { */
+/* 	if(len(xs) > 0 && n > 0) { */
+/* 		return xs.hd : take(n-1, xs.tl); */
+/* 	} else { */
+/* 		return []; */
+/* 	} */
+/* } */
 
-// Drop first n elements of xs
-drop(n, xs) {
-	if(n <= 0) {
-		return xs;
-	}
-	if(len(xs) > 0) {
-		return drop(n-1, xs.tl);
-	} else {
-		return [];
-	}
-}
+/* // Drop first n elements of xs */
+/* drop(n, xs) { */
+/* 	if(n <= 0) { */
+/* 		return xs; */
+/* 	} */
+/* 	if(len(xs) > 0) { */
+/* 		return drop(n-1, xs.tl); */
+/* 	} else { */
+/* 		return []; */
+/* 	} */
+/* } */
 
 // Generate int list with range [start, end) and stepsize step
 range(start, end, step) {
@@ -229,95 +226,74 @@ update_index(i, xs, value) :: Int [a] a -> Void {
 	}
 }
 
-// Partition function for sorting
-partition(input_list, low, high) {
-	var i = low - 1;
-	var pivot = get_index(high, input_list);
-	var j = low;
-	while(j < high) {
-		if(get_index(j, input_list) <= pivot) {
-			i = i + 1;
-			var val_j = get_index(j, input_list);
-			var val_i = get_index(i, input_list);
-			update_index(i, input_list, val_j);
-			update_index(j, input_list, val_i);
-		}
-		j = j + 1;
-	}
-	var high_val = get_index(high, input_list);
-	var ip1_val = get_index(i+1, input_list);
-	update_index(i+1, input_list, high_val);
-	update_index(high, input_list, ip1_val);
-	return i + 1;
-}
+/* // Partition function for sorting */
+/* partition(input_list, low, high) { */
+/* 	var i = low - 1; */
+/* 	var pivot = get_index(high, input_list); */
+/* 	var j = low; */
+/*     var val_j = 0; */
+/*     var val_i = 0; */
+/*     var high_val = 0; */
+/*     var ip1_val = 0; */
+/* 	while(j < high) { */
+/* 		if(get_index(j, input_list) <= pivot) { */
+/* 			i = i + 1; */
+/* 			val_j = get_index(j, input_list); */
+/* 			val_i = get_index(i, input_list); */
+/* 			update_index(i, input_list, val_j); */
+/* 			update_index(j, input_list, val_i); */
+/* 		} */
+/* 		j = j + 1; */
+/* 	} */
+/* 	high_val = get_index(high, input_list); */
+/* 	ip1_val = get_index(i+1, input_list); */
+/* 	update_index(i+1, input_list, high_val); */
+/* 	update_index(high, input_list, ip1_val); */
+/* 	return i + 1; */
+/* } */
 
-// Quicksort
-quickSort(input_list, low, high) {
-	if(low < high) {
-		var partition_index = partition(input_list, low, high);
-		quickSort(input_list, low, partition_index - 1);
-		quickSort(input_list, partition_index + 1, high);
-	}
-}
+/* // Quicksort */
+/* quickSort(input_list, low, high) { */
+/*     var partition_index = 0; */
+/* 	if(low < high) { */
+/* 		partition_index = partition(input_list, low, high); */
+/* 		quickSort(input_list, low, partition_index - 1); */
+/* 		quickSort(input_list, partition_index + 1, high); */
+/* 	} */
+/* } */
 
-permutations(list) :: [a] -> [[a]] {
-	if(isEmpty(list)) {
-		return list : [];
-	}
-	[[a]] result = [];
-	[[a]] perms = permutations(list.tl);
-	Int i = 0;
-	while(i < len(perms)) {
-		[a] perm = get_index(i, perms);
-		Int j = 0;
-		while(j < len(list)) {
-			//    result = (take(j, perm) + (list.hd : drop(j, perm))) : result;
-			result = append(take(j, perm), (list.hd : drop(j, perm))) : result;
-			j = j + 1;
-		}
-		i = i + 1;
-	}
-	return result;
-}
-
-printPermutationsInt(list) :: [Int] -> Void {
-	var result = permutations(list);
-	var lenl = len(result);
-	Int index = 0;
-	print("Showing all "); print(lenl); print(" permutations of: "); print(list);
-	print('\n');
-	while(index < len(result)) {
-		print(get_index(index, result));
-		print('\n');
-		index = index + 1;
-	}
-	return;
-}
-printPermutationsChar(list) :: [Char] -> Void {
-	var result = permutations(list);
-	var lenl = len(result);
-	Int index = 0;
-	print("Showing all "); print(lenl); print(" permutations of: "); print(list);
-	print('\n');
-	while(index < len(result)) {
-		print(get_index(index, result));
-		print('\n');
-		index = index + 1;
-	}
-	return;
-}
-/* Or this if you support overloaded/polymorph functions
-   printPermutations(list)  {
-   var result = permutations(list);
-   var lenl = len(result);
-   Int index = 0;
-   print("Showing all "); print(lenl); print(" permutations of: "); print(list);
-   print('\n');
-   while(index < len(result)) {
-   print(get_index(index, result));
-   print('\n');
-   index = index + 1;
-   }
-   return;
-   }
- */
+/* permutations(list) :: [a] -> [[a]] { */
+/* 	[[a]] result = []; */
+/* 	[[a]] perms = []; */
+/*     [a] perm = []; */
+/* 	Int i = 0; */
+/* 		Int j = 0; */
+/* 	if(isEmpty(list)) { */
+/* 		return list : []; */
+/* 	} */
+/* 	result = []; */
+/* 	perms = permutations(list.tl); */
+/* 	while(i < len(perms)) { */
+/* 		perm = get_index(i, perms); */
+/* 		while(j < len(list)) { */
+/* 			//    result = (take(j, perm) + (list.hd : drop(j, perm))) : result; */
+/* 			result = append(take(j, perm), (list.hd : drop(j, perm))) : result; */
+/* 			j = j + 1; */
+/* 		} */
+/* 		i = i + 1; */
+/* 	} */
+/* 	return result; */
+/* } */
+/* printPermutations(list)  { */
+/*    var result = permutations(list); */
+/*    var lenl = len(result); */
+/*    Int index = 0; */
+/*    print("Showing all "); print(lenl); print(" permutations of: "); print(list); */
+/*    print('\n'); */
+/*    while(index < len(result)) { */
+/*    print(get_index(index, result)); */
+/*    print('\n'); */
+/*    index = index + 1; */
+/*    } */
+/*    return; */
+/* } */

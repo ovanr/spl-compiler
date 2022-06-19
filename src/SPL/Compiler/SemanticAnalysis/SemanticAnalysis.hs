@@ -25,7 +25,7 @@ import Data.Functor (($>))
 printTypeCheckError :: [Text] -> Text
 printTypeCheckError [] = mempty
 printTypeCheckError errors =
-    let header = "Error occurred during type checking phase!"
+    let header = "Error occurred during semantic analysis phase."
       in T.init $ T.unlines $ header: "": errors
 
 printTypeCheckWarnings :: [Text] -> IO ()

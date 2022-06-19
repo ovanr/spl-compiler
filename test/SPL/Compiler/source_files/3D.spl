@@ -5,3 +5,10 @@ transpose (p1,p2) :: (Int, (Int, Int))  (Int, (Int, Int))   -> (Int, (Int, Int))
 scale(p, scalar) :: (Int, (Int, Int)) Int -> (Int, (Int, Int)) {
 	return (p.fst * scalar, (p.snd.fst * scalar, p.snd.snd * scalar));
 }
+
+main() {
+
+    print(scale((1,(2,3)), 10));
+    print(transpose((1,(2,3)), (100, (200, 300))));
+
+}

@@ -35,8 +35,18 @@ main ( ) :: -> Void {
         n = n + 1;
     }
     print ( ok );
+    print(reverse(map(abs, fromTo(-10,20))));
+    print(append([1,2,3], [23,3,23,232,32,23,23]));
+    print(swapCopy(swap((2,3))));
+    print(squareOddNumbers(fromTo(0,10)));
 }
 
+map ( f, xs ) {
+    if (xs == []) 
+        return [];
+    else
+        return f(xs.hd) : map(f, xs.tl);
+}
 // A list based factorial function
 // Defined here to show that functions can be given in any order (unlike C)
 facL ( n ) :: Int -> Int {

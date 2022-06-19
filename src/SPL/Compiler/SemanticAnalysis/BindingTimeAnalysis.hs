@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (
     duplicateDefError,
-    detectDuplicateFunctionNames
+    detectDuplicateFunctionNames,
+    assignToBuiltInError
     ) where
 
 import Control.Monad.State
@@ -22,6 +23,14 @@ import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
 
 type SomeErrorStateMonad s m = (MonadState s m, MonadError Error m, ContainsSource s)
+
+assignToBuiltInError :: (SomeErrorStateMonad s m) => ASTIdentifier -> m ()
+assignToBuiltInError (ASTIdentifier l id) = do
+    let header = [
+            "Assignment to built-in identifier '" <> id <> "' not allowed."
+            ]
+    typeLocTrace <- definition ("'" <> id <> "' has been assigned here:") l
+    throwError $ header <> typeLocTrace
 
 duplicateDefError :: (SomeErrorStateMonad s m) => ASTIdentifier -> m ()
 duplicateDefError (ASTIdentifier l id) = do

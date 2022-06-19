@@ -1,0 +1,121 @@
+/*
+	Program with functions for lists
+	Author: David Kerkkamp
+*/
+
+
+append (x, y) {
+	var r = x;
+	if (isEmpty(x))
+		return y;
+	while (!isEmpty(r.tl))
+		r = r.tl;
+	r.tl = y;
+	return x;
+}
+//println (x) {
+//	print(x);
+//	print('\n');
+//	return;
+//}
+
+len (x) {
+	Int r = 0;
+	while (!isEmpty(x)) {
+		r = r + 1;
+		x = x.tl;
+	}
+	return r;
+}
+
+main() {
+	var slashes = "/////////////////////////////////////////////////////";
+	var nested = (1, "number 1"):(2, "number 2"):[];
+	var suml = 1:2:3:4:5:[];
+	var large = range(0, 10000, 3);
+	var x = "Reverse this string";
+	var input_l = 9:-3:5:2:6:8:-6:1:3:[];
+	var deep = ("lorem", ((True:[]):(False:[]):(True:[]):[], "Other text"))
+		: ("ipsum", ((True:[]):[], "More text"))
+			: ("test", ([], "string")) : [];
+
+	var p = 1:2:3:[];
+    print("noooo");
+	print(slashes);
+	print('\n');
+	print(slashes);
+	print('\n');
+	print(slashes);
+	print('\n');
+	print("******* REVERSE *********");
+	print('\n');
+    print(x);
+	print('\n');
+	print(reverse(x, []));
+	print('\n');
+
+	print(nested);
+	print('\n');
+	print(reverse(nested, []));
+	print('\n');
+	print('\n');
+
+	print("******* LEN *********");
+	print('\n');
+	print(" elements\n");
+	print('\n');
+
+	print("******* CHANGE CONTENT *********");
+	print('\n');
+	print(x);
+	print('\n');
+	x.tl.hd = 'u'; // Change directly
+	update_index(3, x, 'u'); // Using update function
+	update_index(10, x, 'u');
+	update_index(16, x, 'u');
+	print(x);
+	print('\n');
+	print('\n');
+
+}
+
+// Reverse list xs
+reverse(xs, acc) :: [a] [a] -> [a] {
+	if(len(xs) == 0) {
+		return acc;
+	} else {
+		return reverse(xs.tl, xs.hd : acc);
+	}
+}
+
+// Generate int list with range [start, end) and stepsize step
+range(start, end, step) {
+	var lst = [];
+	while(start < end) {
+		lst = start : lst;
+		start = start + step;
+	}
+	return reverse(lst, []);
+}
+
+// Get index i of xs (out of bounds = segmentation fault)
+get_index(i, xs) :: Int [a] -> a {
+	if(i <= 0 || len(xs) == 0) {
+		return xs.hd;
+	} else {
+		return get_index(i-1, xs.tl);
+	}
+}
+
+// Update index i of xs with value
+update_index(i, xs, value) :: Int [a] a -> Void {
+	if(isEmpty(xs) || i < 0) {
+		return;
+	}
+	if(i == 0) {
+		xs.hd = value;
+		return;
+	} else {
+		return update_index(i-1, xs.tl, value);
+	}
+}

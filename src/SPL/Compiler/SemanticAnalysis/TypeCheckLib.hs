@@ -18,10 +18,10 @@ import SPL.Compiler.Common.Error
 import SPL.Compiler.Common.Misc (wrapStateT, inSandboxState)
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
-import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (duplicateDefError)
+import SPL.Compiler.SemanticAnalysis.Env (initGamma)
+import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (duplicateDefError, assignToBuiltInError)
 import SPL.Compiler.SemanticAnalysis.Unify
 import Data.Foldable (toList)
-import Debug.Trace
 
 ast2coreType :: AST.ASTType -> Maybe CoreType
 ast2coreType (AST.ASTUnknownType loc) = Nothing
@@ -77,7 +77,7 @@ freshVar :: EntityLoc -> Text -> TCMonad CoreType
 freshVar loc prefix = do
     suffix <- T.pack . show <$> use getTvCounter
     getTvCounter += 1
-    return $ CoreVarType loc (prefix <> suffix)
+    return $ CoreVarType loc ("_" <> prefix <> suffix)
 
 throwWarning :: Text -> TCMonad ()
 throwWarning warn = getWarnings <>= [warn]
@@ -128,6 +128,12 @@ checkNotInGamma id@(CoreIdentifier l idName) = do
     when (M.member idName env) $
         duplicateDefError (AST.ASTIdentifier l idName)
 
+checkNotAssignToBuiltIn :: CoreIdentifier -> TCMonad ()
+checkNotAssignToBuiltIn id@(CoreIdentifier l idName) = do
+    let TypeEnv env = initGamma
+    when (M.member idName env) $
+        assignToBuiltInError (AST.ASTIdentifier l idName)
+
 variableNotFoundErr :: CoreIdentifier -> TCMonad a
 variableNotFoundErr (CoreIdentifier l idName) = do
     varTrace <- definition (idName <> "' is accessed at:") l
@@ -161,8 +167,10 @@ adjustForMissingReturn t body@(CoreFunBody l varDecls stmts) =
     if not $ any isReturn stmts then do
         subst <- use getSubst
         let retType = getFunRetType (subst $* t)
-        let (CoreVarType l' v) = retType
-        addSubst v (CoreVoidType l')
+        case retType of 
+            (CoreVarType l' v) -> addSubst v (CoreVoidType l')
+            _ -> pure ()
+
         return $ CoreFunBody l varDecls (stmts ++ [ReturnStmt l Nothing])
     else
         pure body
