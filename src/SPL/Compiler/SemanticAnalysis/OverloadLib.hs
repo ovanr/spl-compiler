@@ -22,6 +22,7 @@ import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.Unify
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
 import Control.Monad.Extra (unlessM)
+import SPL.Compiler.Common.Misc (impossible)
 
 data TCon =
         TEq EntityLoc TypeVar
@@ -158,7 +159,7 @@ mkTConArgExpr (c, t@(CoreTupleType loc elemT1 elemT2)) = do
         callerTyp = foldr (CoreFunType loc . pure) typ [baseTyp1, baseTyp2]
         caller = FunIdentifierExpr callerTyp $ CoreIdentifier (getLoc c) (mkTConName c t)
     pure (FunCallExpr (CoreFunCall loc caller callerTyp [baseExpr1, baseExpr2]), typ)
-mkTConArgExpr _ = undefined
+mkTConArgExpr (tcon, t) = invalidTConErr tcon t
 
 ambiguousTConCheck :: CoreType -> TCon -> TConMonad ()
 ambiguousTConCheck t tcon = do
@@ -166,6 +167,14 @@ ambiguousTConCheck t tcon = do
         tv = unTCon tcon
     unless (tv `S.member` freeTV) $
         ambiguousTConErr tcon >>= throwErr
+
+invalidTConErr :: TCon -> CoreType -> TConMonad a
+invalidTConErr tcon t = do
+    let header = T.pack $ "Unable to resolve instance: " <> show tcon <> " for type '" <> show t <> "'"
+    err <- definition (T.pack $ "'" <>
+                       show tcon <> 
+                       "' instance has been inferred for: ") tcon
+    throwErr $ header : err
 
 ambiguousTConErr :: TCon -> TConMonad Error
 ambiguousTConErr tcon = do

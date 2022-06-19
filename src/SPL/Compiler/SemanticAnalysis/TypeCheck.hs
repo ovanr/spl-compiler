@@ -20,7 +20,7 @@ import Control.Monad.State ( foldM, unless, zipWithM, forM )
 import Control.Applicative ()
 import Control.Lens ( (^.), use, (.=), traversed )
 
-import SPL.Compiler.Common.EntityLocation ( Locatable(getLoc) )
+import SPL.Compiler.Common.EntityLocation ( Locatable(getLoc, setLoc) )
 import SPL.Compiler.Common.Error ( definition, throwErr )
 import SPL.Compiler.Common.Misc
     ( wrapStateT, impossible, inSandboxState )
@@ -341,7 +341,7 @@ typeCheckFunDecls (AcyclicSCC func) = do
     func'@(CoreFunDecl _ _ _ t _ ) <- sandBoxedTypeCheckFun func funType
 
     scheme <- generalise t
-    addToEnv GlobalFun (func' ^. funId.idName) scheme
+    addToEnv GlobalFun (func' ^. funId) scheme
     pure (AcyclicSCC func')
 
 typeCheckFunDecls (CyclicSCC funcs) = do
@@ -353,7 +353,7 @@ typeCheckFunDecls (CyclicSCC funcs) = do
     funcs' <- zipWithM sandBoxedTypeCheckFun funcs funTypes
 
     CyclicSCC <$> forM funcs' (
-        \f@(CoreFunDecl _ (CoreIdentifier _ id) _ t _) -> do
+        \f@(CoreFunDecl _ id _ t _) -> do
             scheme <- generalise t
             addToEnv GlobalFun id scheme
             pure f)

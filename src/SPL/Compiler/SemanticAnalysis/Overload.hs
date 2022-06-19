@@ -24,13 +24,13 @@ resolveOverloading (Core varDecls funDecls) = do
     pure $ Core varDecls funDecls'
 
 rewriteTConFunDecls :: SCC CoreFunDecl -> TConMonad (SCC CoreFunDecl)
-rewriteTConFunDecls (AcyclicSCC fun@(CoreFunDecl _ (CoreIdentifier _ id) args t _)) = do
+rewriteTConFunDecls (AcyclicSCC fun@(CoreFunDecl loc (CoreIdentifier _ id) args t _)) = do
     gatherTConFunDecl fun
     tcons <- S.toList <$> use newTCon
     mapM_ (ambiguousTConCheck t) tcons
     when (null args && not (null tcons)) $
         noArgFunTConErr (head tcons)
-    env %= M.insert id (tcons,t)
+    env %= M.insert id (tcons, setLoc loc t)
     AcyclicSCC <$> rewriteTConFunDecl fun
 rewriteTConFunDecls (CyclicSCC funDecls) = do
     findFixPoint (gatherTCon funDecls)
@@ -107,7 +107,7 @@ rewriteTConExpr (FunCallExpr fc) = FunCallExpr <$> rewriteTConFunCall fc
 rewriteTConExpr (TupExpr loc e1 e2) = TupExpr loc <$> rewriteTConExpr e1 <*> rewriteTConExpr e2
 rewriteTConExpr (OpExpr loc op e) = OpExpr loc op <$> rewriteTConExpr e
 rewriteTConExpr e@(FunIdentifierExpr typ (CoreIdentifier loc id)) = do
-    neededTCons <- getNeededTCons id typ
+    neededTCons <- getNeededTCons id (setLoc loc typ)
     instances <- mapM mkTConArgExpr neededTCons
     pure $ case instances of
         [] -> e

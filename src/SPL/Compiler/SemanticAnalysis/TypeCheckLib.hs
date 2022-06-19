@@ -122,11 +122,22 @@ throwWarning warn = getWarnings <>= [warn]
 
         isInstanceOf re t1 _ t2 = typeMismatchError (re $* t2) (re $* t1)
 
-checkNotInGamma :: CoreIdentifier -> TCMonad ()
-checkNotInGamma id@(CoreIdentifier l idName) = do
+checkNotInGamma :: Scope -> CoreIdentifier -> TCMonad ()
+checkNotInGamma scope id@(CoreIdentifier l idName) = do
+    checkNotAssignToBuiltIn id
     TypeEnv env <- use getEnv
-    when (M.member idName env) $
-        duplicateDefError (AST.ASTIdentifier l idName)
+    case M.lookup idName env of
+        Nothing -> pure ()
+        Just (inScope, _) ->
+            if inScope `elem` overrides scope then
+                pure ()
+            else
+                duplicateDefError (AST.ASTIdentifier l idName)
+    where
+        overrides GlobalVar = []
+        overrides GlobalFun = []
+        overrides Arg = [GlobalVar, GlobalFun]
+        overrides Local = [Arg, GlobalVar, GlobalFun]
 
 checkNotAssignToBuiltIn :: CoreIdentifier -> TCMonad ()
 checkNotAssignToBuiltIn id@(CoreIdentifier l idName) = do
@@ -149,18 +160,19 @@ makeAbstractFunType (AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args
 
 addToEnvWithoutGen :: Scope -> CoreIdentifier -> CoreType -> TCMonad ()
 addToEnvWithoutGen scope id@(CoreIdentifier _ idName) idType = do
-    checkNotInGamma id
+    checkNotInGamma scope id
     getEnv %= (\(TypeEnv env) -> TypeEnv $
                 M.insert idName (scope, liftToScheme idType) env)
 
-addToEnv :: Scope -> Text -> Scheme -> TCMonad ()
-addToEnv scope id scheme = do
+addToEnv :: Scope -> CoreIdentifier -> Scheme -> TCMonad ()
+addToEnv scope id@(CoreIdentifier _ idName) scheme = do
+    checkNotAssignToBuiltIn id
     TypeEnv env <- use getEnv
-    getEnv %= \(TypeEnv env) -> TypeEnv $ M.insert id (scope, scheme) env
+    getEnv %= \(TypeEnv env) -> TypeEnv $ M.insert idName (scope, scheme) env
 
 addArgsToEnv :: [(CoreType, CoreIdentifier)] -> TCMonad ()
 addArgsToEnv args = do
-    mapM_ (\(t, CoreIdentifier _ id) -> addToEnv Arg id (liftToScheme t)) args
+    mapM_ (\(t, id) -> addToEnv Arg id (liftToScheme t)) args
 
 adjustForMissingReturn :: CoreType -> CoreFunBody -> TCMonad CoreFunBody
 adjustForMissingReturn t body@(CoreFunBody l varDecls stmts) =
