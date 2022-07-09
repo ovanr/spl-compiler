@@ -35,4 +35,4 @@ all(list) { return foldl(and, True, list); }
 // Checks whether in a list of numbers everybody is older than 18
 allOlderThan18(list) { return all(map(ge18, list)); }
 
-main() { print(allOlderThan18([23,34])); return; }
+main() { print(allOlderThan18([23,10, 34])); return; }
