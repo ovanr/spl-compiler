@@ -27,6 +27,13 @@ Available options:
   -h,--help                Show this help text
 ```
 
+## Running the SSM assembly interpreter 
+
+```bash
+stack run spl-compiler -- -o out.ssm helloWorld.spl
+./ssm.sh --cli --file out.ssm
+```
+
 ## Running the tests
 
 We have an extensive test suite which can be run using:

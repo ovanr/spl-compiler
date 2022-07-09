@@ -1,0 +1,971 @@
+__entry:
+   ldc 1000
+   ldr 3
+   add
+   str 3
+   ldrr 5 3
+   ldc 1
+   ldr 3
+   add
+   str 3
+   bsr main
+   halt
+_pow:
+   link 2
+   ldl -3
+   stl 2
+   ldc 1
+   stl 1
+__loop2:
+   ldl -2
+   ldc 0
+   lt
+   brt __exception3
+   ldl -2
+   ldc 0
+   le
+   brt __end1
+   ldl 1
+   ldl 2
+   mul
+   stl 1
+   ldl -2
+   ldc 1
+   sub
+   stl -2
+   bra __loop2
+__end1:
+   ldl 1
+   str 4
+   unlink
+   ret
+__exception3:
+   ldc 10
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 110
+   trap 1
+   ldc 101
+   trap 1
+   ldc 103
+   trap 1
+   ldc 97
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 118
+   trap 1
+   ldc 101
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 120
+   trap 1
+   ldc 112
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 101
+   trap 1
+   ldc 110
+   trap 1
+   ldc 116
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+_eq_int:
+_eq_bool:
+_eq_char:
+   link 0
+   ldl -3
+   ldl -2
+   eq
+   str 4
+   unlink
+   ret
+_eq_void:
+_le_void:
+_ge_void:
+   link 0
+   ldc -1
+   str 4
+   unlink
+   ret
+_lt_void:
+_gt_void:
+   link 0
+   ldc 0
+   str 4
+   unlink
+   ret
+_eq_list:
+_lt_list:
+_le_list:
+_gt_list:
+_ge_list:
+   link 0
+__loop_start4:
+   ldl -4
+   ldl -3
+   eq
+   brt __success5
+   ldc 0
+   ldl -4
+   eq
+   brt __failure6
+   ldc 0
+   ldl -3
+   eq
+   brt __failure6
+   ldl -4
+   lda -1
+   ldl -3
+   lda -1
+   ldc 2
+   ldl -2
+   bsr __call_thunk
+   ajs -4
+   ldr 4
+   brf __failure6
+   ldl -4
+   lda 0
+   stl -4
+   ldl -3
+   lda 0
+   stl -3
+   bra __loop_start4
+__failure6:
+   ldc 0
+   str 4
+   unlink
+   ret
+__success5:
+   ldc -1
+   str 4
+   unlink
+   ret
+_eq_tup:
+_lt_tup:
+_le_tup:
+_gt_tup:
+_ge_tup:
+   link 0
+   ldl -5
+   lda 0
+   ldl -4
+   lda 0
+   ldc 2
+   ldl -2
+   bsr __call_thunk
+   ajs -4
+   ldr 4
+   brf __failure7
+   ldl -5
+   lda -1
+   ldl -4
+   lda -1
+   ldc 2
+   ldl -3
+   bsr __call_thunk
+   ajs -4
+   ldr 4
+   brf __failure7
+   ldc -1
+   str 4
+   unlink
+   ret
+__failure7:
+   ldc 0
+   str 4
+   unlink
+   ret
+_lt_int:
+_lt_bool:
+_lt_char:
+   link 0
+   ldl -2
+   ldl -3
+   lt
+   str 4
+   unlink
+   ret
+_le_int:
+_le_bool:
+_le_char:
+   link 0
+   ldl -2
+   ldl -3
+   le
+   str 4
+   unlink
+   ret
+_gt_int:
+_gt_bool:
+_gt_char:
+   link 0
+   ldl -2
+   ldl -3
+   gt
+   str 4
+   unlink
+   ret
+_ge_int:
+_ge_bool:
+_ge_char:
+   link 0
+   ldl -2
+   ldl -3
+   ge
+   str 4
+   unlink
+   ret
+_print_int:
+   link 0
+   ldl -2
+   trap 0
+   unlink
+   ret
+_print_bool:
+   link 0
+   ldl -2
+   brf __false8
+   ldc 84
+   trap 1
+   ldc 114
+   trap 1
+   ldc 117
+   trap 1
+   ldc 101
+   trap 1
+   unlink
+   ret
+__false8:
+   ldc 70
+   trap 1
+   ldc 97
+   trap 1
+   ldc 108
+   trap 1
+   ldc 115
+   trap 1
+   ldc 101
+   trap 1
+   unlink
+   ret
+_print_char:
+   link 0
+   ldl -2
+   trap 1
+   unlink
+   ret
+_print_void:
+   ldc 86
+   trap 1
+   ldc 111
+   trap 1
+   ldc 105
+   trap 1
+   ldc 100
+   trap 1
+   unlink
+   ret
+_print_list:
+   link 0
+   ldc 91
+   trap 1
+   ldl -3
+   ldc 0
+   eq
+   brt __end9
+   ldl -3
+   lda -1
+   ldc 1
+   ldl -2
+   bsr __call_thunk
+   ajs -3
+   ldl -3
+   lda 0
+__loop10:
+   lds 0
+   lds 0
+   ldc 0
+   eq
+   brt __end9
+   ldc 44
+   trap 1
+   lda -1
+   ldc 1
+   ldl -2
+   bsr __call_thunk
+   ajs -3
+   lda 0
+   bra __loop10
+__end9:
+   ldc 93
+   trap 1
+   unlink
+   ret
+_print_char_list:
+   link 0
+   ldc 34
+   trap 1
+__loop12:
+   ldl -2
+   ldc 0
+   eq
+   brt __end11
+   ldl -2
+   lda -1
+   trap 1
+   ldl -2
+   lda 0
+   stl -2
+   bra __loop12
+__end11:
+   ldc 34
+   trap 1
+   unlink
+   ret
+_print_tup:
+   link 0
+   ldc 40
+   trap 1
+   ldl -4
+   lda 0
+   ldc 1
+   ldl -2
+   bsr __call_thunk
+   ajs -3
+   ldc 44
+   trap 1
+   ldl -4
+   lda -1
+   ldc 1
+   ldl -3
+   bsr __call_thunk
+   ajs -3
+   ldc 41
+   trap 1
+   str 4
+   unlink
+   ret
+isEmpty:
+   link 0
+   ldl -2
+   ldc 0
+   eq
+   str 4
+   unlink
+   ret
+hd:
+   link 0
+   ldl -2
+   ldc 0
+   eq
+   brt __get_hd_exception
+   ldl -2
+   lda -1
+   str 4
+   unlink
+   ret
+tl:
+   link 0
+   ldl -2
+   ldc 0
+   eq
+   brt __get_tl_exception
+   ldl -2
+   lda 0
+   str 4
+   unlink
+   ret
+fst:
+   link 0
+   ldl -2
+   lda 0
+   str 4
+   unlink
+   ret
+snd:
+   link 0
+   ldl -2
+   lda -1
+   str 4
+   unlink
+   ret
+print:
+   link 0
+   ldl -3
+   ldc 1
+   ldl -2
+   bsr __call_thunk
+   unlink
+   ret
+__call_thunk:
+   link 1
+   ldl -3
+   stl 1
+__load_args_loop:
+   ldl 1
+   ldc 1
+   ge
+   brf __load_thunk
+   ldr 2
+   ldl 1
+   sub
+   lda -3
+   ldl 1
+   ldc 1
+   sub
+   stl 1
+   bra __load_args_loop
+__load_thunk:
+   ldl -2
+   lda 0
+   ldc 3
+   add
+   stl 1
+__load_thunk_loop:
+   ldl 1
+   ldc 1
+   ge
+   brf __eval_thunk
+   ldl -2
+   ldl 1
+   sub
+   lda 1
+   ldl 1
+   ldc 1
+   sub
+   stl 1
+   bra __load_thunk_loop
+__eval_thunk:
+   ldl -3
+   add
+   lds -1
+   lds -1
+   eq
+   brt __eval_saturated_thunk
+   lds -1
+   lds -1
+   lt
+   brt __eval_nested_saturated_thunk
+   bsr __store_thunk
+   unlink
+   ret
+__eval_saturated_thunk:
+   ajs -2
+   jsr
+   unlink
+   ret
+__eval_nested_saturated_thunk:
+   swp
+   sub
+   stl 1
+   jsr
+   ldr 1
+   ldl -2
+   lda -1
+   sub
+   str 1
+__call_nested_thunk:
+   ldl 1
+   ldr 4
+   bsr __call_thunk
+   unlink
+   ret
+__store_thunk:
+   link 1
+   ldl -2
+   ldc 4
+   add
+   stl 1
+   ldc 0
+__store_thunk_loop:
+   ldl 1
+   ldc 1
+   eq
+   brt __end_store_thunk
+   ajs -1
+   ldr 2
+   ldl 1
+   sub
+   lda 0
+   sth
+   ldl 1
+   ldc 1
+   sub
+   stl 1
+   bra __store_thunk_loop
+__end_store_thunk:
+   str 4
+   unlink
+   ret
+__get_hd_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 103
+   trap 1
+   ldc 101
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 104
+   trap 1
+   ldc 101
+   trap 1
+   ldc 97
+   trap 1
+   ldc 100
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__get_tl_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 103
+   trap 1
+   ldc 101
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 97
+   trap 1
+   ldc 105
+   trap 1
+   ldc 108
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__assign_hd_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 97
+   trap 1
+   ldc 115
+   trap 1
+   ldc 115
+   trap 1
+   ldc 105
+   trap 1
+   ldc 103
+   trap 1
+   ldc 110
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 111
+   trap 1
+   ldc 32
+   trap 1
+   ldc 104
+   trap 1
+   ldc 101
+   trap 1
+   ldc 97
+   trap 1
+   ldc 100
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+__assign_tl_exception:
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   ldc 69
+   trap 1
+   ldc 120
+   trap 1
+   ldc 99
+   trap 1
+   ldc 101
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 105
+   trap 1
+   ldc 111
+   trap 1
+   ldc 110
+   trap 1
+   ldc 58
+   trap 1
+   ldc 32
+   trap 1
+   ldc 67
+   trap 1
+   ldc 97
+   trap 1
+   ldc 110
+   trap 1
+   ldc 110
+   trap 1
+   ldc 111
+   trap 1
+   ldc 116
+   trap 1
+   ldc 32
+   trap 1
+   ldc 97
+   trap 1
+   ldc 115
+   trap 1
+   ldc 115
+   trap 1
+   ldc 105
+   trap 1
+   ldc 103
+   trap 1
+   ldc 110
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 111
+   trap 1
+   ldc 32
+   trap 1
+   ldc 116
+   trap 1
+   ldc 97
+   trap 1
+   ldc 105
+   trap 1
+   ldc 108
+   trap 1
+   ldc 32
+   trap 1
+   ldc 111
+   trap 1
+   ldc 102
+   trap 1
+   ldc 32
+   trap 1
+   ldc 101
+   trap 1
+   ldc 109
+   trap 1
+   ldc 112
+   trap 1
+   ldc 116
+   trap 1
+   ldc 121
+   trap 1
+   ldc 32
+   trap 1
+   ldc 108
+   trap 1
+   ldc 105
+   trap 1
+   ldc 115
+   trap 1
+   ldc 116
+   trap 1
+   ldc 33
+   trap 1
+   ldc 42
+   trap 1
+   ldc 42
+   trap 1
+   halt
+main:
+   nop
+   link 0
+   ldc 72
+   ldc 101
+   ldc 108
+   ldc 108
+   ldc 111
+   ldc 32
+   ldc 87
+   ldc 111
+   ldc 114
+   ldc 108
+   ldc 100
+   ldc 0
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   stmh 2
+   ldc _print_char_list
+   ldc 1
+   ldc 0
+   bsr __store_thunk
+   ajs -3
+   ldr 4
+   bsr print
+   ajs -2
+   ldr 4
+   ajs -1
+   annote GP 0 0 blue "_void_var"
+   ldr 5
+   lda 0
+   str 4
+   unlink
+   ret
