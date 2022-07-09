@@ -1,5 +1,7 @@
 # spl-compiler
 
+See the `language_report.pdf` file for a detailed description of the language and the compiler.
+
 ## Installation
 
 Make sure you have stack installed and run:
