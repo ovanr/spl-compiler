@@ -28,7 +28,7 @@ data ASTVarDecl = ASTVarDecl EntityLoc ASTType ASTIdentifier ASTExpr
 data ASTIdentifier = ASTIdentifier { _idLoc :: EntityLoc, _idName :: Text }
     deriving (Eq, Show)
 
-data ASTFunBody = ASTFunBody EntityLoc [ASTVarDecl] [ASTStmt]
+data ASTFunBody = ASTFunBody EntityLoc [ASTStmt]
     deriving (Eq, Show)
 
 data ASTFunCall = ASTFunCall EntityLoc ASTExpr [ASTExpr]
@@ -52,6 +52,7 @@ instance Show Field where
 data ASTStmt = 
         IfElseStmt EntityLoc ASTExpr [ASTStmt] [ASTStmt]
     |   WhileStmt EntityLoc ASTExpr [ASTStmt]
+    |   VarDeclStmt ASTVarDecl
     |   AssignStmt EntityLoc ASTIdentifier [Field] ASTExpr
     |   FunCallStmt ASTFunCall
     |   ReturnStmt EntityLoc (Maybe ASTExpr)  
@@ -63,6 +64,7 @@ data ASTExpr =
     |   BoolExpr EntityLoc Bool
     |   FunCallExpr ASTFunCall
     |   IdentifierExpr ASTIdentifier
+    -- |   LambdaExpr ASTFunDecl
     |   FieldSelectExpr EntityLoc ASTExpr [Field]
     |   OpExpr EntityLoc OpUnary ASTExpr
     |   Op2Expr EntityLoc ASTExpr OpBin ASTExpr  

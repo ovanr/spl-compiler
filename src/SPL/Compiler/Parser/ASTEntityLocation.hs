@@ -54,11 +54,13 @@ instance Locatable ASTExpr where
 instance Locatable ASTStmt where
     setLoc l (IfElseStmt _ c a b) = IfElseStmt l c a b
     setLoc l (WhileStmt _ c b) = WhileStmt l c b
+    setLoc l (VarDeclStmt v) = VarDeclStmt (setLoc l v)
     setLoc l (AssignStmt _ v fd r) = AssignStmt l v fd r
     setLoc l (FunCallStmt f) = FunCallStmt (setLoc l f)
     setLoc l (ReturnStmt _ r) = ReturnStmt l r
     getLoc (IfElseStmt l _ _ _) = l
     getLoc (WhileStmt l _ _) = l
+    getLoc (VarDeclStmt v) = getLoc v
     getLoc (AssignStmt l _ _ _) = l
     getLoc (FunCallStmt f) = getLoc f
     getLoc (ReturnStmt l _) = l
@@ -84,5 +86,5 @@ instance Locatable ASTType where
     getLoc (ASTVoidType l) = l
 
 instance Locatable ASTFunBody where
-    setLoc l (ASTFunBody _ v b) = ASTFunBody l v b
-    getLoc (ASTFunBody l _ _) = l
+    setLoc l (ASTFunBody _ b) = ASTFunBody l b
+    getLoc (ASTFunBody l _) = l

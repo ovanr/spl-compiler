@@ -64,10 +64,9 @@ pFunDecl = pWrapErrors (\_ -> (<>) ["Function declaration"]) $
                 <*> pFunBody
 
     where
-        pFunBody = (\start vs st end -> ASTFunBody (start |-| end) vs st)
+        pFunBody = (\start stmts end -> ASTFunBody (start |-| end) stmts)
                         <$> pIsSymbol '{'
-                        <*> many' pVarDecl
-                        <*> many' pStmt
+                        <*> some' pStmt
                         <*> pIsSymbol '}'
         pDblColon = pTwice (pIsSymbol ':')
 
@@ -178,6 +177,7 @@ pVarDecl =
 pStmt :: SPLParser ASTStmt
 pStmt = pIfElseStmt
         <<|> pWhileStmt
+        <<|> (VarDeclStmt <$> pVarDecl)
         <<|> pAssignStmt
         <<|> pFunCallStmt
         <<|> pReturnStmt

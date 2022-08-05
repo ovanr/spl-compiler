@@ -16,8 +16,8 @@ wrapStateT to from st = do
     modify (from initialState)
     return a
 
-inSandboxState :: MonadState s m => Lens' s a -> a -> m b -> m b
-inSandboxState lens x = wrapStateT
+inSandboxedState :: MonadState s m => Lens' s a -> a -> m b -> m b
+inSandboxedState lens x = wrapStateT
                                (lens .~ x)
                                (\old new -> new & lens .~ (old ^. lens))
 

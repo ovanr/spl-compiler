@@ -5,6 +5,7 @@ module SPL.Compiler.SemanticAnalysis.ConstantFold (
 
 import SPL.Compiler.SemanticAnalysis.Core
 import qualified Data.List as L
+import Data.Bifunctor (Bifunctor(bimap))
 
 constantFold :: Core -> Core
 constantFold (Core varDecls funDecls) = 
@@ -15,11 +16,8 @@ optimizeVarDecl :: CoreVarDecl -> CoreVarDecl
 optimizeVarDecl (CoreVarDecl l t id e) = CoreVarDecl l t id (optimizeExpr e)
 
 optimizeFunDecl :: CoreFunDecl -> CoreFunDecl
-optimizeFunDecl (CoreFunDecl l id args t (CoreFunBody lb vars stmts)) =
-    CoreFunDecl l id args t $ 
-        CoreFunBody lb 
-            (map optimizeVarDecl vars) 
-            (elimUnreachableStmt $ concatMap optimizeStmt stmts)
+optimizeFunDecl (CoreFunDecl l id args t (CoreFunBody lb stmts)) =
+    CoreFunDecl l id args t . CoreFunBody lb $ concatMap (elimUnreachableStmt . optimizeStmt) stmts
 
 optimizeStmt :: CoreStmt -> [CoreStmt]
 optimizeStmt (IfElseStmt l e taken nTaken) =
@@ -32,6 +30,7 @@ optimizeStmt (WhileStmt l e stmts) =
     case optimizeExpr e of
         (BoolExpr _ False) -> []
         e' -> [WhileStmt l e' (elimUnreachableStmt $ concatMap optimizeStmt stmts)]
+optimizeStmt (VarDeclStmt o v) = [VarDeclStmt o $ optimizeVarDecl v]
 optimizeStmt (AssignStmt l i fd t e) = [AssignStmt l i fd t (optimizeExpr e)]
 optimizeStmt (FunCallStmt f) = [FunCallStmt (optimizeFunCall f)]
 optimizeStmt (ReturnStmt l e) = [ReturnStmt l (optimizeExpr <$> e)]

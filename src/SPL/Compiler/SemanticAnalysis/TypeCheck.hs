@@ -13,17 +13,17 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.List as L
-import Data.Bifunctor ()
+import Data.Bifunctor ( Bifunctor(bimap) )
 import Data.Foldable ( forM_ )
 import Data.Maybe ()
 import Control.Monad.State ( foldM, unless, zipWithM, forM )
 import Control.Applicative ()
-import Control.Lens ( (^.), use, (.=), traversed )
+import Control.Lens ( (^.), use, (.=), traversed, (+=) )
 
 import SPL.Compiler.Common.EntityLocation ( Locatable(getLoc, setLoc) )
 import SPL.Compiler.Common.Error ( definition, throwErr )
 import SPL.Compiler.Common.Misc
-    ( wrapStateT, impossible, inSandboxState )
+    ( wrapStateT, impossible, inSandboxedState )
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
     ( Field,
@@ -33,6 +33,7 @@ import SPL.Compiler.SemanticAnalysis.Core
                CoreFunType, CoreBoolType, CoreVoidType),
       CoreExpr(..),
       CoreStmt(..),
+      Offset,
       CoreFunCall(CoreFunCall),
       CoreFunBody(..),
       CoreIdentifier(CoreIdentifier),
@@ -46,7 +47,7 @@ import SPL.Compiler.SemanticAnalysis.Core
       getSubst,
       idName,
       varDeclType,
-      funId )
+      funId, getLocalVarCounter )
 import SPL.Compiler.SemanticAnalysis.CallGraphAnalysis (reorderAst)
 import SPL.Compiler.SemanticAnalysis.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.Unify
@@ -238,14 +239,28 @@ typeCheckFieldSelector id fields tau = do
 typeCheckStmt :: AST.ASTStmt -> CoreType -> TCMonad CoreStmt
 typeCheckStmt (AST.IfElseStmt loc cond thenStmts elseStmts) tau = do
     cond' <- typeCheckExpr cond (CoreBoolType (getLoc cond))
-    thenStmts' <- mapM (`typeCheckStmt` tau) thenStmts
-    elseStmts' <- mapM (`typeCheckStmt` tau) elseStmts
+    counter <- use getLocalVarCounter
+    thenStmts' <- inSandboxedState getLocalVarCounter counter $ 
+                  mapM (`typeCheckStmt` tau) thenStmts
+    elseStmts' <- inSandboxedState getLocalVarCounter counter $ 
+                  mapM (`typeCheckStmt` tau) elseStmts
     return $ IfElseStmt loc cond' thenStmts' elseStmts'
 
 typeCheckStmt (AST.WhileStmt loc cond bodyStmts) tau = do
     cond' <- typeCheckExpr cond (CoreBoolType (getLoc cond))
-    bodyStmts' <- mapM (`typeCheckStmt` tau) bodyStmts
+    counter <- use getLocalVarCounter
+    bodyStmts' <- inSandboxedState getLocalVarCounter counter $ 
+                  mapM (`typeCheckStmt` tau) bodyStmts
     return $ WhileStmt loc cond' bodyStmts'
+
+typeCheckStmt (AST.VarDeclStmt varDecl) _ = do
+    varDecl'@(CoreVarDecl e t id' s) <- typeCheckVarDecl varDecl
+    addToEnvWithoutGen Local id' t
+
+    offset <- use getLocalVarCounter
+    getLocalVarCounter += 1
+
+    return $ VarDeclStmt offset varDecl'
 
 typeCheckStmt (AST.AssignStmt loc id@(AST.ASTIdentifier idLoc idName) fields expr) tau = do
     resultT <- freshVar (getLoc id) "f"
@@ -284,7 +299,9 @@ typeCheckVarDecl (AST.ASTVarDecl loc tau (AST.ASTIdentifier l i) e) = do
 
 typeCheckFunDecl :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc "main") args tau body) abstractType = do
-    let expectedType = CoreFunType (getLoc abstractType) Nothing (CoreVoidType $ getLoc (getFunRetType abstractType))
+    let expectedType = CoreFunType (getLoc abstractType)
+                                   Nothing
+                                   (CoreVoidType . getLoc . getFunRetType $ abstractType)
     unify expectedType abstractType
 
     body' <- do { b <- typeCheckFunBody body (getFunRetType expectedType);
@@ -313,7 +330,7 @@ typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args 
     case ast2coreType tau of
         Nothing -> pure ()
         Just expectedType -> do
-            inSandboxState getEnv initEnv
+            inSandboxedState getEnv initEnv
                        (do { funScheme <- generalise abstractType;
                              expectedType <=* funScheme } )
 
@@ -331,6 +348,7 @@ typeCheckFunDecl f@(AST.ASTFunDecl loc id@(AST.ASTIdentifier idLoc idName) args 
 sandBoxedTypeCheckFun :: AST.ASTFunDecl -> CoreType -> TCMonad CoreFunDecl
 sandBoxedTypeCheckFun fun funType = do
     envBefore <- use getEnv
+    getLocalVarCounter .= 0
     fun' <- typeCheckFunDecl fun funType
     getEnv .= envBefore
     pure fun'
@@ -364,16 +382,9 @@ typeCheckFunDecls (CyclicSCC funcs) = do
 
 
 typeCheckFunBody :: AST.ASTFunBody -> CoreType -> TCMonad CoreFunBody
-typeCheckFunBody (AST.ASTFunBody loc varDecls stmts) tau = do
-    varDecls' <- mapM typeCheckLocalVarDecl varDecls
+typeCheckFunBody (AST.ASTFunBody loc stmts) tau = do
     stmts' <- mapM (`typeCheckStmt` tau) stmts
-    return $ CoreFunBody loc varDecls' stmts'
-
-typeCheckLocalVarDecl :: AST.ASTVarDecl -> TCMonad CoreVarDecl
-typeCheckLocalVarDecl varDecl@(AST.ASTVarDecl _ _ (AST.ASTIdentifier l id) _) = do
-    varDecl'@(CoreVarDecl _ t id' _) <- typeCheckVarDecl varDecl
-    addToEnvWithoutGen Local id' t
-    return varDecl'
+    return $ CoreFunBody loc stmts'
 
 typeCheckGlobVarDecl :: AST.ASTVarDecl -> TCMonad CoreVarDecl
 typeCheckGlobVarDecl v@(AST.ASTVarDecl _ _ (AST.ASTIdentifier l id) _)  = do

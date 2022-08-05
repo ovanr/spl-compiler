@@ -10,12 +10,14 @@ module SPL.Compiler.SemanticAnalysis.Core
      Scheme(..),
      Subst(..),
      TCMonad,
+     Offset,
      varDeclLoc,
      varDeclType,
      varDeclId,
      varDeclExpr,
      TypeCheckState(..),
      getTvCounter,
+     getLocalVarCounter,
      getSubst,
      getEnv,
      getWarnings,
@@ -81,6 +83,7 @@ newtype TypeEnv = TypeEnv (Map Text (Scope, Scheme)) deriving (Show)
 data TypeCheckState =
     TypeCheckState {
         _getTvCounter :: Integer,
+        _getLocalVarCounter :: Integer,
         _getSubst :: Subst,
         _getEnv :: TypeEnv,
         _getWarnings :: [Text],
@@ -116,7 +119,8 @@ data CoreVarDecl = CoreVarDecl {
 data CoreIdentifier = CoreIdentifier { _idLoc :: EntityLoc, _idName :: Text }
     deriving (Eq, Show)
 
-data CoreFunBody = CoreFunBody EntityLoc [CoreVarDecl] [CoreStmt]
+type Offset = Integer
+data CoreFunBody = CoreFunBody EntityLoc [CoreStmt]
     deriving (Eq, Show)
 
 data CoreFunCall =
@@ -130,6 +134,7 @@ data CoreFunCall =
 data CoreStmt =
         IfElseStmt EntityLoc CoreExpr [CoreStmt] [CoreStmt]
     |   WhileStmt EntityLoc CoreExpr [CoreStmt]
+    |   VarDeclStmt Offset CoreVarDecl
     |   AssignStmt EntityLoc CoreIdentifier CoreType [Field] CoreExpr
     |   FunCallStmt CoreFunCall
     |   ReturnStmt EntityLoc (Maybe CoreExpr)

@@ -8,6 +8,7 @@ import SPL.Compiler.Common.Error (definition, throwErr)
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
 import Data.Graph
+import Data.Either (rights)
 
 returnPathCheck :: Core -> TCMonad ()
 returnPathCheck (Core _ funDecls) =
@@ -17,7 +18,7 @@ returnPathCheck (Core _ funDecls) =
         unSCC (CyclicSCC xs) = xs
 
 returnPathCheck' :: CoreFunDecl -> TCMonad ()
-returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ _ stmts)) = do
+returnPathCheck' f@(CoreFunDecl loc (CoreIdentifier _ name) _ t (CoreFunBody _ stmts)) = do
     if returnsVoid t || guaranteedReturn' stmts then
         return ()
     else do

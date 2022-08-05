@@ -62,12 +62,10 @@ rewriteTConFunDecl (CoreFunDecl lf
                                 ident@(CoreIdentifier _ name)
                                 args
                                 t@(CoreFunType lt argT retT)
-                                (CoreFunBody lb varDecls stmts)) = do
+                                (CoreFunBody lb stmts)) = do
     tcons <- concat . maybeToList . fmap fst . M.lookup name <$> use env
     let extraArgs = map mkArg tcons
     tconArgs .= M.fromList (zip tcons extraArgs)
-
-    varDecls' <- mapM rewriteTConVarDecl varDecls
     stmts' <- mapM rewriteTConStmt stmts
 
     let tconTypes = map mkTConVarType tcons
@@ -76,7 +74,7 @@ rewriteTConFunDecl (CoreFunDecl lf
                        ident
                        (extraArgs ++ args)
                        (foldr (CoreFunType lf) retT (map Just tconTypes ++ [argT]))
-                       (CoreFunBody lb varDecls' stmts')
+                       (CoreFunBody lb stmts')
 rewriteTConFunDecl _ = impossible
 
 rewriteTConVarDecl :: CoreVarDecl -> TConMonad CoreVarDecl
@@ -87,6 +85,7 @@ rewriteTConStmt (IfElseStmt loc e taken ntaken) =
     IfElseStmt loc <$> rewriteTConExpr e <*> mapM rewriteTConStmt taken <*> mapM rewriteTConStmt ntaken
 rewriteTConStmt (WhileStmt loc e taken) =
     WhileStmt loc <$> rewriteTConExpr e <*> mapM rewriteTConStmt taken
+rewriteTConStmt (VarDeclStmt offset varDecl) = VarDeclStmt offset <$> rewriteTConVarDecl varDecl
 rewriteTConStmt (AssignStmt loc id t fds e) = AssignStmt loc id t fds <$> rewriteTConExpr e
 rewriteTConStmt (FunCallStmt funCall) = FunCallStmt <$> rewriteTConFunCall funCall
 rewriteTConStmt stmt@(ReturnStmt _ Nothing) = pure stmt
@@ -160,9 +159,8 @@ rewriteTConFunCall (CoreFunCall loc e t args) =
     CoreFunCall loc <$> rewriteTConExpr e <*> pure t <*> mapM rewriteTConExpr args
 
 gatherTConFunDecl :: CoreFunDecl -> TConMonad ()
-gatherTConFunDecl (CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ varDecls stmts)) = do
+gatherTConFunDecl (CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ stmts)) = do
     newTCon .= mempty
-    mapM_ gatherTConVarDecl varDecls
     mapM_ gatherTConStmt stmts
 
 gatherTConVarDecl :: CoreVarDecl -> TConMonad ()
@@ -223,6 +221,7 @@ gatherTConStmt (IfElseStmt loc e taken ntaken) =
     gatherTConExpr e >> mapM_ gatherTConStmt taken >> mapM_ gatherTConStmt ntaken
 gatherTConStmt (WhileStmt loc e taken) =
     gatherTConExpr e >> mapM_ gatherTConStmt taken
+gatherTConStmt (VarDeclStmt _ v) = gatherTConVarDecl v
 gatherTConStmt (AssignStmt loc id t fds e) = gatherTConExpr e
 gatherTConStmt (FunCallStmt funCall) = gatherTConFunCall funCall
 gatherTConStmt stmt@(ReturnStmt _ Nothing) = pure ()

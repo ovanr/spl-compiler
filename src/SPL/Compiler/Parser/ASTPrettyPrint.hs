@@ -85,6 +85,7 @@ instance PrettyPrint ASTStmt where
         mkIdent n <> "while (" <> toCode n cond <> ") {" <> 
             T.unlines ("": map (toCode (n+1)) body) <> 
         mkIdent n <> "}"
+    toCode n (VarDeclStmt v) = toCode n v
     toCode n (AssignStmt _ id fds expr) = 
         mkIdent n <> toCode n id <> T.intercalate "." (map (toCode n) fds) <> " = " <> toCode n expr <> ";"
     toCode n (FunCallStmt fCall) = mkIdent n <> toCode n fCall <> ";"
@@ -116,11 +117,8 @@ instance PrettyPrint OpBin where
     toCode _ Cons = " : "
 
 instance PrettyPrint ASTFunBody where
-    toCode n (ASTFunBody _ varDecls stmts) = 
-        "{" <> 
-            T.unlines ("": map (toCode n) varDecls) <> 
-            T.unlines (map (toCode n) stmts) <> 
-        "}"
+    toCode n (ASTFunBody _ stmts) = 
+        "{" <> T.unlines ("": map (toCode n) stmts) <> "}"
 
 instance PrettyPrint ASTType where
     toCode n (ASTUnknownType _) = ""

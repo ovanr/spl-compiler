@@ -18,11 +18,11 @@ import Data.Text (Text)
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Set.Ordered (OSet)
-import Data.Bifunctor (second, Bifunctor (first))
-import Control.Monad
+import Data.Bifunctor ( second, Bifunctor(first), Bifunctor(bimap) )
+import Control.Monad ()
 import Control.Lens ((^?), ix, (%~), (<>~), (^.), (.~), use)
-import Control.Monad.State
-import System.Random
+import Control.Monad.State ( MonadState, modify, MonadTrans )
+import System.Random ()
 import Data.Function ((&))
 import qualified Data.Text as T
 import qualified Data.List as L
@@ -30,12 +30,29 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Set.Ordered as SO
 
-import SPL.Compiler.Common.EntityLocation
+import SPL.Compiler.Common.EntityLocation ( Locatable(setLoc) )
 import SPL.Compiler.Common.Error
+    ( definition, throwErr, ContainsSource, Error )
 import SPL.Compiler.SemanticAnalysis.Core
-import SPL.Compiler.SemanticAnalysis.CoreEntityLocation
+    ( getEnv,
+      getSubst,
+      Core(..),
+      CoreExpr(EmptyListExpr, FunIdentifierExpr, FunCallExpr, OpExpr,
+               Op2Expr, TupExpr),
+      CoreFunBody(..),
+      CoreFunCall(CoreFunCall),
+      CoreFunDecl(CoreFunDecl),
+      CoreStmt(..),
+      CoreType(..),
+      CoreVarDecl(CoreVarDecl),
+      Scheme(..),
+      Subst(Subst),
+      TCMonad,
+      TypeEnv(..),
+      TypeVar )
+import SPL.Compiler.SemanticAnalysis.CoreEntityLocation ()
 import Data.Foldable (fold)
-import Data.Graph
+import Data.Graph ( SCC(CyclicSCC, AcyclicSCC) )
 import Data.Maybe (fromMaybe)
 
 class Types a where
@@ -65,7 +82,7 @@ instance Types CoreType where
     s $* (CoreCharType l) = CoreCharType l
     s $* (CoreBoolType l) = CoreBoolType l
     s $* (CoreVoidType l) = CoreVoidType l
-    s@(Subst s') $* v@(CoreVarType l a) = 
+    s@(Subst s') $* v@(CoreVarType l a) =
         if M.member a s' then setLoc l (M.findWithDefault v a s') else v
     s $* (CoreListType l a) = CoreListType l (s $* a)
     s $* (CoreTupleType l a b) = CoreTupleType l (s $* a) (s $* b)
@@ -115,17 +132,19 @@ instance Types CoreFunDecl where
     freeVars (CoreFunDecl _ _ _ t _) = freeVars t
 
 instance Types CoreFunBody where
-    s $* (CoreFunBody loc varDecls stmts) = CoreFunBody loc (map (s $*) varDecls) (map (s $*) stmts)
-    freeVars (CoreFunBody _ varDecl stmts) = freeVars varDecl <> freeVars stmts
+    s $* (CoreFunBody loc stmts) = CoreFunBody loc (map (s $*) stmts)
+    freeVars (CoreFunBody _ stmts) = freeVars stmts
 
 instance Types CoreStmt where
     s $* (IfElseStmt loc e s1 s2) = IfElseStmt loc (s $* e) (s $* s1) (s $* s2)
     s $* (WhileStmt loc e stmt) = WhileStmt loc (s $* e) (s $* stmt)
+    s $* (VarDeclStmt o v) = VarDeclStmt o (s $* v)
     s $* (AssignStmt loc i t fd e) = AssignStmt loc i (s $* t) fd (s $* e)
     s $* (ReturnStmt loc me) = ReturnStmt loc (($*) s <$> me)
     s $* (FunCallStmt f) = FunCallStmt (s $* f)
     freeVars (IfElseStmt _ e s1 s2) = freeVars e <> freeVars s1 <> freeVars s2
     freeVars (WhileStmt _ e stmt) = freeVars e <> freeVars stmt
+    freeVars (VarDeclStmt _ v) = freeVars v
     freeVars (AssignStmt loc i t fd stmt) = freeVars t <> freeVars stmt
     freeVars (ReturnStmt loc me) = maybe mempty freeVars me
     freeVars (FunCallStmt f) = freeVars f

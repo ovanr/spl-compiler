@@ -15,6 +15,7 @@ import Control.Monad.State
 import SPL.Compiler.Parser.AST
 import Control.Applicative (liftA2)
 import Options.Applicative (liftA3)
+import Data.Bifunctor (Bifunctor(bimap))
 
 type CGState a = State [FunName] a
 type FunName = Text
@@ -26,7 +27,7 @@ getFunNames :: [ASTFunDecl] -> [FunName]
 getFunNames = map (\(ASTFunDecl _ (ASTIdentifier _ id) _ _ _) -> id)
 
 astToCallGraph :: AST -> CallGraph
-astToCallGraph (ASTUnordered leaves) = 
+astToCallGraph (ASTUnordered leaves) =
     let funDecls = rights leaves
         state = getFunNames funDecls
     in concatMap (flip evalState state . astFunToCallGraph) funDecls
@@ -34,25 +35,23 @@ astToCallGraph (ASTUnordered leaves) =
 astToCallGraph ASTOrdered{} = error "AST is already reordered"
 
 astFunToCallGraph :: ASTFunDecl -> CGState CallGraph
-astFunToCallGraph f@(ASTFunDecl _ (ASTIdentifier _ id) _ _ (ASTFunBody _ vars stmts)) =
-    pure . (f, id,) <$> 
-        liftA2 (++)
-            (concat <$> mapM funCallInVarDecl vars) 
-            (concat <$> mapM funCallInStmt stmts)
+astFunToCallGraph f@(ASTFunDecl _ (ASTIdentifier _ id) _ _ (ASTFunBody _ stmts)) =
+    pure . (f, id,) . concat <$> mapM funCallInStmt stmts
 
 funCallInVarDecl :: ASTVarDecl -> CGState [FunName]
-funCallInVarDecl (ASTVarDecl _ _ (ASTIdentifier _ id) e) = do 
+funCallInVarDecl (ASTVarDecl _ _ (ASTIdentifier _ id) e) = do
     r <- funCallInExpr e
     modify (filter (/= id))
     pure r
 
 funCallInStmt :: ASTStmt -> CGState [FunName]
 funCallInStmt (IfElseStmt _ e s1 s2) =
-    liftA3 (\a b c -> a ++ b ++ c) 
+    liftA3 (\a b c -> a ++ b ++ c)
         (funCallInExpr e)
-        (concat <$> mapM funCallInStmt s1) 
+        (concat <$> mapM funCallInStmt s1)
         (concat <$> mapM funCallInStmt s2)
 funCallInStmt (WhileStmt _ e s) = liftA2 (++) (funCallInExpr e) (concat <$> mapM funCallInStmt s)
+funCallInStmt (VarDeclStmt v) = funCallInVarDecl v
 funCallInStmt (AssignStmt _ _ _ e) = funCallInExpr e
 funCallInStmt (FunCallStmt f) = funCallInFunCall f
 funCallInStmt (ReturnStmt _ me) = maybe (pure []) funCallInExpr me
@@ -69,7 +68,7 @@ funCallInExpr (TupExpr _ e1 e2) = liftA2 (++) (funCallInExpr e1) (funCallInExpr 
 funCallInExpr _ = pure []
 
 funCallInFunCall :: ASTFunCall -> CGState [FunName]
-funCallInFunCall (ASTFunCall _ e args) = 
+funCallInFunCall (ASTFunCall _ e args) =
     liftA2 (++) (funCallInExpr e) (concat <$> mapM funCallInExpr args)
 
 callGraph2ast :: AST -> CallGraph -> AST

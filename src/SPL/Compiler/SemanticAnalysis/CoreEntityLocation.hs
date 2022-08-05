@@ -46,11 +46,13 @@ instance Locatable CoreExpr where
 instance Locatable CoreStmt where
     setLoc l (IfElseStmt _ c a b) = IfElseStmt l c a b
     setLoc l (WhileStmt _ c b) = WhileStmt l c b
+    setLoc l (VarDeclStmt o v) = VarDeclStmt o (setLoc l v)
     setLoc l (AssignStmt _ i fd t v) = AssignStmt l i fd t v
     setLoc l (FunCallStmt f) = FunCallStmt (setLoc l f)
     setLoc l (ReturnStmt _ r) = ReturnStmt l r
     getLoc (IfElseStmt l _ _ _) = l
     getLoc (WhileStmt l _ _) = l
+    getLoc (VarDeclStmt _ v) = getLoc v
     getLoc (AssignStmt l _ _ _ _) = l
     getLoc (FunCallStmt f) = getLoc f
     getLoc (ReturnStmt l _) = l
@@ -74,5 +76,5 @@ instance Locatable CoreType where
     getLoc (CoreVoidType l) = l
 
 instance Locatable CoreFunBody where
-    setLoc l (CoreFunBody _ v s) = CoreFunBody l v s
-    getLoc (CoreFunBody l _ _) = l
+    setLoc l (CoreFunBody _ s) = CoreFunBody l s
+    getLoc (CoreFunBody l _) = l

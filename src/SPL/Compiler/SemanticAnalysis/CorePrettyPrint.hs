@@ -20,12 +20,17 @@ import Data.Text (Text)
 import Data.Set (Set)
 import qualified Data.Text as T
 import Data.Graph
+import Data.Either.Extra (mapLeft)
 
 mkIdent :: Int -> Text
 mkIdent n = foldl (<>) "" $ replicate n "   "
 
 class PrettyPrint a where
     toCode :: Int -> a -> Text
+
+instance (PrettyPrint a, PrettyPrint b) => PrettyPrint (Either a b) where
+    toCode n (Left a) = toCode n a
+    toCode n (Right b) = toCode n b
 
 instance PrettyPrint Core where
     toCode _ (Core varDecls funDecls) =
@@ -76,17 +81,18 @@ instance PrettyPrint CoreStmt where
         mkIdent n <> "while (" <> toCode n cond <> ") {" <>
             T.unlines ("": map (toCode (n+1)) body) <>
         mkIdent n <> "}"
-    toCode n (AssignStmt _ id t [] expr) = 
+    toCode n (VarDeclStmt _ v) = toCode n v
+    toCode n (AssignStmt _ id t [] expr) =
         mkIdent n <> toCode n id <> " = " <> toCode n expr <> ";"
-    toCode n (AssignStmt _ id t fd expr) = 
+    toCode n (AssignStmt _ id t fd expr) =
         mkIdent n <> toCode n id <> "." <>  T.intercalate "." (map (toCode n) fd) <> " = " <> toCode n expr <> ";"
     toCode n (FunCallStmt fCall) = mkIdent n <> toCode n fCall <> ";"
     toCode n (ReturnStmt _ Nothing) = mkIdent n <> "return;"
     toCode n (ReturnStmt _ (Just expr)) = mkIdent n <> "return " <> toCode n expr <> ";"
 
 instance PrettyPrint CoreFunCall where
-    toCode n (CoreFunCall _ id t args) = 
-        toCode n id <> 
+    toCode n (CoreFunCall _ id t args) =
+        toCode n id <>
         "(" <> T.intercalate "," (map (toCode n) args) <> ")"
 
 instance PrettyPrint OpUnary where
@@ -111,11 +117,8 @@ instance PrettyPrint OpBin where
     toCode _ Cons = " : "
 
 instance PrettyPrint CoreFunBody where
-    toCode n (CoreFunBody _ vars stmts) =
-        "{" <>
-            T.unlines ("": map (toCode n) vars) <>
-            T.unlines (map (toCode n) stmts) <>
-        "}"
+    toCode n (CoreFunBody _ stmts) =
+        "{" <> T.unlines ("": map (toCode n) stmts) <> "}"
 
 instance PrettyPrint CoreType where
     toCode n = T.pack . show

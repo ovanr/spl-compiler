@@ -15,13 +15,14 @@ import Control.Lens
 
 import SPL.Compiler.Common.EntityLocation
 import SPL.Compiler.Common.Error
-import SPL.Compiler.Common.Misc (wrapStateT, inSandboxState)
+import SPL.Compiler.Common.Misc (wrapStateT, inSandboxedState)
 import qualified SPL.Compiler.Parser.AST as AST
 import SPL.Compiler.SemanticAnalysis.Core
 import SPL.Compiler.SemanticAnalysis.Env (initGamma)
 import SPL.Compiler.SemanticAnalysis.BindingTimeAnalysis (duplicateDefError, assignToBuiltInError)
 import SPL.Compiler.SemanticAnalysis.Unify
 import Data.Foldable (toList)
+import Data.Either (rights)
 
 ast2coreType :: AST.ASTType -> Maybe CoreType
 ast2coreType (AST.ASTUnknownType loc) = Nothing
@@ -42,7 +43,7 @@ getFunRetType r = r
 
 sanitize :: CoreType -> TCMonad (CoreType, Subst)
 sanitize t = do
-    scheme <- inSandboxState getEnv mempty (generalise t)
+    scheme <- inSandboxedState getEnv mempty (generalise t)
     instantiate scheme
 
 instantiate :: Scheme -> TCMonad (CoreType, Subst)
@@ -162,7 +163,7 @@ addToEnvWithoutGen :: Scope -> CoreIdentifier -> CoreType -> TCMonad ()
 addToEnvWithoutGen scope id@(CoreIdentifier _ idName) idType = do
     checkNotInGamma scope id
     getEnv %= (\(TypeEnv env) -> TypeEnv $
-                M.insert idName (scope, liftToScheme idType) env)
+        M.insert idName (scope, liftToScheme idType) env)
 
 addToEnv :: Scope -> CoreIdentifier -> Scheme -> TCMonad ()
 addToEnv scope id@(CoreIdentifier _ idName) scheme = do
@@ -175,7 +176,7 @@ addArgsToEnv args = do
     mapM_ (\(t, id) -> addToEnv Arg id (liftToScheme t)) args
 
 adjustForMissingReturn :: CoreType -> CoreFunBody -> TCMonad CoreFunBody
-adjustForMissingReturn t body@(CoreFunBody l varDecls stmts) =
+adjustForMissingReturn t body@(CoreFunBody l stmts) =
     if not $ any isReturn stmts then do
         subst <- use getSubst
         let retType = getFunRetType (subst $* t)
@@ -183,7 +184,7 @@ adjustForMissingReturn t body@(CoreFunBody l varDecls stmts) =
             (CoreVarType l' v) -> addSubst v (CoreVoidType l')
             _ -> pure ()
 
-        return $ CoreFunBody l varDecls (stmts ++ [ReturnStmt l Nothing])
+        return $ CoreFunBody l (stmts ++ [ReturnStmt l Nothing])
     else
         pure body
 

@@ -147,15 +147,6 @@ extractArgsVars (CoreFunDecl _ _ args _ _) = extractArgsVars' (-2) args
         extractArgsVars' offset (CoreIdentifier _ id:xs) =
             SSMVar id (Just (Address MP offset)) Arg : extractArgsVars' (offset - 1) xs
 
-extractLocalVars :: CoreFunDecl -> [SSMVar]
-extractLocalVars (CoreFunDecl _ _ _ _ (CoreFunBody _ varDecls _)) =
-    extractLocalVars' 1 varDecls
-    where
-        extractLocalVars' :: Int -> [CoreVarDecl] -> [SSMVar]
-        extractLocalVars' offset [] = []
-        extractLocalVars' offset (CoreVarDecl _ _ (CoreIdentifier _ id) _: xs) =
-            SSMVar id (Just (Address MP offset)) Local : extractLocalVars' (offset + 1) xs
-
 annotate :: SSMVar -> SSMMonad ()
 annotate (SSMVar _ Nothing _) = pure ()
 annotate (SSMVar id (Just (Address reg offset)) varType) = do

@@ -45,7 +45,7 @@ resolveOverloading' path source core = do
 
 performSemanticAnalysis :: Bool -> AST -> FilePath -> [Text] -> ExceptT Text IO Core
 performSemanticAnalysis noOptimization ast path source = do
-    let tcState = TypeCheckState 0 mempty mempty mempty path source
+    let tcState = TypeCheckState 0 0 mempty mempty mempty path source
     let typeCheck = detectDuplicateFunctionNames ast >> 
                     globalVarConstantCheck ast >> 
                     typeCheckToCore ast >>=

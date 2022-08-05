@@ -12,7 +12,7 @@ import SPL.Compiler.SSM.SSMGenLib
 import SPL.Compiler.SSM.SSMRuntime
 import qualified SPL.Compiler.SSM.SSMGenLib as SSM
 import SPL.Compiler.SemanticAnalysis.Core
-import SPL.Compiler.Common.Misc (impossible, intercalateM, inSandboxState)
+import SPL.Compiler.Common.Misc (impossible, intercalateM, inSandboxedState)
 import Data.Graph (SCC (..))
 import Control.Lens (use, traversed, _tail, (%~))
 import Control.Lens.Combinators (view)
@@ -20,6 +20,7 @@ import Data.Map (Map)
 import Data.Maybe (fromJust)
 import Control.Lens.Getter ((^.))
 import Control.Monad (when)
+import Data.List (genericLength)
 
 -- default (Num a) constraints to Num Int when ambiguous from context 
 -- default (OpArgument a) constraints to OpArgument Text when ambiguous from context 
@@ -114,6 +115,12 @@ coreExprToSSM (TupExpr loc e1 e2) = do
     coreExprToSSM e1
     SSM.stmh 2
 
+countVarDecl :: Integral a => [CoreStmt] -> a
+countVarDecl = genericLength . filter isVarDecl 
+    where
+        isVarDecl (VarDeclStmt _ _) = True
+        isVarDecl _ = False
+
 coreStmtToSSM :: CoreStmt -> SSMMonad ()
 coreStmtToSSM (IfElseStmt _ e taken ntaken) = do
     ifelse <- newLabel "if_else"
@@ -121,9 +128,11 @@ coreStmtToSSM (IfElseStmt _ e taken ntaken) = do
     coreExprToSSM e
     SSM.brf ifelse
     mapM_ coreStmtToSSM taken
+    SSM.ajs (-(countVarDecl taken))
     SSM.bra ifend
     newBlock ifelse
     mapM_ coreStmtToSSM ntaken
+    SSM.ajs (-(countVarDecl ntaken))
     newBlock ifend
     SSM.nop
 coreStmtToSSM (WhileStmt _ e stmts) = do
@@ -133,9 +142,15 @@ coreStmtToSSM (WhileStmt _ e stmts) = do
     coreExprToSSM e
     SSM.brf end
     mapM_ coreStmtToSSM stmts
+    SSM.ajs (-(countVarDecl stmts))
     SSM.bra start
     newBlock end
     SSM.nop
+coreStmtToSSM (VarDeclStmt offset varDecl@(CoreVarDecl _ _ (CoreIdentifier _ id) e)) = do
+    coreExprToSSM e
+    let addr = Address MP (fromIntegral $ offset + 1)
+    addVar $ SSMVar id (Just addr) SSM.Local
+
 coreStmtToSSM (AssignStmt _ (CoreIdentifier _ id) _ fields e) = do
     coreExprToSSM e
     var <- getVar id
@@ -172,33 +187,30 @@ coreStmtToSSM (ReturnStmt _ (Just e)) = do
     SSM.str RR
     removeStackFrame
 
-coreVarDeclToSSM :: CoreVarDecl -> SSMMonad ()
-coreVarDeclToSSM (CoreVarDecl _ _ (CoreIdentifier _ id) e) = do
+coreGlobalVarDeclToSSM :: CoreVarDecl -> SSMMonad ()
+coreGlobalVarDeclToSSM (CoreVarDecl _ _ (CoreIdentifier _ id) e) = do
     coreExprToSSM e
     var <- getVar id
     loadVarAddrToTopStack var
     SSM.sta 0
 
 coreFunDeclToSSM :: CoreFunDecl -> SSMMonad ()
-coreFunDeclToSSM fun@(CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ varDecls stmts)) = do
+coreFunDeclToSSM fun@(CoreFunDecl _ (CoreIdentifier _ id) _ _ (CoreFunBody _ stmts)) = do
     newBlock id
     SSM.nop
     let argVars = extractArgsVars fun
     mapM_ addVar argVars
-    let locVars = extractLocalVars fun
-    SSM.link (length locVars)
-    mapM_ addVar locVars
-    mapM_ coreVarDeclToSSM varDecls
+    SSM.link 0 
     mapM_ coreStmtToSSM stmts
     
 coreFunDeclsToSSM :: SCC CoreFunDecl -> SSMMonad ()
 coreFunDeclsToSSM (AcyclicSCC fun) = do 
     initialEnv <- use vars
-    inSandboxState vars initialEnv (coreFunDeclToSSM fun)
+    inSandboxedState vars initialEnv (coreFunDeclToSSM fun)
 coreFunDeclsToSSM (CyclicSCC funs) = do
     forM_ funs $ \fun -> do
         initialEnv <- use vars
-        inSandboxState vars initialEnv (coreFunDeclToSSM fun)
+        inSandboxedState vars initialEnv (coreFunDeclToSSM fun)
 
 declareGlobalVars :: [CoreVarDecl] -> SSMMonad ()
 declareGlobalVars varDecls = addVar voidVar >> declareGlobalVars' 1 varDecls
@@ -223,7 +235,7 @@ coreToSSM (Core varDecls funDecls) = do
     SSM.ldr HP
     SSM.add
     SSM.str HP
-    mapM_ coreVarDeclToSSM varDecls
+    mapM_ coreGlobalVarDeclToSSM varDecls
     when hasMain $ 
         SSM.bsr "main"
     SSM.halt

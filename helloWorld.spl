@@ -1,5 +1,9 @@
 
 
 main () {
-    print("Hello World");
+    /* print("Hello World"); */
+    var x = 2;
+    while (x == 2) {
+        var y = x;
+    }
 }
