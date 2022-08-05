@@ -1,6 +1,6 @@
 # spl-compiler
 
-See the `language_report.pdf` file for a detailed description of the language and the compiler.
+See the [Language Report](https://github.com/ovanr/spl-compiler/raw/main/language_report.pdf) for a detailed description of the language and the compiler.
 
 ## Installation
 
